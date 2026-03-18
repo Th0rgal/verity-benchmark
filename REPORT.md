@@ -8,7 +8,7 @@ This report is generated from the benchmark manifests.
 - Implementations: 6
 - Active cases: 4
 - Buildable active cases: 4
-- Active tasks: 11
+- Active tasks: 12
 - Backlog cases: 2
 
 ## Buildable active cases
@@ -128,6 +128,14 @@ This report is generated from the benchmark manifests.
 - Statement id: `claimUsdc_marks_claimed_spec`
 - Evaluation: engine=`lean_build`, target_kind=`spec`, target=`Benchmark.Cases.PaladinVotes.StreamRecoveryClaimUsdc.Specs`, declaration=`claimUsdc_marks_claimed_spec`
 - Spec target: `Benchmark.Cases.PaladinVotes.StreamRecoveryClaimUsdc.Specs`
+
+### `paladin_votes/stream_recovery_claim_usdc/claimed_plus_allocated_conserved`
+- Track / property class: `proof-only` / `accounting_conservation`
+- Readiness: translation=`ready`, spec=`ready`, proof=`ready`, evaluation=`ready`
+- Statement id: `claimUsdc_claimed_plus_allocated_conserved`
+- Evaluation: engine=`lean_build`, target_kind=`proof`, target=`Benchmark.Cases.PaladinVotes.StreamRecoveryClaimUsdc.Proofs`, declaration=`claimUsdc_claimed_plus_allocated_conserved`
+- Spec target: `Benchmark.Cases.PaladinVotes.StreamRecoveryClaimUsdc.Specs`
+- Proof target: `Benchmark.Cases.PaladinVotes.StreamRecoveryClaimUsdc.Proofs`
 
 ### `paladin_votes/stream_recovery_claim_usdc/no_overclaim`
 - Track / property class: `proof-only` / `accounting_bound`

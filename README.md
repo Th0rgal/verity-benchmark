@@ -8,7 +8,7 @@ This repository pins:
 
 Current status:
 - Active `cases/`: 4 concrete benchmark cases
-- Active `tasks/`: 11 concrete benchmark tasks
+- Active `tasks/`: 12 concrete benchmark tasks
 - Buildable active cases: 4
 - Non-buildable active cases: 0
 - `backlog/`: placeholder intake entries kept visible without polluting the active suite
@@ -36,8 +36,9 @@ Design choices:
 - Families and implementations are tracked explicitly so source provenance stays stable even as case slices evolve
 - Each task declares its own evaluation contract instead of relying on runner inference
 - Pinned `source_ref` values are the reproducibility unit; local paths are supporting metadata
+- Tasks can target either a spec declaration or an explicit proof module/declaration
 - One selected contract per project unless scope is still ambiguous
-- Frozen specs today, proof targets later; manifest fields already distinguish translation, spec, and proof readiness
+- The active suite is still mostly spec-oriented, but proof manifests now support and exercise explicit proof targets
 - `case.yaml` plus `tasks/*.yaml` are the source of truth for benchmark state
 - Stages are intentionally small: `candidate`, `scoped`, `build_green`, `proof_partial`, `proof_complete`
 - `build_green` means the Verity slice typechecks today; it does not mean the case is fully proved

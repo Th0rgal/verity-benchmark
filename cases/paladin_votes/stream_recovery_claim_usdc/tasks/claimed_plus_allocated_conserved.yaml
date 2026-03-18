@@ -1,0 +1,34 @@
+manifest_kind: task
+schema_version: 1
+task_id: claimed_plus_allocated_conserved
+case_id: paladin_votes/stream_recovery_claim_usdc
+split: active
+family_id: paladin_votes
+implementation_id: stream_recovery_claim
+source_ref: https://github.com/Figu3/sonic-earn-recovery-system@699cbbc79def374cab9739e451acbbf866293d12:src/StreamRecoveryClaim.sol
+task_interface_version: 1
+statement_id: claimUsdc_claimed_plus_allocated_conserved
+property_class: accounting_conservation
+difficulty: medium
+category: accounting
+track: proof-only
+translation_status: translated
+spec_status: frozen
+proof_status: partial
+spec_target: Benchmark.Cases.PaladinVotes.StreamRecoveryClaimUsdc.Specs
+proof_target: Benchmark.Cases.PaladinVotes.StreamRecoveryClaimUsdc.Proofs
+evaluation_engine: lean_build
+evaluation_target_kind: proof
+evaluation_target: Benchmark.Cases.PaladinVotes.StreamRecoveryClaimUsdc.Proofs
+evaluation_declaration: claimUsdc_claimed_plus_allocated_conserved
+allowed_files:
+  - cases/paladin_votes/stream_recovery_claim_usdc/tasks/claimed_plus_allocated_conserved.yaml
+  - cases/paladin_votes/stream_recovery_claim_usdc/verity/Specs.lean
+  - Benchmark/Cases/PaladinVotes/StreamRecoveryClaimUsdc/Specs.lean
+  - Benchmark/Cases/PaladinVotes/StreamRecoveryClaimUsdc/Proofs.lean
+abstraction_level: protocol_slice
+abstraction_notes: >
+  This task composes the claim path's two accounting updates into a single
+  conservation theorem: claimed USDC increases by exactly the amount removed
+  from total allocated USDC in the benchmark's single-round slice.
+unsupported_feature_codes: []

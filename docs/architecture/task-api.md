@@ -43,6 +43,11 @@ This removes hidden execution semantics from runner conventions. A task can stil
 provenance with its parent case, but it no longer relies on the runner to guess the
 evaluation contract.
 
+The current suite is still transitioning. Most tasks target frozen spec declarations,
+but the architecture now also supports explicit proof modules and proof declarations as
+first-class task targets. That is the direction of travel for proof-centric benchmark
+expansion.
+
 ## Case vs Task vs Source Snapshot
 
 - `case` is the curation and abstraction boundary. It records selected functions,

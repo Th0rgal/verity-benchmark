@@ -14,10 +14,10 @@
     "implementation_count": 6,
     "active_case_count": 4,
     "backlog_case_count": 2,
-    "active_task_count": 11,
+    "active_task_count": 12,
     "backlog_task_count": 0,
     "buildable_case_count": 4,
-    "runnable_task_count": 11,
+    "runnable_task_count": 12,
     "case_stage_counts": {
       "build_green": 4,
       "candidate": 2
@@ -35,10 +35,11 @@
       "not_started": 4
     },
     "task_track_counts": {
-      "proof-only": 11
+      "proof-only": 12
     },
     "task_property_class_counts": {
       "accounting_bound": 1,
+      "accounting_conservation": 1,
       "authorization_state": 1,
       "mapping_consistency": 1,
       "monotonic_counter": 1,
@@ -421,7 +422,7 @@
       "abstraction_notes": "The benchmark fixes focus on the single-round claim path and abstracts Merkle verification plus token transfer effects into a simpler state-only model.",
       "unsupported_feature_codes": [],
       "spec_target": "Benchmark.Cases.PaladinVotes.StreamRecoveryClaimUsdc.Specs",
-      "proof_target": "Benchmark.Cases.PaladinVotes.StreamRecoveryClaimUsdc.Specs"
+      "proof_target": "Benchmark.Cases.PaladinVotes.StreamRecoveryClaimUsdc.Proofs"
     }
   ],
   "backlog": [
@@ -924,6 +925,50 @@
       }
     },
     {
+      "task_ref": "paladin_votes/stream_recovery_claim_usdc/claimed_plus_allocated_conserved",
+      "task_id": "claimed_plus_allocated_conserved",
+      "case_id": "paladin_votes/stream_recovery_claim_usdc",
+      "suite": "active",
+      "schema_version": 1,
+      "manifest_path": "cases/paladin_votes/stream_recovery_claim_usdc/tasks/claimed_plus_allocated_conserved.yaml",
+      "split": "active",
+      "family_id": "paladin_votes",
+      "implementation_id": "stream_recovery_claim",
+      "source_ref": "https://github.com/Figu3/sonic-earn-recovery-system@699cbbc79def374cab9739e451acbbf866293d12:src/StreamRecoveryClaim.sol",
+      "task_interface_version": 1,
+      "track": "proof-only",
+      "property_class": "accounting_conservation",
+      "category": "accounting",
+      "difficulty": "medium",
+      "statement_id": "claimUsdc_claimed_plus_allocated_conserved",
+      "translation_status": "translated",
+      "spec_status": "frozen",
+      "proof_status": "partial",
+      "allowed_files": [
+        "cases/paladin_votes/stream_recovery_claim_usdc/tasks/claimed_plus_allocated_conserved.yaml",
+        "cases/paladin_votes/stream_recovery_claim_usdc/verity/Specs.lean",
+        "Benchmark/Cases/PaladinVotes/StreamRecoveryClaimUsdc/Specs.lean",
+        "Benchmark/Cases/PaladinVotes/StreamRecoveryClaimUsdc/Proofs.lean"
+      ],
+      "abstraction_level": "protocol_slice",
+      "abstraction_notes": "This task composes the claim path's two accounting updates into a single conservation theorem: claimed USDC increases by exactly the amount removed from total allocated USDC in the benchmark's single-round slice.",
+      "unsupported_feature_codes": [],
+      "spec_target": "Benchmark.Cases.PaladinVotes.StreamRecoveryClaimUsdc.Specs",
+      "proof_target": "Benchmark.Cases.PaladinVotes.StreamRecoveryClaimUsdc.Proofs",
+      "evaluation": {
+        "engine": "lean_build",
+        "target_kind": "proof",
+        "target": "Benchmark.Cases.PaladinVotes.StreamRecoveryClaimUsdc.Proofs",
+        "declaration": "claimUsdc_claimed_plus_allocated_conserved"
+      },
+      "readiness": {
+        "translation": "ready",
+        "spec": "ready",
+        "proof": "ready",
+        "evaluation": "ready"
+      }
+    },
+    {
       "task_ref": "paladin_votes/stream_recovery_claim_usdc/no_overclaim",
       "task_id": "no_overclaim",
       "case_id": "paladin_votes/stream_recovery_claim_usdc",
@@ -967,5 +1012,5 @@
     }
   ],
   "backlog_tasks": [],
-  "generated_at": "2026-03-18T16:04:22.229500+00:00"
+  "generated_at": "2026-03-18T16:31:22.129405+00:00"
 }

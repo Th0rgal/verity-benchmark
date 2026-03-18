@@ -30,7 +30,7 @@ abstraction_notes: >
   verification plus token transfer effects into a simpler state-only model.
 unsupported_feature_codes: []
 spec_target: Benchmark.Cases.PaladinVotes.StreamRecoveryClaimUsdc.Specs
-proof_target: Benchmark.Cases.PaladinVotes.StreamRecoveryClaimUsdc.Specs
+proof_target: Benchmark.Cases.PaladinVotes.StreamRecoveryClaimUsdc.Proofs
 notes: >
   Single-round accounting slice of the USDC claim path. Merkle verification is
   abstracted as a boolean witness and token transfer side effects are omitted.
