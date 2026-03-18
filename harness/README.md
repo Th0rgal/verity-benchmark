@@ -14,6 +14,26 @@ Supported evaluation layers:
 
 The shell entrypoints in `scripts/` delegate to `harness/task_runner.py`.
 
+The default benchmark agent now has its own explicit entrypoint:
+
+- `scripts/run_default_agent.sh <task_ref>` invokes `harness/default_agent.py`
+- the agent contract is configured by `harness/default-agent.example.json`
+- the current adapter is `openai_compatible`
+- credentials and endpoint selection are injected through env vars instead of being hard-coded
+
+Default OpenAI-compatible env contract:
+
+- `VERITY_BENCHMARK_AGENT_BASE_URL`
+- `VERITY_BENCHMARK_AGENT_MODEL`
+- `VERITY_BENCHMARK_AGENT_API_KEY`
+
+Useful commands:
+
+- `python3 harness/default_agent.py validate-config harness/default-agent.example.json`
+- `python3 harness/default_agent.py describe --config harness/default-agent.example.json`
+- `python3 harness/default_agent.py prompt ethereum/deposit_contract_minimal/deposit_count --config harness/default-agent.example.json`
+- `./scripts/run_default_agent.sh ethereum/deposit_contract_minimal/deposit_count`
+
 Supported task manifest interface fields:
 
 - `source_ref`: pinned upstream source reference for reproducibility

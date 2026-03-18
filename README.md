@@ -28,6 +28,7 @@ Repository layout:
 - `scripts/run_task.sh`: agent entrypoint for one benchmark task
 - `scripts/run_case.sh`: agent entrypoint for one case
 - `scripts/run_all.sh`: agent entrypoint for all active tasks
+- `scripts/run_default_agent.sh`: explicit default-agent entrypoint for one task
 - `scripts/check.sh`: repo-level metadata and benchmark check
 - `docs/architecture/task-api.md`: benchmark architecture note for case/task/source roles
 
@@ -70,6 +71,15 @@ Run one task:
 
 ```bash
 ./scripts/run_task.sh ethereum/deposit_contract_minimal/deposit_count
+```
+
+Run the default benchmark agent for one task:
+
+```bash
+export VERITY_BENCHMARK_AGENT_BASE_URL="https://agent-backend.thomas.md/v1"
+export VERITY_BENCHMARK_AGENT_MODEL="builtin/fast"
+export VERITY_BENCHMARK_AGENT_API_KEY="<redacted>"
+./scripts/run_default_agent.sh ethereum/deposit_contract_minimal/deposit_count
 ```
 
 Run all active tasks:

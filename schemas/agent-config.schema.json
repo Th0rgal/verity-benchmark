@@ -1,0 +1,66 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://verity-benchmark.local/schemas/agent-config.schema.json",
+  "title": "Default Benchmark Agent Config",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "adapter",
+    "base_url",
+    "base_url_env",
+    "model",
+    "model_env",
+    "api_key_env",
+    "chat_completions_path",
+    "system_prompt_files",
+    "temperature",
+    "max_completion_tokens",
+    "headers"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": 1
+    },
+    "adapter": {
+      "enum": ["openai_compatible"]
+    },
+    "base_url": {
+      "type": ["string", "null"]
+    },
+    "base_url_env": {
+      "type": "string"
+    },
+    "model": {
+      "type": ["string", "null"]
+    },
+    "model_env": {
+      "type": "string"
+    },
+    "api_key_env": {
+      "type": "string"
+    },
+    "chat_completions_path": {
+      "type": "string"
+    },
+    "system_prompt_files": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "minItems": 1
+    },
+    "temperature": {
+      "type": "number"
+    },
+    "max_completion_tokens": {
+      "type": "integer"
+    },
+    "headers": {
+      "type": "object",
+      "additionalProperties": {
+        "type": "string"
+      }
+    }
+  }
+}
