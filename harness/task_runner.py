@@ -6,6 +6,7 @@ import json
 import subprocess
 import sys
 import time
+import tempfile
 from collections import Counter, defaultdict
 from datetime import datetime, timezone
 from pathlib import Path
@@ -169,6 +170,34 @@ def run_command(command: list[str]) -> tuple[int, str]:
     )
     output = (completed.stdout + completed.stderr).strip()
     return completed.returncode, output
+
+
+def declaration_exists(module_name: str, declaration_name: str) -> tuple[bool, str]:
+    candidates = [declaration_name]
+    qualified_name = f"{module_name}.{declaration_name}"
+    if declaration_name != qualified_name:
+        candidates.append(qualified_name)
+    if "." in module_name:
+        namespace_name = module_name.rsplit(".", 1)[0]
+        namespaced_decl = f"{namespace_name}.{declaration_name}"
+        if namespaced_decl not in candidates:
+            candidates.append(namespaced_decl)
+
+    with tempfile.TemporaryDirectory(prefix="verity-benchmark-check-") as tmp_dir:
+        check_path = Path(tmp_dir) / "Check.lean"
+        last_output = ""
+        for candidate in candidates:
+            check_path.write_text(
+                f"import {module_name}\n#check {candidate}\n",
+                encoding="utf-8",
+            )
+            code, output = run_command(["lake", "env", "lean", str(check_path)])
+            if code == 0:
+                return True, output
+            last_output = output
+    return False, last_output
+
+
 def select_primary_target(task: dict[str, Any]) -> tuple[str | None, str | None, str | None]:
     targets = task["targets"]
     readiness = task["readiness"]
@@ -200,13 +229,31 @@ def execute_task(task_ref: str) -> tuple[int, Path]:
     elif selected_kind == "proof":
         command = ["lake", "build", selected_target]
         code, execution_output = run_command(command)
-        execution_status = "passed" if code == 0 else "failed"
+        if code == 0 and selected_decl:
+            exists, decl_output = declaration_exists(selected_target, selected_decl)
+            if exists:
+                execution_status = "passed"
+            else:
+                execution_status = "failed"
+                failure_mode = "proof_declaration_missing"
+                execution_output = "\n".join(filter(None, [execution_output, decl_output]))
+        else:
+            execution_status = "passed" if code == 0 else "failed"
         if code != 0:
             failure_mode = "proof_target_check_failed"
     elif selected_kind == "spec":
         command = ["lake", "build", selected_target]
         code, execution_output = run_command(command)
-        execution_status = "passed" if code == 0 else "failed"
+        if code == 0 and selected_decl:
+            exists, decl_output = declaration_exists(selected_target, selected_decl)
+            if exists:
+                execution_status = "passed"
+            else:
+                execution_status = "failed"
+                failure_mode = "spec_declaration_missing"
+                execution_output = "\n".join(filter(None, [execution_output, decl_output]))
+        else:
+            execution_status = "passed" if code == 0 else "failed"
         if code != 0:
             failure_mode = "spec_target_check_failed"
     elif selected_kind == "translation":
@@ -269,14 +316,30 @@ def execute_task(task_ref: str) -> tuple[int, Path]:
     return (1 if execution_status == "failed" else 0), result_path
 
 
-def aggregate_results(task_refs: list[str]) -> dict[str, Any]:
+def load_case_records_for_suite(suite: str) -> list[dict[str, Any]]:
+    roots = []
+    if suite in {"active", "all"}:
+        roots.append(ROOT / "cases")
+    if suite in {"backlog", "all"}:
+        roots.append(ROOT / "backlog")
+
+    records = []
+    for root in roots:
+        if not root.exists():
+            continue
+        for case_manifest in sorted(root.glob("*/*/case.yaml")):
+            records.append(load_case_record(case_manifest))
+    return records
+
+
+def aggregate_results(task_refs: list[str], suite: str) -> dict[str, Any]:
     results = []
     for task_ref in task_refs:
         path = TASK_RESULTS_DIR / f"{task_ref.replace('/', '__')}.json"
         if path.exists():
             results.append(json.loads(path.read_text(encoding="utf-8")))
 
-    status_counts = Counter(item["status"] for item in results)
+    task_status_counts = Counter(item["status"] for item in results)
     failure_mode_counts = Counter(item["failure_mode"] for item in results if item["failure_mode"])
     by_track: dict[str, Counter[str]] = defaultdict(Counter)
     by_property_class: dict[str, Counter[str]] = defaultdict(Counter)
@@ -294,20 +357,32 @@ def aggregate_results(task_refs: list[str]) -> dict[str, Any]:
         )
 
     case_rows = []
-    for case_id, case_results in sorted(by_case.items()):
+    for case_record in load_case_records_for_suite(suite):
+        case_id = case_record["case_id"]
+        case_results = by_case.get(case_id, [])
         statuses = [entry["status"] for entry in case_results]
-        if any(status == "failed" for status in statuses):
-            case_status = "failed"
-        elif any(status == "passed" for status in statuses):
-            case_status = "passed"
+        if statuses:
+            if any(status == "failed" for status in statuses):
+                case_status = "failed"
+            elif any(status == "passed" for status in statuses):
+                case_status = "passed"
+            else:
+                case_status = "not_runnable"
+            case_status_counts = dict(sorted(Counter(statuses).items()))
         else:
             case_status = "not_runnable"
+            case_status_counts = {}
+
         case_rows.append(
             {
                 "case_id": case_id,
+                "suite": case_record["suite"],
+                "stage": case_record["stage"],
+                "lean_target": case_record["lean_target"],
+                "failure_reason": case_record["failure_reason"],
                 "status": case_status,
                 "task_count": len(case_results),
-                "status_counts": dict(sorted(Counter(statuses).items())),
+                "status_counts": case_status_counts,
             }
         )
 
@@ -316,7 +391,7 @@ def aggregate_results(task_refs: list[str]) -> dict[str, Any]:
         "schema_version": 1,
         "unit": "task",
         "total_tasks": len(results),
-        "status_counts": dict(sorted(status_counts.items())),
+        "status_counts": dict(sorted(task_status_counts.items())),
         "failure_mode_counts": dict(sorted(failure_mode_counts.items())),
         "track_status_counts": {
             key: dict(sorted(value.items()))
@@ -351,7 +426,8 @@ def main() -> int:
     run_parser.add_argument("task_ref")
 
     aggregate_parser = subparsers.add_parser("aggregate", help="Aggregate existing task results")
-    aggregate_parser.add_argument("task_refs", nargs="+")
+    aggregate_parser.add_argument("--suite", choices=["active", "backlog", "all"], default="active")
+    aggregate_parser.add_argument("task_refs", nargs="*")
 
     args = parser.parse_args()
 
@@ -366,7 +442,7 @@ def main() -> int:
         return code
 
     RESULTS_DIR.mkdir(parents=True, exist_ok=True)
-    aggregated = aggregate_results(args.task_refs)
+    aggregated = aggregate_results(args.task_refs, args.suite)
     (RESULTS_DIR / "summary.json").write_text(
         json.dumps(aggregated["task_summary"], indent=2) + "\n",
         encoding="utf-8",

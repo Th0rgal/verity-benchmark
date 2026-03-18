@@ -123,14 +123,15 @@ def load_case_manifest(path: Path, suite: str) -> dict:
 def load_task_manifest(path: Path, suite: str) -> dict:
     data = load_manifest_data(path)
     case_dir = path.parent.parent
+    case_entry = load_case_manifest(case_dir / "case.yaml", suite)
     project = case_dir.parent.name
     case_name = case_dir.name
     task_id = normalize_optional_string(data.get("task_id")) or path.stem
     spec_target = normalize_optional_string(data.get("spec_target"))
     proof_target = normalize_optional_string(data.get("proof_target"))
-    translation_status = normalize_optional_string(data.get("translation_status")) or "not_started"
-    spec_status = normalize_optional_string(data.get("spec_status")) or "not_started"
-    proof_status = normalize_optional_string(data.get("proof_status")) or "not_started"
+    translation_status = normalize_optional_string(data.get("translation_status")) or case_entry["translation_status"]
+    spec_status = normalize_optional_string(data.get("spec_status")) or case_entry["spec_status"]
+    proof_status = normalize_optional_string(data.get("proof_status")) or case_entry["proof_status"]
 
     entry = {
         "task_ref": f"{project}/{case_name}/{task_id}",
@@ -159,7 +160,13 @@ def load_task_manifest(path: Path, suite: str) -> dict:
         "spec_target": spec_target,
         "proof_target": proof_target,
         "readiness": {
-            "translation": "ready" if translation_status in RUNNABLE_TRANSLATION_STATUSES else "blocked",
+            "translation": (
+                "ready"
+                if case_entry["lean_target"]
+                and case_entry["stage"] in BUILDABLE_STAGES
+                and translation_status in RUNNABLE_TRANSLATION_STATUSES
+                else "blocked"
+            ),
             "spec": "ready" if spec_target and spec_status in RUNNABLE_SPEC_STATUSES else "planned",
             "proof": "ready" if proof_target and proof_status in RUNNABLE_PROOF_STATUSES else "planned",
         },

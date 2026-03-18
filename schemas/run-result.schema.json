@@ -7,12 +7,17 @@
   "required": [
     "benchmark",
     "schema_version",
+    "unit",
     "run_id",
     "task_id",
     "task_ref",
     "case_id",
     "suite",
     "track",
+    "property_class",
+    "category",
+    "difficulty",
+    "statement_id",
     "command",
     "started_at",
     "completed_at",
@@ -35,6 +40,9 @@
     "schema_version": {
       "type": "integer"
     },
+    "unit": {
+      "const": "task"
+    },
     "run_id": {
       "type": "string"
     },
@@ -52,6 +60,18 @@
     },
     "track": {
       "type": "string"
+    },
+    "property_class": {
+      "type": "string"
+    },
+    "category": {
+      "type": "string"
+    },
+    "difficulty": {
+      "type": "string"
+    },
+    "statement_id": {
+      "type": ["string", "null"]
     },
     "command": {
       "type": "array",
@@ -104,6 +124,12 @@
     "readiness": {
       "type": "object",
       "additionalProperties": {
+        "type": "string"
+      }
+    },
+    "allowed_files": {
+      "type": "array",
+      "items": {
         "type": "string"
       }
     },
