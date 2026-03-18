@@ -1,0 +1,128 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://verity-benchmark.local/schemas/agent-run.schema.json",
+  "title": "Default Benchmark Agent Run Result",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "task_ref",
+    "task_id",
+    "case_id",
+    "timestamp",
+    "dry_run",
+    "agent",
+    "messages"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": 1
+    },
+    "task_ref": {
+      "type": "string"
+    },
+    "task_id": {
+      "type": "string"
+    },
+    "case_id": {
+      "type": "string"
+    },
+    "timestamp": {
+      "type": "string"
+    },
+    "dry_run": {
+      "type": "boolean"
+    },
+    "agent": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "adapter",
+        "config_path",
+        "base_url",
+        "model",
+        "api_key_env",
+        "chat_completions_path",
+        "models_path",
+        "system_prompt_files",
+        "temperature",
+        "max_completion_tokens",
+        "request_timeout_seconds",
+        "headers",
+        "extra_body"
+      ],
+      "properties": {
+        "adapter": {
+          "type": "string"
+        },
+        "config_path": {
+          "type": "string"
+        },
+        "base_url": {
+          "type": "string"
+        },
+        "model": {
+          "type": "string"
+        },
+        "api_key_env": {
+          "type": ["string", "null"]
+        },
+        "chat_completions_path": {
+          "type": "string"
+        },
+        "models_path": {
+          "type": "string"
+        },
+        "system_prompt_files": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "temperature": {
+          "type": "number"
+        },
+        "max_completion_tokens": {
+          "type": "integer"
+        },
+        "request_timeout_seconds": {
+          "type": "integer"
+        },
+        "headers": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "string"
+          }
+        },
+        "extra_body": {
+          "type": "object"
+        }
+      }
+    },
+    "messages": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "role",
+          "content"
+        ],
+        "properties": {
+          "role": {
+            "type": "string"
+          },
+          "content": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "response": {
+      "type": "object"
+    },
+    "response_text": {
+      "type": "string"
+    }
+  }
+}

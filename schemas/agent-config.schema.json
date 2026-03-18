@@ -13,10 +13,14 @@
     "model_env",
     "api_key_env",
     "chat_completions_path",
+    "models_path",
     "system_prompt_files",
     "temperature",
     "max_completion_tokens",
-    "headers"
+    "headers",
+    "header_envs",
+    "extra_body",
+    "request_timeout_seconds"
   ],
   "properties": {
     "schema_version": {
@@ -43,6 +47,9 @@
     "chat_completions_path": {
       "type": "string"
     },
+    "models_path": {
+      "type": "string"
+    },
     "system_prompt_files": {
       "type": "array",
       "items": {
@@ -61,6 +68,19 @@
       "additionalProperties": {
         "type": "string"
       }
+    },
+    "header_envs": {
+      "type": "object",
+      "additionalProperties": {
+        "type": "string"
+      }
+    },
+    "extra_body": {
+      "type": "object"
+    },
+    "request_timeout_seconds": {
+      "type": "integer",
+      "minimum": 1
     }
   }
 }

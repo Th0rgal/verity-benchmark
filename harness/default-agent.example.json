@@ -7,6 +7,7 @@
   "model_env": "VERITY_BENCHMARK_AGENT_MODEL",
   "api_key_env": "VERITY_BENCHMARK_AGENT_API_KEY",
   "chat_completions_path": "/chat/completions",
+  "models_path": "/models",
   "system_prompt_files": [
     "harness/PROMPT.md",
     "harness/POLICY.md",
@@ -14,5 +15,8 @@
   ],
   "temperature": 0.0,
   "max_completion_tokens": 1200,
-  "headers": {}
+  "headers": {},
+  "header_envs": {},
+  "extra_body": {},
+  "request_timeout_seconds": 120
 }

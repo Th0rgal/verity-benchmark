@@ -8,7 +8,7 @@ This repository pins:
 
 Current status:
 - Active `cases/`: 4 concrete benchmark cases
-- Active `tasks/`: 12 concrete benchmark tasks
+- Active `tasks/`: 14 concrete benchmark tasks
 - Buildable active cases: 4
 - Non-buildable active cases: 0
 - `backlog/`: placeholder intake entries kept visible without polluting the active suite
@@ -31,6 +31,7 @@ Repository layout:
 - `scripts/run_default_agent.sh`: explicit default-agent entrypoint for one task
 - `scripts/check.sh`: repo-level metadata and benchmark check
 - `docs/architecture/task-api.md`: benchmark architecture note for case/task/source roles
+- `schemas/agent-run.schema.json`: schema for default-agent run artifacts
 
 Design choices:
 - One folder per benchmark case, with many tasks per case as the intended scaling unit
@@ -38,6 +39,7 @@ Design choices:
 - Each task declares its own evaluation contract instead of relying on runner inference
 - Pinned `source_ref` values are the reproducibility unit; local paths are supporting metadata
 - Tasks can target either a spec declaration or an explicit proof module/declaration
+- The default-agent path is adapter-driven and can target the repo default setup or an external OpenAI-compatible backend through the same interface
 - One selected contract per project unless scope is still ambiguous
 - The active suite is still mostly spec-oriented, but proof manifests now support and exercise explicit proof targets
 - `case.yaml` plus `tasks/*.yaml` are the source of truth for benchmark state
@@ -79,6 +81,7 @@ Run the default benchmark agent for one task:
 export VERITY_BENCHMARK_AGENT_BASE_URL="https://agent-backend.thomas.md/v1"
 export VERITY_BENCHMARK_AGENT_MODEL="builtin/fast"
 export VERITY_BENCHMARK_AGENT_API_KEY="<redacted>"
+python3 harness/default_agent.py probe --config harness/default-agent.example.json --ensure-model
 ./scripts/run_default_agent.sh ethereum/deposit_contract_minimal/deposit_count
 ```
 

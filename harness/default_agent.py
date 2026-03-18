@@ -15,6 +15,7 @@ from task_runner import ROOT, load_task_record, resolve_task_manifest
 
 AGENT_RESULTS_DIR = ROOT / "results" / "agent_runs"
 SCHEMA_PATH = ROOT / "schemas" / "agent-config.schema.json"
+RUN_SCHEMA_PATH = ROOT / "schemas" / "agent-run.schema.json"
 
 
 @dataclass(frozen=True)
@@ -24,11 +25,15 @@ class ResolvedAgentConfig:
     base_url: str
     model: str
     api_key: str
+    api_key_env: str | None
     chat_completions_path: str
+    models_path: str
     system_prompt_files: list[str]
     temperature: float
     max_completion_tokens: int
     headers: dict[str, str]
+    extra_body: dict[str, Any]
+    request_timeout_seconds: int
 
 
 def load_json(path: Path) -> object:
@@ -92,6 +97,11 @@ def validate(value: object, schema: dict[str, Any], path: str) -> list[str]:
         for index, item in enumerate(value):
             errors.extend(validate(item, schema["items"], f"{path}[{index}]"))
 
+    if isinstance(value, (int, float)) and not isinstance(value, bool):
+        minimum = schema.get("minimum")
+        if minimum is not None and value < minimum:
+            errors.append(f"{path}: expected >= {minimum}, got {value}")
+
     return errors
 
 
@@ -133,6 +143,22 @@ def resolve_field(config: dict[str, Any], field: str, *, required: bool) -> str 
     return None
 
 
+def resolve_headers(config: dict[str, Any]) -> dict[str, str]:
+    headers: dict[str, str] = {}
+    raw_headers = config.get("headers", {})
+    if isinstance(raw_headers, dict):
+        headers.update({str(key): str(value) for key, value in raw_headers.items()})
+
+    raw_header_envs = config.get("header_envs", {})
+    if isinstance(raw_header_envs, dict):
+        for header_name, env_name in raw_header_envs.items():
+            env_value = normalize_string(os.environ.get(str(env_name)))
+            if env_value:
+                headers[str(header_name)] = env_value
+
+    return headers
+
+
 def resolve_config(path: Path, *, require_secrets: bool) -> ResolvedAgentConfig:
     config = load_config(path)
     prompt_files = [str(item) for item in config["system_prompt_files"]]
@@ -140,22 +166,21 @@ def resolve_config(path: Path, *, require_secrets: bool) -> ResolvedAgentConfig:
     if missing_files:
         raise SystemExit(f"missing system prompt files: {', '.join(missing_files)}")
 
-    headers: dict[str, str] = {}
-    raw_headers = config.get("headers", {})
-    if isinstance(raw_headers, dict):
-        headers = {str(key): str(value) for key, value in raw_headers.items()}
-
     return ResolvedAgentConfig(
         adapter=str(config["adapter"]),
         config_path=str(path.relative_to(ROOT)),
         base_url=(resolve_field(config, "base_url", required=require_secrets) or "").rstrip("/"),
         model=resolve_field(config, "model", required=require_secrets) or "",
         api_key=resolve_field(config, "api_key", required=require_secrets) or "",
+        api_key_env=normalize_string(config.get("api_key_env")),
         chat_completions_path=str(config["chat_completions_path"]),
+        models_path=str(config.get("models_path", "/models")),
         system_prompt_files=prompt_files,
         temperature=float(config["temperature"]),
         max_completion_tokens=int(config["max_completion_tokens"]),
-        headers=headers,
+        headers=resolve_headers(config),
+        extra_body=dict(config.get("extra_body", {})),
+        request_timeout_seconds=int(config.get("request_timeout_seconds", 120)),
     )
 
 
@@ -208,6 +233,7 @@ def send_chat_completion(config: ResolvedAgentConfig, messages: list[dict[str, s
         "temperature": config.temperature,
         "max_tokens": config.max_completion_tokens,
     }
+    payload.update(config.extra_body)
     req = request.Request(
         url,
         data=json.dumps(payload).encode("utf-8"),
@@ -220,7 +246,7 @@ def send_chat_completion(config: ResolvedAgentConfig, messages: list[dict[str, s
         method="POST",
     )
     try:
-        with request.urlopen(req, timeout=120) as response:
+        with request.urlopen(req, timeout=config.request_timeout_seconds) as response:
             body = response.read().decode("utf-8")
     except error.HTTPError as exc:
         detail = exc.read().decode("utf-8", errors="replace")
@@ -228,6 +254,39 @@ def send_chat_completion(config: ResolvedAgentConfig, messages: list[dict[str, s
     except error.URLError as exc:
         raise SystemExit(f"chat completion request failed: {exc}") from exc
     return json.loads(body)
+
+
+def list_models(config: ResolvedAgentConfig) -> dict[str, Any]:
+    url = f"{config.base_url}{config.models_path}"
+    headers = {
+        "User-Agent": "verity-benchmark/0.1",
+        **config.headers,
+    }
+    if config.api_key:
+        headers["Authorization"] = f"Bearer {config.api_key}"
+    req = request.Request(url, headers=headers, method="GET")
+    try:
+        with request.urlopen(req, timeout=config.request_timeout_seconds) as response:
+            body = response.read().decode("utf-8")
+    except error.HTTPError as exc:
+        detail = exc.read().decode("utf-8", errors="replace")
+        raise SystemExit(f"model probe failed with HTTP {exc.code}: {detail}") from exc
+    except error.URLError as exc:
+        raise SystemExit(f"model probe failed: {exc}") from exc
+    return json.loads(body)
+
+
+def extract_model_ids(models_payload: dict[str, Any]) -> list[str]:
+    data = models_payload.get("data")
+    if not isinstance(data, list):
+        return []
+    model_ids: list[str] = []
+    for item in data:
+        if isinstance(item, dict):
+            model_id = item.get("id")
+            if isinstance(model_id, str):
+                model_ids.append(model_id)
+    return model_ids
 
 
 def extract_text(response: dict[str, Any]) -> str:
@@ -259,12 +318,47 @@ def write_result(task_ref: str, payload: dict[str, Any]) -> Path:
     return result_path
 
 
+def build_result(task_ref: str, config: ResolvedAgentConfig, messages: list[dict[str, str]], *, dry_run: bool) -> dict[str, Any]:
+    task = resolve_task(task_ref)
+    return {
+        "schema_version": 1,
+        "task_ref": task_ref,
+        "task_id": task["task_id"],
+        "case_id": task["case_id"],
+        "timestamp": datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
+        "dry_run": dry_run,
+        "agent": {
+            "adapter": config.adapter,
+            "config_path": config.config_path,
+            "base_url": config.base_url,
+            "model": config.model,
+            "api_key_env": config.api_key_env,
+            "chat_completions_path": config.chat_completions_path,
+            "models_path": config.models_path,
+            "system_prompt_files": config.system_prompt_files,
+            "temperature": config.temperature,
+            "max_completion_tokens": config.max_completion_tokens,
+            "request_timeout_seconds": config.request_timeout_seconds,
+            "headers": config.headers,
+            "extra_body": config.extra_body,
+        },
+        "messages": messages,
+    }
+
+
+def validate_result_payload(payload: dict[str, Any], label: str) -> None:
+    schema = load_json(RUN_SCHEMA_PATH)
+    errors = validate(payload, schema, label)
+    if errors:
+        raise SystemExit("\n".join(errors))
+
+
 def resolve_task(task_ref: str) -> dict[str, Any]:
     return load_task_record(resolve_task_manifest(task_ref))
 
 
 def validate_command(config_path: Path) -> int:
-    load_config(config_path)
+    resolve_config(config_path, require_secrets=False)
     print(config_path.relative_to(ROOT))
     return 0
 
@@ -283,10 +377,14 @@ def describe_command(config_path: Path) -> int:
                 "model_env": config_data.get("model_env"),
                 "api_key_env": config_data.get("api_key_env"),
                 "chat_completions_path": config.chat_completions_path,
+                "models_path": config.models_path,
                 "system_prompt_files": config.system_prompt_files,
                 "temperature": config.temperature,
                 "max_completion_tokens": config.max_completion_tokens,
                 "headers": config.headers,
+                "header_envs": config_data.get("header_envs", {}),
+                "extra_body": config.extra_body,
+                "request_timeout_seconds": config.request_timeout_seconds,
                 "api_key_present": bool(config.api_key),
             },
             indent=2,
@@ -306,30 +404,32 @@ def prompt_command(config_path: Path, task_ref: str) -> int:
     return 0
 
 
+def probe_command(config_path: Path, ensure_model: bool) -> int:
+    config = resolve_config(config_path, require_secrets=True)
+    models_payload = list_models(config)
+    model_ids = extract_model_ids(models_payload)
+    payload = {
+        "adapter": config.adapter,
+        "base_url": config.base_url,
+        "models_path": config.models_path,
+        "configured_model": config.model,
+        "model_count": len(model_ids),
+        "models": model_ids,
+        "configured_model_available": config.model in model_ids if model_ids else None,
+    }
+    print(json.dumps(payload, indent=2))
+    if ensure_model and model_ids and config.model not in model_ids:
+        return 1
+    return 0
+
+
 def run_command(config_path: Path, task_ref: str, dry_run: bool) -> int:
     config = resolve_config(config_path, require_secrets=not dry_run)
     task = resolve_task(task_ref)
     messages = build_messages(config, task)
-    timestamp = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
-
-    result: dict[str, Any] = {
-        "schema_version": 1,
-        "task_ref": task_ref,
-        "timestamp": timestamp,
-        "agent": {
-            "adapter": config.adapter,
-            "config_path": config.config_path,
-            "base_url": config.base_url,
-            "model": config.model,
-            "chat_completions_path": config.chat_completions_path,
-            "system_prompt_files": config.system_prompt_files,
-            "temperature": config.temperature,
-            "max_completion_tokens": config.max_completion_tokens,
-        },
-        "messages": messages,
-    }
+    result = build_result(task_ref, config, messages, dry_run=dry_run)
     if dry_run:
-        result["dry_run"] = True
+        validate_result_payload(result, task_ref)
         result_path = write_result(task_ref, result)
         print(result_path.relative_to(ROOT))
         return 0
@@ -337,6 +437,7 @@ def run_command(config_path: Path, task_ref: str, dry_run: bool) -> int:
     response = send_chat_completion(config, messages)
     result["response"] = response
     result["response_text"] = extract_text(response)
+    validate_result_payload(result, task_ref)
     result_path = write_result(task_ref, result)
     print(result_path.relative_to(ROOT))
     return 0
@@ -356,6 +457,10 @@ def main() -> int:
     prompt_parser.add_argument("task_ref")
     prompt_parser.add_argument("--config", default="harness/default-agent.example.json")
 
+    probe_parser = subparsers.add_parser("probe", help="Probe the configured OpenAI-compatible backend")
+    probe_parser.add_argument("--config", default="harness/default-agent.example.json")
+    probe_parser.add_argument("--ensure-model", action="store_true")
+
     run_parser = subparsers.add_parser("run", help="Invoke the configured default agent for one task")
     run_parser.add_argument("task_ref")
     run_parser.add_argument("--config", default="harness/default-agent.example.json")
@@ -369,6 +474,8 @@ def main() -> int:
         return describe_command(ROOT / args.config)
     if args.command == "prompt":
         return prompt_command(ROOT / args.config, args.task_ref)
+    if args.command == "probe":
+        return probe_command(ROOT / args.config, args.ensure_model)
     if args.command == "run":
         return run_command(ROOT / args.config, args.task_ref, args.dry_run)
 
