@@ -16,6 +16,8 @@ from task_runner import ROOT, load_task_record, resolve_task_manifest
 AGENT_RESULTS_DIR = ROOT / "results" / "agent_runs"
 SCHEMA_PATH = ROOT / "schemas" / "agent-config.schema.json"
 RUN_SCHEMA_PATH = ROOT / "schemas" / "agent-run.schema.json"
+DEFAULT_PROFILE = "default"
+AGENT_PROFILES_DIR = ROOT / "harness" / "agents"
 
 
 @dataclass(frozen=True)
@@ -117,6 +119,55 @@ def validate_config_data(data: object, label: str) -> dict[str, Any]:
 
 def load_config(path: Path) -> dict[str, Any]:
     return validate_config_data(load_json(path), str(path.relative_to(ROOT)))
+
+
+def config_label(path: Path) -> str:
+    try:
+        return str(path.relative_to(ROOT))
+    except ValueError:
+        return str(path)
+
+
+def profile_path(profile: str) -> Path:
+    name = profile.strip()
+    if not name:
+        raise SystemExit("profile name must not be empty")
+    if "/" in name or name.startswith("."):
+        raise SystemExit(f"invalid profile name {profile!r}")
+    return AGENT_PROFILES_DIR / f"{name}.json"
+
+
+def resolve_config_path(config_or_profile: str | None, profile: str | None) -> Path:
+    if config_or_profile and profile:
+        raise SystemExit("pass either --config or --profile, not both")
+    if profile:
+        path = profile_path(profile)
+        if not path.is_file():
+            raise SystemExit(f"agent profile not found: {config_label(path)}")
+        return path
+    if config_or_profile:
+        candidate = Path(config_or_profile)
+        if not candidate.is_absolute():
+            candidate = ROOT / candidate
+        if candidate.is_file():
+            return candidate
+        fallback = profile_path(config_or_profile)
+        if fallback.is_file():
+            return fallback
+        raise SystemExit(
+            f"agent config not found: {config_or_profile!r} "
+            f"(checked file {config_label(candidate)} and profile {config_label(fallback)})"
+        )
+    default_path = profile_path(DEFAULT_PROFILE)
+    if default_path.is_file():
+        return default_path
+    raise SystemExit(f"default agent profile not found: {config_label(default_path)}")
+
+
+def discover_profiles() -> list[str]:
+    if not AGENT_PROFILES_DIR.is_dir():
+        return []
+    return sorted(path.stem for path in AGENT_PROFILES_DIR.glob("*.json") if path.is_file())
 
 
 def normalize_string(value: object) -> str | None:
@@ -359,7 +410,7 @@ def resolve_task(task_ref: str) -> dict[str, Any]:
 
 def validate_command(config_path: Path) -> int:
     resolve_config(config_path, require_secrets=False)
-    print(config_path.relative_to(ROOT))
+    print(config_label(config_path))
     return 0
 
 
@@ -443,6 +494,16 @@ def run_command(config_path: Path, task_ref: str, dry_run: bool) -> int:
     return 0
 
 
+def profiles_command() -> int:
+    payload = {
+        "profiles_dir": config_label(AGENT_PROFILES_DIR),
+        "default_profile": DEFAULT_PROFILE,
+        "profiles": discover_profiles(),
+    }
+    print(json.dumps(payload, indent=2))
+    return 0
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(description="Default benchmark agent adapter")
     subparsers = parser.add_subparsers(dest="command", required=True)
@@ -451,33 +512,41 @@ def main() -> int:
     validate_parser.add_argument("config")
 
     describe_parser = subparsers.add_parser("describe", help="Resolve and print a non-secret config summary")
-    describe_parser.add_argument("--config", default="harness/default-agent.example.json")
+    describe_parser.add_argument("--config")
+    describe_parser.add_argument("--profile")
 
     prompt_parser = subparsers.add_parser("prompt", help="Render the default-agent prompt package for one task")
     prompt_parser.add_argument("task_ref")
-    prompt_parser.add_argument("--config", default="harness/default-agent.example.json")
+    prompt_parser.add_argument("--config")
+    prompt_parser.add_argument("--profile")
 
     probe_parser = subparsers.add_parser("probe", help="Probe the configured OpenAI-compatible backend")
-    probe_parser.add_argument("--config", default="harness/default-agent.example.json")
+    probe_parser.add_argument("--config")
+    probe_parser.add_argument("--profile")
     probe_parser.add_argument("--ensure-model", action="store_true")
 
     run_parser = subparsers.add_parser("run", help="Invoke the configured default agent for one task")
     run_parser.add_argument("task_ref")
-    run_parser.add_argument("--config", default="harness/default-agent.example.json")
+    run_parser.add_argument("--config")
+    run_parser.add_argument("--profile")
     run_parser.add_argument("--dry-run", action="store_true")
+
+    subparsers.add_parser("profiles", help="List bundled default-agent profiles")
 
     args = parser.parse_args()
 
     if args.command == "validate-config":
         return validate_command(ROOT / args.config)
     if args.command == "describe":
-        return describe_command(ROOT / args.config)
+        return describe_command(resolve_config_path(args.config, args.profile))
     if args.command == "prompt":
-        return prompt_command(ROOT / args.config, args.task_ref)
+        return prompt_command(resolve_config_path(args.config, args.profile), args.task_ref)
     if args.command == "probe":
-        return probe_command(ROOT / args.config, args.ensure_model)
+        return probe_command(resolve_config_path(args.config, args.profile), args.ensure_model)
     if args.command == "run":
-        return run_command(ROOT / args.config, args.task_ref, args.dry_run)
+        return run_command(resolve_config_path(args.config, args.profile), args.task_ref, args.dry_run)
+    if args.command == "profiles":
+        return profiles_command()
 
     print(f"unsupported command: {args.command}", file=sys.stderr)
     return 1

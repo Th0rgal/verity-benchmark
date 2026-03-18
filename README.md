@@ -40,6 +40,7 @@ Design choices:
 - Pinned `source_ref` values are the reproducibility unit; local paths are supporting metadata
 - Tasks can target either a spec declaration or an explicit proof module/declaration
 - The default-agent path is adapter-driven and can target the repo default setup or an external OpenAI-compatible backend through the same interface
+- The default-agent path uses named profiles in `harness/agents/` so the repo-default setup and external OpenAI-compatible backends share one entrypoint
 - One selected contract per project unless scope is still ambiguous
 - The active suite is still mostly spec-oriented, but proof manifests now support and exercise explicit proof targets
 - `case.yaml` plus `tasks/*.yaml` are the source of truth for benchmark state
@@ -78,12 +79,16 @@ Run one task:
 Run the default benchmark agent for one task:
 
 ```bash
-export VERITY_BENCHMARK_AGENT_BASE_URL="https://agent-backend.thomas.md/v1"
-export VERITY_BENCHMARK_AGENT_MODEL="builtin/fast"
 export VERITY_BENCHMARK_AGENT_API_KEY="<redacted>"
-python3 harness/default_agent.py probe --config harness/default-agent.example.json --ensure-model
-./scripts/run_default_agent.sh ethereum/deposit_contract_minimal/deposit_count
+python3 harness/default_agent.py profiles
+python3 harness/default_agent.py probe --profile openai-proxy-fast --ensure-model
+VERITY_BENCHMARK_AGENT_PROFILE=openai-proxy-fast ./scripts/run_default_agent.sh ethereum/deposit_contract_minimal/deposit_count
 ```
+
+Bundled default-agent profiles:
+
+- `default`: generic OpenAI-compatible profile; provide base URL, model, and API key via env vars
+- `openai-proxy-fast`: pinned proxy profile for `https://agent-backend.thomas.md/v1` and `builtin/fast`; provide only the API key via env
 
 Run all active tasks:
 

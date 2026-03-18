@@ -1,0 +1,22 @@
+{
+  "schema_version": 1,
+  "adapter": "openai_compatible",
+  "base_url": "https://agent-backend.thomas.md/v1",
+  "base_url_env": "VERITY_BENCHMARK_AGENT_BASE_URL",
+  "model": "builtin/fast",
+  "model_env": "VERITY_BENCHMARK_AGENT_MODEL",
+  "api_key_env": "VERITY_BENCHMARK_AGENT_API_KEY",
+  "chat_completions_path": "/chat/completions",
+  "models_path": "/models",
+  "system_prompt_files": [
+    "harness/PROMPT.md",
+    "harness/POLICY.md",
+    "harness/TOOLS.md"
+  ],
+  "temperature": 0.0,
+  "max_completion_tokens": 1200,
+  "headers": {},
+  "header_envs": {},
+  "extra_body": {},
+  "request_timeout_seconds": 120
+}
