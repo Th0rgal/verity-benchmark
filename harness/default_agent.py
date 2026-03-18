@@ -22,6 +22,7 @@ AGENT_PROFILES_DIR = ROOT / "harness" / "agents"
 
 @dataclass(frozen=True)
 class ResolvedAgentConfig:
+    profile: str | None
     adapter: str
     config_path: str
     base_url: str
@@ -210,7 +211,7 @@ def resolve_headers(config: dict[str, Any]) -> dict[str, str]:
     return headers
 
 
-def resolve_config(path: Path, *, require_secrets: bool) -> ResolvedAgentConfig:
+def resolve_config(path: Path, *, require_secrets: bool, profile: str | None = None) -> ResolvedAgentConfig:
     config = load_config(path)
     prompt_files = [str(item) for item in config["system_prompt_files"]]
     missing_files = [item for item in prompt_files if not (ROOT / item).is_file()]
@@ -218,6 +219,7 @@ def resolve_config(path: Path, *, require_secrets: bool) -> ResolvedAgentConfig:
         raise SystemExit(f"missing system prompt files: {', '.join(missing_files)}")
 
     return ResolvedAgentConfig(
+        profile=profile,
         adapter=str(config["adapter"]),
         config_path=str(path.relative_to(ROOT)),
         base_url=(resolve_field(config, "base_url", required=require_secrets) or "").rstrip("/"),
@@ -378,7 +380,9 @@ def build_result(task_ref: str, config: ResolvedAgentConfig, messages: list[dict
         "case_id": task["case_id"],
         "timestamp": datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
         "dry_run": dry_run,
+        "status": "dry_run" if dry_run else "completed",
         "agent": {
+            "profile": config.profile,
             "adapter": config.adapter,
             "config_path": config.config_path,
             "base_url": config.base_url,
@@ -474,22 +478,26 @@ def probe_command(config_path: Path, ensure_model: bool) -> int:
     return 0
 
 
-def run_command(config_path: Path, task_ref: str, dry_run: bool) -> int:
-    config = resolve_config(config_path, require_secrets=not dry_run)
+def execute_agent_task(config_path: Path, task_ref: str, dry_run: bool, *, profile: str | None = None) -> tuple[int, Path]:
+    config = resolve_config(config_path, require_secrets=not dry_run, profile=profile)
     task = resolve_task(task_ref)
     messages = build_messages(config, task)
     result = build_result(task_ref, config, messages, dry_run=dry_run)
     if dry_run:
         validate_result_payload(result, task_ref)
         result_path = write_result(task_ref, result)
-        print(result_path.relative_to(ROOT))
-        return 0
+        return 0, result_path
 
     response = send_chat_completion(config, messages)
     result["response"] = response
     result["response_text"] = extract_text(response)
     validate_result_payload(result, task_ref)
     result_path = write_result(task_ref, result)
+    return 0, result_path
+
+
+def run_command(config_path: Path, task_ref: str, dry_run: bool, *, profile: str | None = None) -> int:
+    _, result_path = execute_agent_task(config_path, task_ref, dry_run, profile=profile)
     print(result_path.relative_to(ROOT))
     return 0
 
@@ -544,7 +552,12 @@ def main() -> int:
     if args.command == "probe":
         return probe_command(resolve_config_path(args.config, args.profile), args.ensure_model)
     if args.command == "run":
-        return run_command(resolve_config_path(args.config, args.profile), args.task_ref, args.dry_run)
+        return run_command(
+            resolve_config_path(args.config, args.profile),
+            args.task_ref,
+            args.dry_run,
+            profile=args.profile,
+        )
     if args.command == "profiles":
         return profiles_command()
 

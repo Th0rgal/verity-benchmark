@@ -9,9 +9,9 @@ if [[ -n "${VERITY_BENCHMARK_AGENT_PROFILE:-}" && -n "${VERITY_BENCHMARK_AGENT_C
 fi
 
 if [[ -n "${VERITY_BENCHMARK_AGENT_PROFILE:-}" ]]; then
-  python3 harness/agent_runner.py run "$@" --profile "$VERITY_BENCHMARK_AGENT_PROFILE"
+  python3 harness/agent_runner.py run-suite --suite active "$@" --profile "$VERITY_BENCHMARK_AGENT_PROFILE"
 elif [[ -n "${VERITY_BENCHMARK_AGENT_CONFIG:-}" ]]; then
-  python3 harness/agent_runner.py run "$@" --config "$VERITY_BENCHMARK_AGENT_CONFIG"
+  python3 harness/agent_runner.py run-suite --suite active "$@" --config "$VERITY_BENCHMARK_AGENT_CONFIG"
 else
-  python3 harness/agent_runner.py run "$@" --profile default
+  python3 harness/agent_runner.py run-suite --suite active "$@" --profile default
 fi

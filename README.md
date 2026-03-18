@@ -29,6 +29,8 @@ Repository layout:
 - `scripts/run_case.sh`: agent entrypoint for one case
 - `scripts/run_all.sh`: agent entrypoint for all active tasks
 - `scripts/run_default_agent.sh`: explicit default-agent entrypoint for one task
+- `scripts/run_default_agent_case.sh`: explicit default-agent entrypoint for one case
+- `scripts/run_default_agent_all.sh`: explicit default-agent entrypoint for all active tasks
 - `scripts/check.sh`: repo-level metadata and benchmark check
 - `docs/architecture/task-api.md`: benchmark architecture note for case/task/source roles
 - `schemas/agent-run.schema.json`: schema for default-agent run artifacts
@@ -41,6 +43,7 @@ Design choices:
 - Tasks can target either a spec declaration or an explicit proof module/declaration
 - The default-agent path is adapter-driven and can target the repo default setup or an external OpenAI-compatible backend through the same interface
 - The default-agent path uses named profiles in `harness/agents/` so the repo-default setup and external OpenAI-compatible backends share one entrypoint
+- The default-agent path is now runner-backed at task, case, and suite scope through `harness/agent_runner.py`
 - One selected contract per project unless scope is still ambiguous
 - The active suite is still mostly spec-oriented, but proof manifests now support and exercise explicit proof targets
 - `case.yaml` plus `tasks/*.yaml` are the source of truth for benchmark state
@@ -83,6 +86,14 @@ export VERITY_BENCHMARK_AGENT_API_KEY="<redacted>"
 python3 harness/default_agent.py profiles
 python3 harness/default_agent.py probe --profile openai-proxy-fast --ensure-model
 VERITY_BENCHMARK_AGENT_PROFILE=openai-proxy-fast ./scripts/run_default_agent.sh ethereum/deposit_contract_minimal/deposit_count
+```
+
+Run the default benchmark agent for one case or the whole active suite:
+
+```bash
+export VERITY_BENCHMARK_AGENT_API_KEY="<redacted>"
+VERITY_BENCHMARK_AGENT_PROFILE=openai-proxy-fast ./scripts/run_default_agent_case.sh ethereum/deposit_contract_minimal
+VERITY_BENCHMARK_AGENT_PROFILE=openai-proxy-fast ./scripts/run_default_agent_all.sh
 ```
 
 Bundled default-agent profiles:

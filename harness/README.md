@@ -16,12 +16,16 @@ The shell entrypoints in `scripts/` delegate to `harness/task_runner.py`.
 
 The default benchmark agent now has its own explicit entrypoint:
 
-- `scripts/run_default_agent.sh <task_ref>` invokes `harness/default_agent.py`
+- `scripts/run_default_agent.sh <task_ref>` invokes the default-agent runner for one task
+- `scripts/run_default_agent_case.sh <project/case_id>` invokes the same path for each task in one case
+- `scripts/run_default_agent_all.sh` invokes the same path for all active tasks
+- `harness/agent_runner.py` is the first-class runner for task, case, and suite default-agent execution
 - bundled reusable profiles live in `harness/agents/*.json`
 - the default profile is `default`, and the proxy example profile is `openai-proxy-fast`
 - the current adapter is `openai_compatible`
 - credentials and endpoint selection are injected through env vars instead of being hard-coded
 - the default-agent run artifact is schema-backed by `schemas/agent-run.schema.json`
+- aggregated case/suite agent-run status is written to `results/agent_summary.json`
 
 Default OpenAI-compatible env contract:
 
@@ -43,12 +47,15 @@ Optional config-only extensions for OpenAI-compatible backends:
 
 Useful commands:
 
+- `python3 harness/agent_runner.py list --suite active`
 - `python3 harness/default_agent.py profiles`
 - `python3 harness/default_agent.py validate-config harness/agents/default.json`
 - `python3 harness/default_agent.py describe --profile default`
 - `python3 harness/default_agent.py probe --profile openai-proxy-fast --ensure-model`
 - `python3 harness/default_agent.py prompt ethereum/deposit_contract_minimal/deposit_count --profile default`
 - `VERITY_BENCHMARK_AGENT_PROFILE=openai-proxy-fast ./scripts/run_default_agent.sh ethereum/deposit_contract_minimal/deposit_count`
+- `VERITY_BENCHMARK_AGENT_PROFILE=openai-proxy-fast ./scripts/run_default_agent_case.sh ethereum/deposit_contract_minimal`
+- `VERITY_BENCHMARK_AGENT_PROFILE=openai-proxy-fast ./scripts/run_default_agent_all.sh`
 
 Supported task manifest interface fields:
 

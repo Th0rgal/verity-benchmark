@@ -11,6 +11,7 @@
     "case_id",
     "timestamp",
     "dry_run",
+    "status",
     "agent",
     "messages"
   ],
@@ -33,10 +34,14 @@
     "dry_run": {
       "type": "boolean"
     },
+    "status": {
+      "enum": ["dry_run", "completed"]
+    },
     "agent": {
       "type": "object",
       "additionalProperties": false,
       "required": [
+        "profile",
         "adapter",
         "config_path",
         "base_url",
@@ -52,6 +57,9 @@
         "extra_body"
       ],
       "properties": {
+        "profile": {
+          "type": ["string", "null"]
+        },
         "adapter": {
           "type": "string"
         },
