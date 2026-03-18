@@ -5,24 +5,43 @@
   "type": "object",
   "additionalProperties": false,
   "required": [
+    "benchmark",
     "schema_version",
     "run_id",
+    "task_id",
+    "task_ref",
     "case_id",
     "suite",
+    "track",
     "command",
     "started_at",
     "completed_at",
     "outcome",
+    "status",
+    "failure_mode",
     "exit_code",
+    "manifests",
     "artifacts",
     "metrics",
-    "environment"
+    "environment",
+    "readiness",
+    "targets",
+    "output"
   ],
   "properties": {
+    "benchmark": {
+      "const": "verity-benchmark"
+    },
     "schema_version": {
       "type": "integer"
     },
     "run_id": {
+      "type": "string"
+    },
+    "task_id": {
+      "type": "string"
+    },
+    "task_ref": {
       "type": "string"
     },
     "case_id": {
@@ -31,8 +50,14 @@
     "suite": {
       "type": "string"
     },
-    "command": {
+    "track": {
       "type": "string"
+    },
+    "command": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
     },
     "started_at": {
       "type": "string"
@@ -41,10 +66,22 @@
       "type": "string"
     },
     "outcome": {
-      "enum": ["passed", "failed", "error", "skipped"]
+      "enum": ["passed", "failed", "not_runnable"]
+    },
+    "status": {
+      "enum": ["passed", "failed", "not_runnable"]
+    },
+    "failure_mode": {
+      "type": ["string", "null"]
     },
     "exit_code": {
       "type": "integer"
+    },
+    "manifests": {
+      "type": "object",
+      "additionalProperties": {
+        "type": "string"
+      }
     },
     "artifacts": {
       "type": "array",
@@ -63,6 +100,21 @@
       "additionalProperties": {
         "type": ["string", "number", "integer", "boolean", "null"]
       }
+    },
+    "readiness": {
+      "type": "object",
+      "additionalProperties": {
+        "type": "string"
+      }
+    },
+    "targets": {
+      "type": "object",
+      "additionalProperties": {
+        "type": ["string", "null"]
+      }
+    },
+    "output": {
+      "type": "string"
     }
   }
 }

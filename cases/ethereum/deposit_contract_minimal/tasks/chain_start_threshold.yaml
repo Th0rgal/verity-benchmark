@@ -13,8 +13,8 @@ track: proof-only
 translation_status: translated
 spec_status: frozen
 proof_status: not_started
-spec_target: Benchmark.Cases.Ethereum.DepositContractMinimal.deposit_starts_chain_at_threshold_spec
-proof_target: Benchmark.Cases.Ethereum.DepositContractMinimal.deposit_starts_chain_at_threshold_spec
+spec_target: Benchmark.Cases.Ethereum.DepositContractMinimal.Specs
+proof_target: null
 allowed_files:
   - cases/ethereum/deposit_contract_minimal/verity/Specs.lean
   - Benchmark/Cases/Ethereum/DepositContractMinimal/Specs.lean

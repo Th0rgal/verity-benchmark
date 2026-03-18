@@ -74,10 +74,10 @@
       "enum": ["not_started", "in_progress", "partial", "complete", "blocked"]
     },
     "spec_target": {
-      "type": "string"
+      "type": ["string", "null"]
     },
     "proof_target": {
-      "type": "string"
+      "type": ["string", "null"]
     },
     "allowed_files": {
       "type": "array",

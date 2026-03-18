@@ -2,25 +2,325 @@
   "benchmark": "verity-benchmark",
   "manifest_schema_version": 1,
   "inventory_source": {
-    "active": "cases/*/*/case.yaml",
-    "backlog": "backlog/*/*/case.yaml"
+    "families": "families/*/family.yaml",
+    "implementations": "families/*/implementations/*/implementation.yaml",
+    "active_cases": "cases/*/*/case.yaml",
+    "active_tasks": "cases/*/*/tasks/*.yaml",
+    "backlog_cases": "backlog/*/*/case.yaml",
+    "backlog_tasks": "backlog/*/*/tasks/*.yaml"
   },
   "summary": {
-    "active_cases": 4,
-    "backlog_cases": 4,
-    "buildable_cases": 2,
-    "stages": {
+    "family_count": 7,
+    "implementation_count": 8,
+    "active_case_count": 4,
+    "backlog_case_count": 4,
+    "active_task_count": 4,
+    "backlog_task_count": 0,
+    "buildable_case_count": 2,
+    "runnable_task_count": 4,
+    "case_stage_counts": {
       "build_green": 2,
       "candidate": 4,
       "scoped": 2
+    },
+    "translation_status_counts": {
+      "blocked": 4,
+      "not_started": 2,
+      "translated": 2
+    },
+    "spec_status_counts": {
+      "blocked": 1,
+      "draft": 1,
+      "frozen": 2,
+      "not_started": 4
+    },
+    "proof_status_counts": {
+      "blocked": 6,
+      "not_started": 2
+    },
+    "task_track_counts": {
+      "proof-only": 4
+    },
+    "task_property_class_counts": {
+      "accounting_bound": 1,
+      "authorization_state": 1,
+      "monotonic_counter": 1,
+      "threshold_activation": 1
+    },
+    "family_split_counts": {
+      "active": 3,
+      "backlog": 4
     }
   },
+  "families": [
+    {
+      "family_id": "ethereum",
+      "display_name": "Ethereum",
+      "split": "active",
+      "status": "active",
+      "description": "Ethereum L1 benchmark slices covering deposit processing and the beacon roots predeploy interface pinned from public upstream artifacts.",
+      "implementation_ids": [
+        "deposit_contract",
+        "beacon_roots_predeploy"
+      ],
+      "case_ids": [
+        "ethereum/deposit_contract_minimal",
+        "ethereum/beacon_roots_predeploy"
+      ],
+      "source_languages": [
+        "vyper",
+        "spec"
+      ],
+      "manifest_path": "families/ethereum/family.yaml"
+    },
+    {
+      "family_id": "kleros",
+      "display_name": "Kleros",
+      "split": "backlog",
+      "status": "backlog",
+      "description": "Backlog intake for Kleros v2 protocol contracts waiting on narrowed target selection and benchmark property scoping.",
+      "implementation_ids": [
+        "kleros_v2"
+      ],
+      "case_ids": [
+        "kleros/placeholder"
+      ],
+      "source_languages": [
+        "solidity"
+      ],
+      "manifest_path": "families/kleros/family.yaml"
+    },
+    {
+      "family_id": "nexus_mutual",
+      "display_name": "Nexus Mutual",
+      "split": "backlog",
+      "status": "backlog",
+      "description": "Backlog intake for Nexus Mutual protocol contracts pending concrete target and invariant selection.",
+      "implementation_ids": [
+        "smart_contracts"
+      ],
+      "case_ids": [
+        "nexus_mutual/placeholder"
+      ],
+      "source_languages": [
+        "solidity"
+      ],
+      "manifest_path": "families/nexus_mutual/family.yaml"
+    },
+    {
+      "family_id": "paladin_votes",
+      "display_name": "Paladin Votes",
+      "split": "active",
+      "status": "active",
+      "description": "Governance recovery flow benchmarks drawn from the Sonic earn recovery system with emphasis on accounting and claim-state updates.",
+      "implementation_ids": [
+        "stream_recovery_claim"
+      ],
+      "case_ids": [
+        "paladin_votes/stream_recovery_claim_usdc"
+      ],
+      "source_languages": [
+        "solidity"
+      ],
+      "manifest_path": "families/paladin_votes/family.yaml"
+    },
+    {
+      "family_id": "unlink_xyz",
+      "display_name": "unlink.xyz",
+      "split": "backlog",
+      "status": "backlog",
+      "description": "Backlog intake for unlink.xyz contracts pending recovery of a resolvable upstream repository snapshot.",
+      "implementation_ids": [
+        "monorepo"
+      ],
+      "case_ids": [
+        "unlink_xyz/placeholder"
+      ],
+      "source_languages": [
+        "solidity"
+      ],
+      "manifest_path": "families/unlink_xyz/family.yaml"
+    },
+    {
+      "family_id": "usual",
+      "display_name": "Usual",
+      "split": "backlog",
+      "status": "backlog",
+      "description": "Backlog intake for a private upstream that cannot yet be pinned to a public benchmarkable contract artifact.",
+      "implementation_ids": [
+        "private_repo"
+      ],
+      "case_ids": [
+        "usual/placeholder"
+      ],
+      "source_languages": [
+        "solidity"
+      ],
+      "manifest_path": "families/usual/family.yaml"
+    },
+    {
+      "family_id": "zama",
+      "display_name": "Zama",
+      "split": "active",
+      "status": "active",
+      "description": "Confidential token benchmarks sourced from the OpenZeppelin confidential contracts codebase and tracked even when current Verity support is incomplete.",
+      "implementation_ids": [
+        "openzeppelin_confidential_contracts"
+      ],
+      "case_ids": [
+        "zama/erc7984"
+      ],
+      "source_languages": [
+        "solidity"
+      ],
+      "manifest_path": "families/zama/family.yaml"
+    }
+  ],
+  "implementations": [
+    {
+      "family_id": "ethereum",
+      "implementation_id": "beacon_roots_predeploy",
+      "display_name": "Beacon Roots Predeploy",
+      "split": "active",
+      "status": "blocked",
+      "upstream_repo": "https://github.com/ethereum/EIPs/blob/master/EIPS/eip-4788.md",
+      "upstream_commit": "4f64d1b5040aca16d3f165867c9ee441e4239a95",
+      "source_language": "spec",
+      "source_artifact_path": "EIPS/eip-4788.md",
+      "case_ids": [
+        "ethereum/beacon_roots_predeploy"
+      ],
+      "notes": "This target is pinned to the EIP text today and remains blocked until a stable implementation artifact is selected for translation.",
+      "manifest_path": "families/ethereum/implementations/beacon_roots_predeploy/implementation.yaml"
+    },
+    {
+      "family_id": "ethereum",
+      "implementation_id": "deposit_contract",
+      "display_name": "Ethereum Deposit Contract",
+      "split": "active",
+      "status": "translated",
+      "upstream_repo": "https://github.com/ethereum/deposit_contract",
+      "upstream_commit": "691feb18330d3d102b5a4b3d4434fac7571f51b8",
+      "source_language": "vyper",
+      "source_artifact_path": "deposit_contract/contracts/validator_registration.v.py",
+      "case_ids": [
+        "ethereum/deposit_contract_minimal"
+      ],
+      "notes": "Canonical validator deposit contract used for the minimal counter and threshold slice translated into Lean.",
+      "manifest_path": "families/ethereum/implementations/deposit_contract/implementation.yaml"
+    },
+    {
+      "family_id": "kleros",
+      "implementation_id": "kleros_v2",
+      "display_name": "Kleros V2",
+      "split": "backlog",
+      "status": "candidate",
+      "upstream_repo": "https://github.com/kleros/kleros-v2",
+      "upstream_commit": "982af06592f1c48747481ab39999b776f05cac36",
+      "source_language": "solidity",
+      "source_artifact_path": "TBD",
+      "case_ids": [
+        "kleros/placeholder"
+      ],
+      "notes": "Upstream source is pinned, but the benchmark still needs a final contract and invariant selection before translation work starts.",
+      "manifest_path": "families/kleros/implementations/kleros_v2/implementation.yaml"
+    },
+    {
+      "family_id": "nexus_mutual",
+      "implementation_id": "smart_contracts",
+      "display_name": "Nexus Mutual Smart Contracts",
+      "split": "backlog",
+      "status": "candidate",
+      "upstream_repo": "https://github.com/NexusMutual/smart-contracts",
+      "upstream_commit": "070972503a471b6e14d01213aca4cf41e156c215",
+      "source_language": "solidity",
+      "source_artifact_path": "TBD",
+      "case_ids": [
+        "nexus_mutual/placeholder"
+      ],
+      "notes": "Public repository is pinned, but the benchmark has not yet selected a stable contract/function slice to translate.",
+      "manifest_path": "families/nexus_mutual/implementations/smart_contracts/implementation.yaml"
+    },
+    {
+      "family_id": "paladin_votes",
+      "implementation_id": "stream_recovery_claim",
+      "display_name": "Stream Recovery Claim",
+      "split": "active",
+      "status": "translated",
+      "upstream_repo": "https://github.com/Figu3/sonic-earn-recovery-system",
+      "upstream_commit": "699cbbc79def374cab9739e451acbbf866293d12",
+      "source_language": "solidity",
+      "source_artifact_path": "src/StreamRecoveryClaim.sol",
+      "case_ids": [
+        "paladin_votes/stream_recovery_claim_usdc"
+      ],
+      "notes": "Claim accounting contract translated as a single-round slice with Merkle verification abstracted away from the benchmark.",
+      "manifest_path": "families/paladin_votes/implementations/stream_recovery_claim/implementation.yaml"
+    },
+    {
+      "family_id": "unlink_xyz",
+      "implementation_id": "monorepo",
+      "display_name": "unlink.xyz Monorepo",
+      "split": "backlog",
+      "status": "blocked",
+      "upstream_repo": "https://github.com/unlink-xyz/monorepo",
+      "upstream_commit": null,
+      "source_language": "solidity",
+      "source_artifact_path": "TBD",
+      "case_ids": [
+        "unlink_xyz/placeholder"
+      ],
+      "notes": "The referenced repository snapshot was unavailable during intake, so the case remains a placeholder without a pinned artifact.",
+      "manifest_path": "families/unlink_xyz/implementations/monorepo/implementation.yaml"
+    },
+    {
+      "family_id": "usual",
+      "implementation_id": "private_repo",
+      "display_name": "Usual Private Repository",
+      "split": "backlog",
+      "status": "blocked",
+      "upstream_repo": null,
+      "upstream_commit": null,
+      "source_language": "solidity",
+      "source_artifact_path": "TBD",
+      "case_ids": [
+        "usual/placeholder"
+      ],
+      "notes": "Intake is blocked on repository access, so no implementation artifact or case slice can be pinned yet.",
+      "manifest_path": "families/usual/implementations/private_repo/implementation.yaml"
+    },
+    {
+      "family_id": "zama",
+      "implementation_id": "openzeppelin_confidential_contracts",
+      "display_name": "OpenZeppelin Confidential Contracts",
+      "split": "active",
+      "status": "blocked",
+      "upstream_repo": "https://github.com/OpenZeppelin/openzeppelin-confidential-contracts",
+      "upstream_commit": "d7ecc2c65e38dc5646ef976490cca287c1b1c3c8",
+      "source_language": "solidity",
+      "source_artifact_path": "contracts/token/ERC7984/ERC7984.sol",
+      "case_ids": [
+        "zama/erc7984"
+      ],
+      "notes": "Benchmark intake is blocked on encrypted integer support and FHE runtime semantics that are outside the current Verity benchmark surface.",
+      "manifest_path": "families/zama/implementations/openzeppelin_confidential_contracts/implementation.yaml"
+    }
+  ],
   "cases": [
     {
       "case_id": "ethereum/beacon_roots_predeploy",
+      "project": "ethereum",
+      "case_name": "beacon_roots_predeploy",
       "suite": "active",
       "schema_version": 1,
+      "manifest_path": "cases/ethereum/beacon_roots_predeploy/case.yaml",
+      "split": "active",
+      "family_id": "ethereum",
+      "implementation_id": "beacon_roots_predeploy",
       "stage": "scoped",
+      "translation_status": "blocked",
+      "spec_status": "draft",
+      "proof_status": "blocked",
       "source_language": "spec",
       "upstream_repo": "https://github.com/ethereum/EIPs/blob/master/EIPS/eip-4788.md",
       "upstream_commit": "4f64d1b5040aca16d3f165867c9ee441e4239a95",
@@ -32,16 +332,36 @@
       "lean_target": null,
       "failure_reason": "missing_implementation_artifact",
       "notes": "Candidate selected, but the benchmark currently lacks a pinned implementation artifact beyond the EIP text.",
-      "manifest_path": "cases/ethereum/beacon_roots_predeploy/case.yaml",
       "buildable": false,
       "verity_commit": "34a6b2b2e91713f870572fef1e1c4b5131812dfb",
-      "lean_toolchain": "leanprover/lean4:v4.22.0"
+      "lean_toolchain": "leanprover/lean4:v4.22.0",
+      "abstraction_level": "protocol_slice",
+      "abstraction_tags": [
+        "execution_layer_interface",
+        "spec_only",
+        "artifact_gap"
+      ],
+      "abstraction_notes": "The benchmark scope is the ring-buffer get/set interface from EIP-4788, but no pinned deployable implementation artifact is tracked yet.",
+      "unsupported_feature_codes": [
+        "missing_implementation_artifact"
+      ],
+      "spec_target": null,
+      "proof_target": null
     },
     {
       "case_id": "ethereum/deposit_contract_minimal",
+      "project": "ethereum",
+      "case_name": "deposit_contract_minimal",
       "suite": "active",
       "schema_version": 1,
+      "manifest_path": "cases/ethereum/deposit_contract_minimal/case.yaml",
+      "split": "active",
+      "family_id": "ethereum",
+      "implementation_id": "deposit_contract",
       "stage": "build_green",
+      "translation_status": "translated",
+      "spec_status": "frozen",
+      "proof_status": "not_started",
       "source_language": "vyper",
       "upstream_repo": "https://github.com/ethereum/deposit_contract",
       "upstream_commit": "691feb18330d3d102b5a4b3d4434fac7571f51b8",
@@ -52,16 +372,35 @@
       "lean_target": "Benchmark.Cases.Ethereum.DepositContractMinimal.Compile",
       "failure_reason": null,
       "notes": "Counter-oriented slice of the deposit path. Merkle tree, SSZ hashing, and log emission are omitted so the benchmark can focus on threshold-driven state updates.",
-      "manifest_path": "cases/ethereum/deposit_contract_minimal/case.yaml",
       "buildable": true,
       "verity_commit": "34a6b2b2e91713f870572fef1e1c4b5131812dfb",
-      "lean_toolchain": "leanprover/lean4:v4.22.0"
+      "lean_toolchain": "leanprover/lean4:v4.22.0",
+      "abstraction_level": "protocol_slice",
+      "abstraction_tags": [
+        "merkle_elided",
+        "ssz_elided",
+        "event_elided",
+        "deposit_counter_slice"
+      ],
+      "abstraction_notes": "The benchmark keeps the threshold and counter state transitions while abstracting away Merkle tree updates, SSZ hashing, and event emission.",
+      "unsupported_feature_codes": [],
+      "spec_target": "Benchmark.Cases.Ethereum.DepositContractMinimal.Specs",
+      "proof_target": "Benchmark.Cases.Ethereum.DepositContractMinimal.Specs"
     },
     {
       "case_id": "paladin_votes/stream_recovery_claim_usdc",
+      "project": "paladin_votes",
+      "case_name": "stream_recovery_claim_usdc",
       "suite": "active",
       "schema_version": 1,
+      "manifest_path": "cases/paladin_votes/stream_recovery_claim_usdc/case.yaml",
+      "split": "active",
+      "family_id": "paladin_votes",
+      "implementation_id": "stream_recovery_claim",
       "stage": "build_green",
+      "translation_status": "translated",
+      "spec_status": "frozen",
+      "proof_status": "not_started",
       "source_language": "solidity",
       "upstream_repo": "https://github.com/Figu3/sonic-earn-recovery-system",
       "upstream_commit": "699cbbc79def374cab9739e451acbbf866293d12",
@@ -73,16 +412,34 @@
       "lean_target": "Benchmark.Cases.PaladinVotes.StreamRecoveryClaimUsdc.Compile",
       "failure_reason": null,
       "notes": "Single-round accounting slice of the USDC claim path. Merkle verification is abstracted as a boolean witness and token transfer side effects are omitted.",
-      "manifest_path": "cases/paladin_votes/stream_recovery_claim_usdc/case.yaml",
       "buildable": true,
       "verity_commit": "34a6b2b2e91713f870572fef1e1c4b5131812dfb",
-      "lean_toolchain": "leanprover/lean4:v4.22.0"
+      "lean_toolchain": "leanprover/lean4:v4.22.0",
+      "abstraction_level": "protocol_slice",
+      "abstraction_tags": [
+        "merkle_elided",
+        "token_transfer_elided",
+        "single_round_slice"
+      ],
+      "abstraction_notes": "The benchmark fixes focus on the single-round claim path and abstracts Merkle verification plus token transfer effects into a simpler state-only model.",
+      "unsupported_feature_codes": [],
+      "spec_target": "Benchmark.Cases.PaladinVotes.StreamRecoveryClaimUsdc.Specs",
+      "proof_target": "Benchmark.Cases.PaladinVotes.StreamRecoveryClaimUsdc.Specs"
     },
     {
       "case_id": "zama/erc7984",
+      "project": "zama",
+      "case_name": "erc7984",
       "suite": "active",
       "schema_version": 1,
+      "manifest_path": "cases/zama/erc7984/case.yaml",
+      "split": "active",
+      "family_id": "zama",
+      "implementation_id": "openzeppelin_confidential_contracts",
       "stage": "scoped",
+      "translation_status": "blocked",
+      "spec_status": "blocked",
+      "proof_status": "blocked",
       "source_language": "solidity",
       "upstream_repo": "https://github.com/OpenZeppelin/openzeppelin-confidential-contracts",
       "upstream_commit": "d7ecc2c65e38dc5646ef976490cca287c1b1c3c8",
@@ -94,18 +451,39 @@
       "lean_target": null,
       "failure_reason": "missing_verity_feature",
       "notes": "Selected as requested, but blocked because the contract depends on encrypted euint64 values and FHE-specific runtime semantics that are not benchmarked in this v1 scaffold.",
-      "manifest_path": "cases/zama/erc7984/case.yaml",
       "buildable": false,
       "verity_commit": "34a6b2b2e91713f870572fef1e1c4b5131812dfb",
-      "lean_toolchain": "leanprover/lean4:v4.22.0"
+      "lean_toolchain": "leanprover/lean4:v4.22.0",
+      "abstraction_level": "unsupported_runtime",
+      "abstraction_tags": [
+        "encrypted_uint",
+        "fhe_runtime",
+        "confidential_transfer"
+      ],
+      "abstraction_notes": "The candidate is useful for roadmap tracking, but the encrypted integer and FHE execution semantics are outside the current benchmark abstraction boundary.",
+      "unsupported_feature_codes": [
+        "encrypted_uint",
+        "fhe_runtime"
+      ],
+      "spec_target": null,
+      "proof_target": null
     }
   ],
   "backlog": [
     {
       "case_id": "kleros/placeholder",
+      "project": "kleros",
+      "case_name": "placeholder",
       "suite": "backlog",
       "schema_version": 1,
+      "manifest_path": "backlog/kleros/placeholder/case.yaml",
+      "split": "backlog",
+      "family_id": "kleros",
+      "implementation_id": "kleros_v2",
       "stage": "candidate",
+      "translation_status": "not_started",
+      "spec_status": "not_started",
+      "proof_status": "blocked",
       "source_language": "solidity",
       "upstream_repo": "https://github.com/kleros/kleros-v2",
       "upstream_commit": "982af06592f1c48747481ab39999b776f05cac36",
@@ -114,16 +492,35 @@
       "lean_target": null,
       "failure_reason": "selection_pending",
       "notes": "Waiting for protocol-side contract/function selection.",
-      "manifest_path": "backlog/kleros/placeholder/case.yaml",
       "buildable": false,
       "verity_commit": "34a6b2b2e91713f870572fef1e1c4b5131812dfb",
-      "lean_toolchain": "leanprover/lean4:v4.22.0"
+      "lean_toolchain": "leanprover/lean4:v4.22.0",
+      "abstraction_level": "unscoped",
+      "abstraction_tags": [
+        "intake_placeholder",
+        "selection_pending"
+      ],
+      "abstraction_notes": "Upstream source is pinned, but the benchmark has not yet selected the contract slice, abstractions, or proof targets worth formalizing.",
+      "unsupported_feature_codes": [
+        "selection_pending"
+      ],
+      "spec_target": null,
+      "proof_target": null
     },
     {
       "case_id": "nexus_mutual/placeholder",
+      "project": "nexus_mutual",
+      "case_name": "placeholder",
       "suite": "backlog",
       "schema_version": 1,
+      "manifest_path": "backlog/nexus_mutual/placeholder/case.yaml",
+      "split": "backlog",
+      "family_id": "nexus_mutual",
+      "implementation_id": "smart_contracts",
       "stage": "candidate",
+      "translation_status": "not_started",
+      "spec_status": "not_started",
+      "proof_status": "blocked",
       "source_language": "solidity",
       "upstream_repo": "https://github.com/NexusMutual/smart-contracts",
       "upstream_commit": "070972503a471b6e14d01213aca4cf41e156c215",
@@ -132,16 +529,35 @@
       "lean_target": null,
       "failure_reason": "selection_pending",
       "notes": "Waiting for protocol-side invariant and target contract selection.",
-      "manifest_path": "backlog/nexus_mutual/placeholder/case.yaml",
       "buildable": false,
       "verity_commit": "34a6b2b2e91713f870572fef1e1c4b5131812dfb",
-      "lean_toolchain": "leanprover/lean4:v4.22.0"
+      "lean_toolchain": "leanprover/lean4:v4.22.0",
+      "abstraction_level": "unscoped",
+      "abstraction_tags": [
+        "intake_placeholder",
+        "selection_pending"
+      ],
+      "abstraction_notes": "The family is pinned to a public repository, but no benchmark slice or contract abstraction boundary has been selected yet.",
+      "unsupported_feature_codes": [
+        "selection_pending"
+      ],
+      "spec_target": null,
+      "proof_target": null
     },
     {
       "case_id": "unlink_xyz/placeholder",
+      "project": "unlink_xyz",
+      "case_name": "placeholder",
       "suite": "backlog",
       "schema_version": 1,
+      "manifest_path": "backlog/unlink_xyz/placeholder/case.yaml",
+      "split": "backlog",
+      "family_id": "unlink_xyz",
+      "implementation_id": "monorepo",
       "stage": "candidate",
+      "translation_status": "blocked",
+      "spec_status": "not_started",
+      "proof_status": "blocked",
       "source_language": "solidity",
       "upstream_repo": "https://github.com/unlink-xyz/monorepo",
       "upstream_commit": null,
@@ -150,16 +566,35 @@
       "lean_target": null,
       "failure_reason": "upstream_unavailable",
       "notes": "Referenced repository was not resolvable during setup, so no candidate contract was pinned.",
-      "manifest_path": "backlog/unlink_xyz/placeholder/case.yaml",
       "buildable": false,
       "verity_commit": "34a6b2b2e91713f870572fef1e1c4b5131812dfb",
-      "lean_toolchain": "leanprover/lean4:v4.22.0"
+      "lean_toolchain": "leanprover/lean4:v4.22.0",
+      "abstraction_level": "inaccessible_upstream",
+      "abstraction_tags": [
+        "intake_placeholder",
+        "upstream_missing"
+      ],
+      "abstraction_notes": "Intake cannot progress until a resolvable upstream snapshot is available and a benchmark slice can be selected from it.",
+      "unsupported_feature_codes": [
+        "upstream_unavailable"
+      ],
+      "spec_target": null,
+      "proof_target": null
     },
     {
       "case_id": "usual/placeholder",
+      "project": "usual",
+      "case_name": "placeholder",
       "suite": "backlog",
       "schema_version": 1,
+      "manifest_path": "backlog/usual/placeholder/case.yaml",
+      "split": "backlog",
+      "family_id": "usual",
+      "implementation_id": "private_repo",
       "stage": "candidate",
+      "translation_status": "blocked",
+      "spec_status": "not_started",
+      "proof_status": "blocked",
       "source_language": "solidity",
       "upstream_repo": null,
       "upstream_commit": null,
@@ -168,11 +603,156 @@
       "lean_target": null,
       "failure_reason": "private_access",
       "notes": "Pending private repository access and target selection.",
-      "manifest_path": "backlog/usual/placeholder/case.yaml",
       "buildable": false,
       "verity_commit": "34a6b2b2e91713f870572fef1e1c4b5131812dfb",
-      "lean_toolchain": "leanprover/lean4:v4.22.0"
+      "lean_toolchain": "leanprover/lean4:v4.22.0",
+      "abstraction_level": "inaccessible_upstream",
+      "abstraction_tags": [
+        "intake_placeholder",
+        "private_repo"
+      ],
+      "abstraction_notes": "The benchmark cannot define a translation or spec slice until repository access is available and a concrete contract artifact can be pinned.",
+      "unsupported_feature_codes": [
+        "private_repo_access"
+      ],
+      "spec_target": null,
+      "proof_target": null
     }
   ],
-  "generated_at": "2026-03-18T07:38:26.822277+00:00"
+  "tasks": [
+    {
+      "task_ref": "ethereum/deposit_contract_minimal/chain_start_threshold",
+      "task_id": "chain_start_threshold",
+      "case_id": "ethereum/deposit_contract_minimal",
+      "suite": "active",
+      "schema_version": 1,
+      "manifest_path": "cases/ethereum/deposit_contract_minimal/tasks/chain_start_threshold.yaml",
+      "split": "active",
+      "family_id": "ethereum",
+      "implementation_id": "deposit_contract",
+      "track": "proof-only",
+      "property_class": "threshold_activation",
+      "category": "bounds",
+      "difficulty": "medium",
+      "statement_id": "deposit_starts_chain_at_threshold_spec",
+      "translation_status": "translated",
+      "spec_status": "frozen",
+      "proof_status": "not_started",
+      "allowed_files": [
+        "cases/ethereum/deposit_contract_minimal/verity/Specs.lean",
+        "Benchmark/Cases/Ethereum/DepositContractMinimal/Specs.lean"
+      ],
+      "abstraction_level": "protocol_slice",
+      "abstraction_notes": "The task focuses on the threshold-triggered state flip after enough full deposits, not on global beacon chain initialization mechanics.",
+      "unsupported_feature_codes": [],
+      "spec_target": "Benchmark.Cases.Ethereum.DepositContractMinimal.Specs",
+      "proof_target": null,
+      "readiness": {
+        "translation": "ready",
+        "spec": "ready",
+        "proof": "planned"
+      }
+    },
+    {
+      "task_ref": "ethereum/deposit_contract_minimal/deposit_count",
+      "task_id": "deposit_count",
+      "case_id": "ethereum/deposit_contract_minimal",
+      "suite": "active",
+      "schema_version": 1,
+      "manifest_path": "cases/ethereum/deposit_contract_minimal/tasks/deposit_count.yaml",
+      "split": "active",
+      "family_id": "ethereum",
+      "implementation_id": "deposit_contract",
+      "track": "proof-only",
+      "property_class": "monotonic_counter",
+      "category": "state-transition",
+      "difficulty": "easy",
+      "statement_id": "deposit_increments_deposit_count_spec",
+      "translation_status": "translated",
+      "spec_status": "frozen",
+      "proof_status": "not_started",
+      "allowed_files": [
+        "cases/ethereum/deposit_contract_minimal/verity/Specs.lean",
+        "Benchmark/Cases/Ethereum/DepositContractMinimal/Specs.lean"
+      ],
+      "abstraction_level": "protocol_slice",
+      "abstraction_notes": "This task isolates the counter increment effect of a successful deposit without exposing the omitted Merkle tree or event machinery.",
+      "unsupported_feature_codes": [],
+      "spec_target": "Benchmark.Cases.Ethereum.DepositContractMinimal.Specs",
+      "proof_target": null,
+      "readiness": {
+        "translation": "ready",
+        "spec": "ready",
+        "proof": "planned"
+      }
+    },
+    {
+      "task_ref": "paladin_votes/stream_recovery_claim_usdc/claim_marks_user",
+      "task_id": "claim_marks_user",
+      "case_id": "paladin_votes/stream_recovery_claim_usdc",
+      "suite": "active",
+      "schema_version": 1,
+      "manifest_path": "cases/paladin_votes/stream_recovery_claim_usdc/tasks/claim_marks_user.yaml",
+      "split": "active",
+      "family_id": "paladin_votes",
+      "implementation_id": "stream_recovery_claim",
+      "track": "proof-only",
+      "property_class": "authorization_state",
+      "category": "state-transition",
+      "difficulty": "easy",
+      "statement_id": "claimUsdc_marks_claimed_spec",
+      "translation_status": "translated",
+      "spec_status": "frozen",
+      "proof_status": "not_started",
+      "allowed_files": [
+        "cases/paladin_votes/stream_recovery_claim_usdc/verity/Specs.lean",
+        "Benchmark/Cases/PaladinVotes/StreamRecoveryClaimUsdc/Specs.lean"
+      ],
+      "abstraction_level": "protocol_slice",
+      "abstraction_notes": "The task checks the claimed flag update in isolation from Merkle validation and ERC20 transfer side effects.",
+      "unsupported_feature_codes": [],
+      "spec_target": "Benchmark.Cases.PaladinVotes.StreamRecoveryClaimUsdc.Specs",
+      "proof_target": null,
+      "readiness": {
+        "translation": "ready",
+        "spec": "ready",
+        "proof": "planned"
+      }
+    },
+    {
+      "task_ref": "paladin_votes/stream_recovery_claim_usdc/no_overclaim",
+      "task_id": "no_overclaim",
+      "case_id": "paladin_votes/stream_recovery_claim_usdc",
+      "suite": "active",
+      "schema_version": 1,
+      "manifest_path": "cases/paladin_votes/stream_recovery_claim_usdc/tasks/no_overclaim.yaml",
+      "split": "active",
+      "family_id": "paladin_votes",
+      "implementation_id": "stream_recovery_claim",
+      "track": "proof-only",
+      "property_class": "accounting_bound",
+      "category": "accounting",
+      "difficulty": "easy",
+      "statement_id": "claimUsdc_preserves_round_bound_spec",
+      "translation_status": "translated",
+      "spec_status": "frozen",
+      "proof_status": "not_started",
+      "allowed_files": [
+        "cases/paladin_votes/stream_recovery_claim_usdc/verity/Specs.lean",
+        "Benchmark/Cases/PaladinVotes/StreamRecoveryClaimUsdc/Specs.lean"
+      ],
+      "abstraction_level": "protocol_slice",
+      "abstraction_notes": "The task captures the round-level accounting bound after a claim while staying inside the benchmark's simplified single-round model.",
+      "unsupported_feature_codes": [],
+      "spec_target": "Benchmark.Cases.PaladinVotes.StreamRecoveryClaimUsdc.Specs",
+      "proof_target": null,
+      "readiness": {
+        "translation": "ready",
+        "spec": "ready",
+        "proof": "planned"
+      }
+    }
+  ],
+  "backlog_tasks": [],
+  "generated_at": "2026-03-18T10:14:40.900205+00:00"
 }

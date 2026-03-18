@@ -5,15 +5,10 @@ import json
 from pathlib import Path
 import sys
 
-import yaml
+from manifest_utils import load_manifest_data
 
 ROOT = Path(__file__).resolve().parent.parent
 SCHEMA_ROOT = ROOT / "schemas"
-
-
-def load_yaml(path: Path) -> object:
-    with path.open(encoding="utf-8") as handle:
-        return yaml.safe_load(handle)
 
 
 def load_json(path: Path) -> object:
@@ -84,6 +79,13 @@ def collect_paths(pattern: str) -> list[Path]:
     return sorted(ROOT.glob(pattern))
 
 
+def load_manifest(path: Path) -> dict:
+    data = load_manifest_data(path)
+    if not isinstance(data, dict):
+        raise ValueError(f"{path}: manifest must decode to an object")
+    return data
+
+
 def main() -> int:
     schema_files = {
         "family": load_json(SCHEMA_ROOT / "family.schema.json"),
@@ -96,35 +98,31 @@ def main() -> int:
     family_manifests = collect_paths("families/*/family.yaml")
     implementation_manifests = collect_paths("families/*/implementations/*/implementation.yaml")
     case_manifests = collect_paths("cases/*/*/case.yaml") + collect_paths("backlog/*/*/case.yaml")
-    task_manifests = collect_paths("cases/*/*/tasks/*.yaml")
+    task_manifests = collect_paths("cases/*/*/tasks/*.yaml") + collect_paths("backlog/*/*/tasks/*.yaml")
 
     families: dict[str, dict] = {}
     implementations: dict[tuple[str, str], dict] = {}
     cases: dict[str, dict] = {}
 
     for path in family_manifests:
-        data = load_yaml(path)
+        data = load_manifest(path)
         errors.extend(validate(data, schema_files["family"], str(path.relative_to(ROOT))))
-        if isinstance(data, dict):
-            family_id = data.get("family_id")
-            if isinstance(family_id, str):
-                families[family_id] = data
+        family_id = data.get("family_id")
+        if isinstance(family_id, str):
+            families[family_id] = data
 
     for path in implementation_manifests:
-        data = load_yaml(path)
+        data = load_manifest(path)
         errors.extend(validate(data, schema_files["implementation"], str(path.relative_to(ROOT))))
-        if isinstance(data, dict):
-            family_id = data.get("family_id")
-            implementation_id = data.get("implementation_id")
-            if isinstance(family_id, str) and isinstance(implementation_id, str):
-                implementations[(family_id, implementation_id)] = data
+        family_id = data.get("family_id")
+        implementation_id = data.get("implementation_id")
+        if isinstance(family_id, str) and isinstance(implementation_id, str):
+            implementations[(family_id, implementation_id)] = data
 
     for path in case_manifests:
-        data = load_yaml(path)
+        data = load_manifest(path)
         rel = str(path.relative_to(ROOT))
         errors.extend(validate(data, schema_files["case"], rel))
-        if not isinstance(data, dict):
-            continue
         project = data.get("project")
         case_id = data.get("case_id")
         family_id = data.get("family_id")
@@ -134,19 +132,17 @@ def main() -> int:
             cases[full_case_id] = data
             if family_id != project:
                 errors.append(f"{rel}: family_id must match project for current layout")
-            if not isinstance(family_id, str) or family_id not in families:
-                errors.append(f"{rel}: unknown family_id {family_id!r}")
-            if not isinstance(family_id, str) or not isinstance(implementation_id, str):
-                errors.append(f"{rel}: implementation reference is incomplete")
-            elif (family_id, implementation_id) not in implementations:
-                errors.append(f"{rel}: unknown implementation {(family_id, implementation_id)!r}")
+        if not isinstance(family_id, str) or family_id not in families:
+            errors.append(f"{rel}: unknown family_id {family_id!r}")
+        if not isinstance(family_id, str) or not isinstance(implementation_id, str):
+            errors.append(f"{rel}: implementation reference is incomplete")
+        elif (family_id, implementation_id) not in implementations:
+            errors.append(f"{rel}: unknown implementation {(family_id, implementation_id)!r}")
 
     for path in task_manifests:
-        data = load_yaml(path)
+        data = load_manifest(path)
         rel = str(path.relative_to(ROOT))
         errors.extend(validate(data, schema_files["task"], rel))
-        if not isinstance(data, dict):
-            continue
         case_id = data.get("case_id")
         family_id = data.get("family_id")
         implementation_id = data.get("implementation_id")
@@ -161,15 +157,15 @@ def main() -> int:
         allowed_files = data.get("allowed_files")
         if isinstance(allowed_files, list):
             for allowed in allowed_files:
-                allowed_path = ROOT / allowed
+                allowed_path = ROOT / str(allowed)
                 if not allowed_path.exists():
                     errors.append(f"{rel}: allowed_files entry does not exist: {allowed}")
 
     for family_id, data in families.items():
-        for case_id in data["case_ids"]:
+        for case_id in data.get("case_ids", []):
             if case_id not in cases:
                 errors.append(f"families/{family_id}/family.yaml: missing case reference {case_id}")
-        for implementation_id in data["implementation_ids"]:
+        for implementation_id in data.get("implementation_ids", []):
             if (family_id, implementation_id) not in implementations:
                 errors.append(
                     f"families/{family_id}/family.yaml: missing implementation reference {implementation_id}"
