@@ -432,10 +432,23 @@ def extract_model_ids(models_payload: dict[str, Any]) -> list[str]:
     model_ids: list[str] = []
     for item in data:
         if isinstance(item, dict):
-            model_id = item.get("id")
-            if isinstance(model_id, str):
-                model_ids.append(model_id)
+                model_id = item.get("id")
+                if isinstance(model_id, str):
+                    model_ids.append(model_id)
     return model_ids
+
+
+def ensure_configured_model_available(config: ResolvedAgentConfig, model_ids: list[str]) -> None:
+    if not model_ids:
+        raise SystemExit(
+            "model probe could not confirm configured model "
+            f"{config.model!r}: {config.models_path} returned no parseable model ids"
+        )
+    if config.model not in model_ids:
+        raise SystemExit(
+            "model probe could not confirm configured model "
+            f"{config.model!r}: not present in {config.models_path} response"
+        )
 
 
 def extract_text(response: dict[str, Any]) -> str:
@@ -627,6 +640,7 @@ def probe_command(config_path: Path, ensure_model: bool) -> int:
     config = resolve_config(config_path, require_secrets=True)
     models_payload = list_models(config)
     model_ids = extract_model_ids(models_payload)
+    configured_model_available = config.model in model_ids
     payload = {
         "adapter": config.adapter,
         "base_url": config.base_url,
@@ -634,11 +648,11 @@ def probe_command(config_path: Path, ensure_model: bool) -> int:
         "configured_model": config.model,
         "model_count": len(model_ids),
         "models": model_ids,
-        "configured_model_available": config.model in model_ids if model_ids else None,
+        "configured_model_available": configured_model_available,
     }
     print(json.dumps(payload, indent=2))
-    if ensure_model and model_ids and config.model not in model_ids:
-        return 1
+    if ensure_model:
+        ensure_configured_model_available(config, model_ids)
     return 0
 
 

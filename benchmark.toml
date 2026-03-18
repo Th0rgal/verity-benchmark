@@ -15,6 +15,8 @@ default_agent_default_profile = "default"
 custom_agent_default_profile = "openai-compatible"
 default_agent_config = "harness/agents/default.json"
 default_agent_result_schema = "schemas/agent-run.schema.json"
+# Canonical summaries are written under results/agent_summaries/<track>/<run_slug>.json.
+# These two paths name the benchmark-owned reference defaults for the repo and generic external tracks.
 default_agent_summary = "results/agent_summaries/reference/default.json"
 custom_agent_summary = "results/agent_summaries/custom/openai-compatible.json"
 inventory = "benchmark-inventory.json"

@@ -30,6 +30,7 @@ The default benchmark agent now has its own explicit entrypoint:
 - each run artifact records the resolved `base_url` and `model` plus the originating `*_env` contract for reproducibility
 - task artifacts are partitioned under `results/agent_runs/<track>/<run_slug>/...`
 - aggregated case/suite agent-run status is written to `results/agent_summaries/<track>/<run_slug>.json`
+- `benchmark.toml` only names the benchmark-owned default summary paths: `results/agent_summaries/reference/default.json` for the repo profile and `results/agent_summaries/custom/openai-compatible.json` for the generic external profile
 - compatibility aliases remain at `results/agent_runs/*.json` and `results/agent_summary.json` for the repo reference `default` profile
 - `harness/agent_runner.py` resolves one `ResolvedAgentConfig` per run scope and reuses it across tasks, so missing or bad required env config fails once up front for live runs
 
@@ -38,6 +39,12 @@ Default OpenAI-compatible env contract:
 - `VERITY_BENCHMARK_AGENT_BASE_URL`
 - `VERITY_BENCHMARK_AGENT_MODEL`
 - `VERITY_BENCHMARK_AGENT_API_KEY`
+
+Proxy-backed example for the generic external contract:
+
+- `VERITY_BENCHMARK_AGENT_BASE_URL=https://agent-backend.thomas.md/v1`
+- `VERITY_BENCHMARK_AGENT_MODEL=builtin/fast`
+- `VERITY_BENCHMARK_AGENT_API_KEY=<token from env>`
 
 Bundled profile contract:
 
@@ -52,6 +59,7 @@ Safe reuse paths through the same default-agent entrypoints:
 - reuse the repo-owned backend through the external contract: `VERITY_BENCHMARK_AGENT_BASE_URL=https://agent-backend.thomas.md/v1 VERITY_BENCHMARK_AGENT_MODEL=builtin/fast VERITY_BENCHMARK_AGENT_API_KEY=... VERITY_BENCHMARK_AGENT_PROFILE=openai-compatible ./scripts/run_default_agent.sh <task_ref>`
 - keep a repo-local custom config on the same runner: `VERITY_BENCHMARK_AGENT_CONFIG=harness/default-agent.example.json ./scripts/run_default_agent.sh <task_ref>`
 - inspect which env vars a profile or config expects with `python3 harness/default_agent.py describe --profile <name>` or `--config <path>`
+- `python3 harness/default_agent.py probe --profile <name> --ensure-model` now fails if `/models` does not return parseable model ids or if the configured model is absent, so OpenAI-compatible validation stays explicit
 
 Optional config-only extensions for OpenAI-compatible backends:
 
@@ -105,3 +113,4 @@ Config contract for OpenAI-compatible backends:
 - set `base_url_env`, `model_env`, and `api_key_env` when those values should come from the environment
 - for each of the three connection fields, the config must provide either the direct value or the env var name
 - bundled pinned profiles use `null` for unused `*_env` fields instead of placeholder empty strings
+- the repo-owned proxy contract is `base_url = https://agent-backend.thomas.md/v1`, `model = builtin/fast`, and `api_key_env = VERITY_BENCHMARK_AGENT_API_KEY`
