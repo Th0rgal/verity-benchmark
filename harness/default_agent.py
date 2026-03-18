@@ -116,6 +116,7 @@ def validate_config_data(data: object, label: str) -> dict[str, Any]:
     if not isinstance(data, dict):
         raise SystemExit(f"{label}: config must decode to an object")
     errors = validate(data, schema, label)
+    errors.extend(validate_agent_contract(data, label))
     if errors:
         raise SystemExit("\n".join(errors))
     return data
@@ -179,6 +180,17 @@ def normalize_string(value: object) -> str | None:
         return None
     text = str(value).strip()
     return text or None
+
+
+def validate_agent_contract(config: dict[str, Any], label: str) -> list[str]:
+    errors: list[str] = []
+    for field in ("base_url", "model", "api_key"):
+        direct_value = normalize_string(config.get(field))
+        env_name = normalize_string(config.get(f"{field}_env"))
+        if direct_value or env_name:
+            continue
+        errors.append(f"{label}: set either {field!r} or {field + '_env'!r}")
+    return errors
 
 
 def slugify(value: str) -> str:
@@ -507,6 +519,14 @@ def env_contract(config: dict[str, Any]) -> dict[str, list[str]]:
     }
 
 
+def field_source(config: dict[str, Any], field: str) -> str:
+    if normalize_string(config.get(field)):
+        return "config"
+    if normalize_string(config.get(f"{field}_env")):
+        return "env"
+    return "missing"
+
+
 def describe_command(config_path: Path) -> int:
     config_data = load_config(config_path)
     config = resolve_config(config_path, require_secrets=False)
@@ -520,8 +540,11 @@ def describe_command(config_path: Path) -> int:
                 "config_path": config.config_path,
                 "base_url": config.base_url or None,
                 "base_url_env": config_data.get("base_url_env"),
+                "base_url_source": field_source(config_data, "base_url"),
                 "model": config.model or None,
                 "model_env": config_data.get("model_env"),
+                "model_source": field_source(config_data, "model"),
+                "api_key_source": field_source(config_data, "api_key"),
                 "api_key_env": config_data.get("api_key_env"),
                 "chat_completions_path": config.chat_completions_path,
                 "models_path": config.models_path,

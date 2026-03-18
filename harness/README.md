@@ -23,6 +23,7 @@ The default benchmark agent now has its own explicit entrypoint:
 - the direct proxy profile is `openai-proxy-fast`, which is a pinned `custom/openai-proxy-fast` run path
 - the current transport adapter contract is `openai_compatible`
 - credentials and endpoint selection are injected through env vars where the profile does not pin them
+- each connection field is explicit in config: `base_url`, `model`, and `api_key` may be pinned directly or sourced from `*_env`
 - the default-agent run artifact is schema-backed by `schemas/agent-run.schema.json`
 - task artifacts are partitioned under `results/agent_runs/<track>/<run_slug>/...`
 - aggregated case/suite agent-run status is written to `results/agent_summaries/<track>/<run_slug>.json`
@@ -60,9 +61,11 @@ Useful commands:
 - `python3 harness/default_agent.py profiles`
 - `python3 harness/default_agent.py validate-config harness/agents/default.json`
 - `python3 harness/default_agent.py validate-config harness/agents/openai-compatible.json`
+- `python3 harness/default_agent.py validate-config harness/agents/openai-proxy-fast.json`
 - `python3 harness/default_agent.py validate-config harness/default-agent.example.json`
 - `python3 harness/default_agent.py describe --profile default`
 - `python3 harness/default_agent.py describe --profile openai-compatible`
+- `python3 harness/default_agent.py describe --profile openai-proxy-fast`
 - `python3 harness/default_agent.py describe --config harness/default-agent.example.json`
 - `python3 harness/default_agent.py probe --profile openai-proxy-fast --ensure-model`
 - `python3 harness/default_agent.py prompt ethereum/deposit_contract_minimal/deposit_count --profile default`
@@ -86,3 +89,10 @@ Supported task manifest interface fields:
 
 `case.yaml` still carries curation and provenance metadata, but it is no longer the
 canonical description of how a task is executed.
+
+Config contract for OpenAI-compatible backends:
+
+- set `base_url`, `model`, and `api_key` directly when you want a pinned reusable profile
+- set `base_url_env`, `model_env`, and `api_key_env` when those values should come from the environment
+- for each of the three connection fields, the config must provide either the direct value or the env var name
+- bundled pinned profiles use `null` for unused `*_env` fields instead of placeholder empty strings

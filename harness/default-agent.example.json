@@ -8,6 +8,7 @@
   "base_url_env": "VERITY_BENCHMARK_AGENT_BASE_URL",
   "model": null,
   "model_env": "VERITY_BENCHMARK_AGENT_MODEL",
+  "api_key": null,
   "api_key_env": "VERITY_BENCHMARK_AGENT_API_KEY",
   "chat_completions_path": "/chat/completions",
   "models_path": "/models",

@@ -47,6 +47,7 @@ Design choices:
 - The default-agent path is adapter-driven and uses the `openai_compatible` contract for both the repo-default setup and external backends
 - The default-agent path uses named profiles in `harness/agents/` so the repo-owned reference agent and custom OpenAI-compatible backends share one runner
 - The default-agent path is now runner-backed at task, case, and suite scope through `harness/agent_runner.py`
+- The OpenAI-compatible connection contract is explicit in config: `base_url`, `model`, and `api_key` can each be pinned directly or supplied via `*_env`
 - Default-agent artifacts are partitioned by `track/run_slug` under `results/agent_runs/` with summaries under `results/agent_summaries/`
 - One selected contract per project unless scope is still ambiguous
 - The active suite is proof-only at the task level; internal `Specs` modules remain as proof premises inside Lean
@@ -99,7 +100,10 @@ export VERITY_BENCHMARK_AGENT_BASE_URL="https://agent-backend.thomas.md/v1"
 export VERITY_BENCHMARK_AGENT_MODEL="builtin/fast"
 export VERITY_BENCHMARK_AGENT_API_KEY="<redacted>"
 python3 harness/default_agent.py describe --profile openai-compatible
+python3 harness/default_agent.py describe --profile openai-proxy-fast
 VERITY_BENCHMARK_AGENT_PROFILE=openai-compatible \
+  ./scripts/run_default_agent.sh ethereum/deposit_contract_minimal/deposit_count
+VERITY_BENCHMARK_AGENT_PROFILE=openai-proxy-fast \
   ./scripts/run_default_agent.sh ethereum/deposit_contract_minimal/deposit_count
 VERITY_BENCHMARK_AGENT_CONFIG=harness/default-agent.example.json \
   ./scripts/run_default_agent.sh ethereum/deposit_contract_minimal/deposit_count
