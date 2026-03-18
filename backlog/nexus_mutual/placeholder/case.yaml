@@ -1,7 +1,14 @@
+manifest_kind: case
 project: nexus_mutual
 case_id: placeholder
 schema_version: 1
+split: backlog
+family_id: nexus_mutual
+implementation_id: smart_contracts
 stage: candidate
+translation_status: not_started
+spec_status: not_started
+proof_status: blocked
 upstream_repo: https://github.com/NexusMutual/smart-contracts
 upstream_commit: 070972503a471b6e14d01213aca4cf41e156c215
 original_contract_path: TBD
@@ -10,4 +17,15 @@ failure_reason: selection_pending
 source_language: solidity
 verity_version: 34a6b2b2e91713f870572fef1e1c4b5131812dfb
 lean_toolchain: leanprover/lean4:v4.22.0
+abstraction_level: unscoped
+abstraction_tags:
+  - intake_placeholder
+  - selection_pending
+abstraction_notes: >
+  The family is pinned to a public repository, but no benchmark slice or contract
+  abstraction boundary has been selected yet.
+unsupported_feature_codes:
+  - selection_pending
+spec_target: null
+proof_target: null
 notes: Waiting for protocol-side invariant and target contract selection.

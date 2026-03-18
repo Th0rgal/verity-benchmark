@@ -1,7 +1,14 @@
+manifest_kind: case
 project: zama
 case_id: erc7984
 schema_version: 1
+split: active
+family_id: zama
+implementation_id: openzeppelin_confidential_contracts
 stage: scoped
+translation_status: blocked
+spec_status: blocked
+proof_status: blocked
 upstream_repo: https://github.com/OpenZeppelin/openzeppelin-confidential-contracts
 upstream_commit: d7ecc2c65e38dc5646ef976490cca287c1b1c3c8
 original_contract_path: contracts/token/ERC7984/ERC7984.sol
@@ -12,6 +19,19 @@ failure_reason: missing_verity_feature
 source_language: solidity
 verity_version: 34a6b2b2e91713f870572fef1e1c4b5131812dfb
 lean_toolchain: leanprover/lean4:v4.22.0
+abstraction_level: unsupported_runtime
+abstraction_tags:
+  - encrypted_uint
+  - fhe_runtime
+  - confidential_transfer
+abstraction_notes: >
+  The candidate is useful for roadmap tracking, but the encrypted integer and FHE
+  execution semantics are outside the current benchmark abstraction boundary.
+unsupported_feature_codes:
+  - encrypted_uint
+  - fhe_runtime
+spec_target: null
+proof_target: null
 notes: >
   Selected as requested, but blocked because the contract depends on encrypted euint64
   values and FHE-specific runtime semantics that are not benchmarked in this v1 scaffold.

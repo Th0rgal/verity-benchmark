@@ -1,7 +1,14 @@
+manifest_kind: case
 project: usual
 case_id: placeholder
 schema_version: 1
+split: backlog
+family_id: usual
+implementation_id: private_repo
 stage: candidate
+translation_status: blocked
+spec_status: not_started
+proof_status: blocked
 upstream_repo: null
 upstream_commit: null
 original_contract_path: TBD
@@ -10,4 +17,15 @@ failure_reason: private_access
 source_language: solidity
 verity_version: 34a6b2b2e91713f870572fef1e1c4b5131812dfb
 lean_toolchain: leanprover/lean4:v4.22.0
+abstraction_level: inaccessible_upstream
+abstraction_tags:
+  - intake_placeholder
+  - private_repo
+abstraction_notes: >
+  The benchmark cannot define a translation or spec slice until repository access
+  is available and a concrete contract artifact can be pinned.
+unsupported_feature_codes:
+  - private_repo_access
+spec_target: null
+proof_target: null
 notes: Pending private repository access and target selection.

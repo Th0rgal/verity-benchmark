@@ -1,0 +1,15 @@
+manifest_kind: family
+schema_version: 1
+family_id: nexus_mutual
+display_name: Nexus Mutual
+split: backlog
+status: backlog
+description: >
+  Backlog intake for Nexus Mutual protocol contracts pending concrete target and
+  invariant selection.
+implementation_ids:
+  - smart_contracts
+case_ids:
+  - nexus_mutual/placeholder
+source_languages:
+  - solidity

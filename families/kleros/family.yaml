@@ -1,0 +1,15 @@
+manifest_kind: family
+schema_version: 1
+family_id: kleros
+display_name: Kleros
+split: backlog
+status: backlog
+description: >
+  Backlog intake for Kleros v2 protocol contracts waiting on narrowed target
+  selection and benchmark property scoping.
+implementation_ids:
+  - kleros_v2
+case_ids:
+  - kleros/placeholder
+source_languages:
+  - solidity

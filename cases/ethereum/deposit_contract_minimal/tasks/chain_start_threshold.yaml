@@ -1,8 +1,25 @@
+manifest_kind: task
+schema_version: 1
 task_id: chain_start_threshold
+case_id: ethereum/deposit_contract_minimal
+split: active
+family_id: ethereum
+implementation_id: deposit_contract
 statement_id: deposit_starts_chain_at_threshold_spec
+property_class: threshold_activation
 difficulty: medium
 category: bounds
 track: proof-only
+translation_status: translated
+spec_status: frozen
+proof_status: not_started
+spec_target: Benchmark.Cases.Ethereum.DepositContractMinimal.deposit_starts_chain_at_threshold_spec
+proof_target: Benchmark.Cases.Ethereum.DepositContractMinimal.deposit_starts_chain_at_threshold_spec
 allowed_files:
   - cases/ethereum/deposit_contract_minimal/verity/Specs.lean
   - Benchmark/Cases/Ethereum/DepositContractMinimal/Specs.lean
+abstraction_level: protocol_slice
+abstraction_notes: >
+  The task focuses on the threshold-triggered state flip after enough full deposits,
+  not on global beacon chain initialization mechanics.
+unsupported_feature_codes: []

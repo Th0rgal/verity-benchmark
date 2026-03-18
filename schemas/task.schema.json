@@ -1,0 +1,101 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://verity-benchmark.local/schemas/task.schema.json",
+  "title": "Benchmark Task Manifest",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "manifest_kind",
+    "schema_version",
+    "task_id",
+    "case_id",
+    "split",
+    "family_id",
+    "implementation_id",
+    "statement_id",
+    "property_class",
+    "difficulty",
+    "category",
+    "track",
+    "translation_status",
+    "spec_status",
+    "proof_status",
+    "spec_target",
+    "proof_target",
+    "allowed_files",
+    "abstraction_level",
+    "abstraction_notes",
+    "unsupported_feature_codes"
+  ],
+  "properties": {
+    "manifest_kind": {
+      "const": "task"
+    },
+    "schema_version": {
+      "type": "integer"
+    },
+    "task_id": {
+      "type": "string"
+    },
+    "case_id": {
+      "type": "string"
+    },
+    "split": {
+      "enum": ["active", "backlog"]
+    },
+    "family_id": {
+      "type": "string"
+    },
+    "implementation_id": {
+      "type": "string"
+    },
+    "statement_id": {
+      "type": "string"
+    },
+    "property_class": {
+      "type": "string"
+    },
+    "difficulty": {
+      "type": "string"
+    },
+    "category": {
+      "type": "string"
+    },
+    "track": {
+      "type": "string"
+    },
+    "translation_status": {
+      "enum": ["not_started", "scoped", "translated", "blocked"]
+    },
+    "spec_status": {
+      "enum": ["not_started", "draft", "frozen", "blocked"]
+    },
+    "proof_status": {
+      "enum": ["not_started", "in_progress", "partial", "complete", "blocked"]
+    },
+    "spec_target": {
+      "type": "string"
+    },
+    "proof_target": {
+      "type": "string"
+    },
+    "allowed_files": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "abstraction_level": {
+      "type": "string"
+    },
+    "abstraction_notes": {
+      "type": "string"
+    },
+    "unsupported_feature_codes": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    }
+  }
+}

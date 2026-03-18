@@ -14,18 +14,22 @@ Current status:
 
 Repository layout:
 - `Benchmark/`: canonical Lean modules that must compile under `lake build`
+- `families/`: family and implementation manifests for benchmark source organization
 - `cases/`: active benchmark cases with canonical `case.yaml` manifests
 - `backlog/`: non-runnable placeholders and intake candidates
+- `schemas/`: machine-readable schemas for manifests and run results
 - `benchmark-inventory.json`: generated machine-readable inventory
 - `REPORT.md`: generated status report
 - `results/`: JSON outputs emitted by the runner scripts
 - `scripts/generate_metadata.py`: regenerates the inventory and report from manifests
+- `scripts/validate_manifests.py`: validates manifest YAML against the repository schemas
 - `scripts/run_case.sh`: agent entrypoint for one case
 - `scripts/run_all.sh`: agent entrypoint for all active cases
 - `scripts/check.sh`: repo-level metadata and benchmark check
 
 Design choices:
 - One folder per benchmark case
+- Families and implementations are tracked explicitly so source provenance stays stable even as case slices evolve
 - One selected contract per project unless scope is still ambiguous
 - Simple frozen specs only
 - `case.yaml` is the only source of truth for benchmark state

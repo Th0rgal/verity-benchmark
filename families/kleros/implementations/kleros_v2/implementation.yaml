@@ -1,0 +1,16 @@
+manifest_kind: implementation
+schema_version: 1
+family_id: kleros
+implementation_id: kleros_v2
+display_name: Kleros V2
+split: backlog
+status: candidate
+upstream_repo: https://github.com/kleros/kleros-v2
+upstream_commit: 982af06592f1c48747481ab39999b776f05cac36
+source_language: solidity
+source_artifact_path: TBD
+case_ids:
+  - kleros/placeholder
+notes: >
+  Upstream source is pinned, but the benchmark still needs a final contract and
+  invariant selection before translation work starts.

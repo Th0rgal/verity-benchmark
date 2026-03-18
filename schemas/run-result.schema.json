@@ -1,0 +1,68 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://verity-benchmark.local/schemas/run-result.schema.json",
+  "title": "Benchmark Run Result",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "run_id",
+    "case_id",
+    "suite",
+    "command",
+    "started_at",
+    "completed_at",
+    "outcome",
+    "exit_code",
+    "artifacts",
+    "metrics",
+    "environment"
+  ],
+  "properties": {
+    "schema_version": {
+      "type": "integer"
+    },
+    "run_id": {
+      "type": "string"
+    },
+    "case_id": {
+      "type": "string"
+    },
+    "suite": {
+      "type": "string"
+    },
+    "command": {
+      "type": "string"
+    },
+    "started_at": {
+      "type": "string"
+    },
+    "completed_at": {
+      "type": "string"
+    },
+    "outcome": {
+      "enum": ["passed", "failed", "error", "skipped"]
+    },
+    "exit_code": {
+      "type": "integer"
+    },
+    "artifacts": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "metrics": {
+      "type": "object",
+      "additionalProperties": {
+        "type": ["string", "number", "integer", "boolean", "null"]
+      }
+    },
+    "environment": {
+      "type": "object",
+      "additionalProperties": {
+        "type": ["string", "number", "integer", "boolean", "null"]
+      }
+    }
+  }
+}
