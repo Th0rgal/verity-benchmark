@@ -24,6 +24,7 @@
     "outcome",
     "status",
     "failure_mode",
+    "failure_reason",
     "exit_code",
     "manifests",
     "artifacts",
@@ -92,6 +93,9 @@
       "enum": ["passed", "failed", "not_runnable"]
     },
     "failure_mode": {
+      "type": ["string", "null"]
+    },
+    "failure_reason": {
       "type": ["string", "null"]
     },
     "exit_code": {

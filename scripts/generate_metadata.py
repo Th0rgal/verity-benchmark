@@ -54,6 +54,12 @@ def normalize_string_list(path: Path, key: str, value: object) -> list[str]:
     return [str(item).strip() for item in value]
 
 
+def derive_spec_target(compile_target: str | None) -> str | None:
+    if compile_target and compile_target.endswith(".Compile"):
+        return compile_target[: -len(".Compile")] + ".Specs"
+    return None
+
+
 def load_case_manifest(path: Path, suite: str) -> dict:
     data = load_manifest_data(path)
     required = {
@@ -127,8 +133,9 @@ def load_task_manifest(path: Path, suite: str) -> dict:
     project = case_dir.parent.name
     case_name = case_dir.name
     task_id = normalize_optional_string(data.get("task_id")) or path.stem
-    spec_target = normalize_optional_string(data.get("spec_target"))
+    spec_target = normalize_optional_string(data.get("spec_target")) or derive_spec_target(case_entry["lean_target"])
     proof_target = normalize_optional_string(data.get("proof_target"))
+    statement_id = normalize_optional_string(data.get("statement_id"))
     translation_status = normalize_optional_string(data.get("translation_status")) or case_entry["translation_status"]
     spec_status = normalize_optional_string(data.get("spec_status")) or case_entry["spec_status"]
     proof_status = normalize_optional_string(data.get("proof_status")) or case_entry["proof_status"]
@@ -147,7 +154,7 @@ def load_task_manifest(path: Path, suite: str) -> dict:
         "property_class": normalize_optional_string(data.get("property_class")) or "unspecified",
         "category": normalize_optional_string(data.get("category")) or "unspecified",
         "difficulty": normalize_optional_string(data.get("difficulty")) or "unspecified",
-        "statement_id": normalize_optional_string(data.get("statement_id")),
+        "statement_id": statement_id,
         "translation_status": translation_status,
         "spec_status": spec_status,
         "proof_status": proof_status,
@@ -167,8 +174,8 @@ def load_task_manifest(path: Path, suite: str) -> dict:
                 and translation_status in RUNNABLE_TRANSLATION_STATUSES
                 else "blocked"
             ),
-            "spec": "ready" if spec_target and spec_status in RUNNABLE_SPEC_STATUSES else "planned",
-            "proof": "ready" if proof_target and proof_status in RUNNABLE_PROOF_STATUSES else "planned",
+            "spec": "ready" if spec_target and statement_id and spec_status in RUNNABLE_SPEC_STATUSES else "planned",
+            "proof": "ready" if proof_target and statement_id and proof_status in RUNNABLE_PROOF_STATUSES else "planned",
         },
     }
     return entry

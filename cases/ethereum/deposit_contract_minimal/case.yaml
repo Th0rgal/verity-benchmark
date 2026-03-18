@@ -16,7 +16,7 @@ lean_target: Benchmark.Cases.Ethereum.DepositContractMinimal.Compile
 selected_functions:
   - deposit
 source_language: vyper
-verity_version: 34a6b2b2e91713f870572fef1e1c4b5131812dfb
+verity_version: 4ebe4931d25e5a1594fcd3f43ff040ecc3c4225a
 lean_toolchain: leanprover/lean4:v4.22.0
 abstraction_level: protocol_slice
 abstraction_tags:

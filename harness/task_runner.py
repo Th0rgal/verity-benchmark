@@ -333,6 +333,9 @@ def load_case_records_for_suite(suite: str) -> list[dict[str, Any]]:
 
 
 def aggregate_results(task_refs: list[str], suite: str) -> dict[str, Any]:
+    if not task_refs:
+        task_refs = discover_task_refs(suite)
+
     results = []
     for task_ref in task_refs:
         path = TASK_RESULTS_DIR / f"{task_ref.replace('/', '__')}.json"

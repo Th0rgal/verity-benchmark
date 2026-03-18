@@ -6,10 +6,10 @@ This report is generated from the benchmark manifests.
 
 - Families: 7
 - Implementations: 8
-- Active cases: 4
-- Buildable active cases: 2
-- Active tasks: 4
-- Backlog cases: 4
+- Active cases: 6
+- Buildable active cases: 4
+- Active tasks: 11
+- Backlog cases: 2
 
 ## Buildable active cases
 
@@ -21,6 +21,24 @@ This report is generated from the benchmark manifests.
 - Selected functions: `deposit`
 - Source artifact: `deposit_contract/contracts/validator_registration.v.py`
 - Notes: Counter-oriented slice of the deposit path. Merkle tree, SSZ hashing, and log emission are omitted so the benchmark can focus on threshold-driven state updates.
+
+### `kleros/sortition_trees`
+- Family / implementation: `kleros` / `kleros_v2`
+- Stage: `build_green`
+- Status dimensions: translation=`translated`, spec=`frozen`, proof=`not_started`
+- Lean target: `Benchmark.Cases.Kleros.SortitionTrees.Compile`
+- Selected functions: `set`, `updateParents`, `draw`
+- Source artifact: `contracts/src/libraries/SortitionTrees.sol`
+- Notes: Sortition-tree slice focused on additive parent invariants, root conservation, interval-based draws, and ID/index correspondence.
+
+### `nexus_mutual/ramm_price_band`
+- Family / implementation: `nexus_mutual` / `smart_contracts`
+- Stage: `build_green`
+- Status dimensions: translation=`translated`, spec=`frozen`, proof=`not_started`
+- Lean target: `Benchmark.Cases.NexusMutual.RammPriceBand.Compile`
+- Selected functions: `calculateNxm`, `_getReserves`, `getSpotPrices`, `getBookValue`
+- Source artifact: `contracts/modules/capital/Ramm.sol`
+- Notes: Price-band slice of Nexus Mutual RAMM. The Verity model keeps the buffered book-value computation behind buy and sell spot prices and omits unrelated state evolution machinery.
 
 ### `paladin_votes/stream_recovery_claim_usdc`
 - Family / implementation: `paladin_votes` / `stream_recovery_claim`
@@ -65,6 +83,48 @@ This report is generated from the benchmark manifests.
 - Statement id: `deposit_increments_deposit_count_spec`
 - Spec target: `Benchmark.Cases.Ethereum.DepositContractMinimal.Specs`
 
+### `kleros/sortition_trees/draw_interval_matches_weights`
+- Track / property class: `proof-only` / `weighted_selection`
+- Readiness: translation=`ready`, spec=`ready`, proof=`planned`
+- Statement id: `draw_interval_matches_weights_spec`
+- Spec target: `Benchmark.Cases.Kleros.SortitionTrees.Specs`
+
+### `kleros/sortition_trees/node_id_bijection`
+- Track / property class: `proof-only` / `mapping_consistency`
+- Readiness: translation=`ready`, spec=`ready`, proof=`planned`
+- Statement id: `node_id_bijection_spec`
+- Spec target: `Benchmark.Cases.Kleros.SortitionTrees.Specs`
+
+### `kleros/sortition_trees/parent_equals_sum_of_children`
+- Track / property class: `proof-only` / `tree_conservation`
+- Readiness: translation=`ready`, spec=`ready`, proof=`planned`
+- Statement id: `parent_equals_sum_of_children_spec`
+- Spec target: `Benchmark.Cases.Kleros.SortitionTrees.Specs`
+
+### `kleros/sortition_trees/root_equals_sum_of_leaves`
+- Track / property class: `proof-only` / `total_conservation`
+- Readiness: translation=`ready`, spec=`ready`, proof=`planned`
+- Statement id: `root_equals_sum_of_leaves_spec`
+- Spec target: `Benchmark.Cases.Kleros.SortitionTrees.Specs`
+
+### `nexus_mutual/ramm_price_band/buy_price_ge_bv_plus_1pct`
+- Track / property class: `proof-only` / `price_lower_bound`
+- Readiness: translation=`ready`, spec=`ready`, proof=`planned`
+- Statement id: `buy_price_above_book_value_buffer_spec`
+- Spec target: `Benchmark.Cases.NexusMutual.RammPriceBand.Specs`
+
+### `nexus_mutual/ramm_price_band/sell_price_le_buy_price`
+- Track / property class: `proof-only` / `price_ordering`
+- Readiness: translation=`ready`, spec=`ready`, proof=`planned`
+- Statement id: `sell_price_below_buy_price_spec`
+- Spec target: `Benchmark.Cases.NexusMutual.RammPriceBand.Specs`
+
+### `nexus_mutual/ramm_price_band/sell_price_le_bv_minus_1pct`
+- Track / property class: `proof-only` / `price_upper_bound`
+- Readiness: translation=`ready`, spec=`ready`, proof=`planned`
+- Statement id: `sell_price_below_book_value_buffer_spec`
+- Spec target: `Benchmark.Cases.NexusMutual.RammPriceBand.Specs`
+
 ### `paladin_votes/stream_recovery_claim_usdc/claim_marks_user`
 - Track / property class: `proof-only` / `authorization_state`
 - Readiness: translation=`ready`, spec=`ready`, proof=`planned`
@@ -78,22 +138,6 @@ This report is generated from the benchmark manifests.
 - Spec target: `Benchmark.Cases.PaladinVotes.StreamRecoveryClaimUsdc.Specs`
 
 ## Backlog
-
-### `kleros/placeholder`
-- Family / implementation: `kleros` / `kleros_v2`
-- Stage: `candidate`
-- Status dimensions: translation=`not_started`, spec=`not_started`, proof=`blocked`
-- Failure reason: `selection_pending`
-- Source artifact: `TBD`
-- Notes: Waiting for protocol-side contract/function selection.
-
-### `nexus_mutual/placeholder`
-- Family / implementation: `nexus_mutual` / `smart_contracts`
-- Stage: `candidate`
-- Status dimensions: translation=`not_started`, spec=`not_started`, proof=`blocked`
-- Failure reason: `selection_pending`
-- Source artifact: `TBD`
-- Notes: Waiting for protocol-side invariant and target contract selection.
 
 ### `unlink_xyz/placeholder`
 - Family / implementation: `unlink_xyz` / `monorepo`

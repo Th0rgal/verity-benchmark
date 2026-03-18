@@ -15,7 +15,7 @@ original_contract_path: TBD
 selected_functions: []
 failure_reason: private_access
 source_language: solidity
-verity_version: 34a6b2b2e91713f870572fef1e1c4b5131812dfb
+verity_version: 4ebe4931d25e5a1594fcd3f43ff040ecc3c4225a
 lean_toolchain: leanprover/lean4:v4.22.0
 abstraction_level: inaccessible_upstream
 abstraction_tags:

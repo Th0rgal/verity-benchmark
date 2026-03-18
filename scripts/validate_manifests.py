@@ -148,6 +148,12 @@ def main() -> int:
         implementation_id = data.get("implementation_id")
         if not isinstance(case_id, str) or case_id not in cases:
             errors.append(f"{rel}: unknown case_id {case_id!r}")
+        else:
+            parent_case_id = f"{path.parent.parent.parent.name}/{path.parent.parent.name}"
+            if case_id != parent_case_id:
+                errors.append(
+                    f"{rel}: case_id {case_id!r} does not match parent case {parent_case_id!r}"
+                )
         if not isinstance(family_id, str) or family_id not in families:
             errors.append(f"{rel}: unknown family_id {family_id!r}")
         if not isinstance(family_id, str) or not isinstance(implementation_id, str):

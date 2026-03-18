@@ -1,0 +1,25 @@
+manifest_kind: task
+schema_version: 1
+task_id: draw_interval_matches_weights
+case_id: kleros/sortition_trees
+split: active
+family_id: kleros
+implementation_id: kleros_v2
+statement_id: draw_interval_matches_weights_spec
+property_class: weighted_selection
+difficulty: hard
+category: probabilistic-encoding
+track: proof-only
+translation_status: translated
+spec_status: frozen
+proof_status: not_started
+spec_target: Benchmark.Cases.Kleros.SortitionTrees.Specs
+proof_target: null
+allowed_files:
+  - cases/kleros/sortition_trees/verity/Specs.lean
+  - Benchmark/Cases/Kleros/SortitionTrees/Specs.lean
+abstraction_level: protocol_slice
+abstraction_notes: >
+  The probabilistic claim is encoded as interval preservation: each leaf owns a
+  contiguous ticket interval whose width equals its weight.
+unsupported_feature_codes: []

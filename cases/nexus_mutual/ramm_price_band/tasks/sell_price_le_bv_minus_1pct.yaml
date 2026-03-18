@@ -1,0 +1,25 @@
+manifest_kind: task
+schema_version: 1
+task_id: sell_price_le_bv_minus_1pct
+case_id: nexus_mutual/ramm_price_band
+split: active
+family_id: nexus_mutual
+implementation_id: smart_contracts
+statement_id: sell_price_below_book_value_buffer_spec
+property_class: price_upper_bound
+difficulty: easy
+category: arithmetic-invariant
+track: proof-only
+translation_status: translated
+spec_status: frozen
+proof_status: not_started
+spec_target: Benchmark.Cases.NexusMutual.RammPriceBand.Specs
+proof_target: null
+allowed_files:
+  - cases/nexus_mutual/ramm_price_band/verity/Specs.lean
+  - Benchmark/Cases/NexusMutual/RammPriceBand/Specs.lean
+abstraction_level: protocol_slice
+abstraction_notes: >
+  The task isolates the 1 percent sell-side discount below book value after the
+  price band is synchronized.
+unsupported_feature_codes: []

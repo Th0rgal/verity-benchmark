@@ -1,0 +1,25 @@
+manifest_kind: task
+schema_version: 1
+task_id: parent_equals_sum_of_children
+case_id: kleros/sortition_trees
+split: active
+family_id: kleros
+implementation_id: kleros_v2
+statement_id: parent_equals_sum_of_children_spec
+property_class: tree_conservation
+difficulty: medium
+category: state-transition
+track: proof-only
+translation_status: translated
+spec_status: frozen
+proof_status: not_started
+spec_target: Benchmark.Cases.Kleros.SortitionTrees.Specs
+proof_target: null
+allowed_files:
+  - cases/kleros/sortition_trees/verity/Specs.lean
+  - Benchmark/Cases/Kleros/SortitionTrees/Specs.lean
+abstraction_level: protocol_slice
+abstraction_notes: >
+  This task checks that each internal node remains the sum of its direct
+  children after a leaf update.
+unsupported_feature_codes: []

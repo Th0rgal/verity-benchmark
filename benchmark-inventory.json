@@ -12,44 +12,50 @@
   "summary": {
     "family_count": 7,
     "implementation_count": 8,
-    "active_case_count": 4,
-    "backlog_case_count": 4,
-    "active_task_count": 4,
+    "active_case_count": 6,
+    "backlog_case_count": 2,
+    "active_task_count": 11,
     "backlog_task_count": 0,
-    "buildable_case_count": 2,
-    "runnable_task_count": 4,
+    "buildable_case_count": 4,
+    "runnable_task_count": 11,
     "case_stage_counts": {
-      "build_green": 2,
-      "candidate": 4,
+      "build_green": 4,
+      "candidate": 2,
       "scoped": 2
     },
     "translation_status_counts": {
       "blocked": 4,
-      "not_started": 2,
-      "translated": 2
+      "translated": 4
     },
     "spec_status_counts": {
       "blocked": 1,
       "draft": 1,
-      "frozen": 2,
-      "not_started": 4
-    },
-    "proof_status_counts": {
-      "blocked": 6,
+      "frozen": 4,
       "not_started": 2
     },
+    "proof_status_counts": {
+      "blocked": 4,
+      "not_started": 4
+    },
     "task_track_counts": {
-      "proof-only": 4
+      "proof-only": 11
     },
     "task_property_class_counts": {
       "accounting_bound": 1,
       "authorization_state": 1,
+      "mapping_consistency": 1,
       "monotonic_counter": 1,
-      "threshold_activation": 1
+      "price_lower_bound": 1,
+      "price_ordering": 1,
+      "price_upper_bound": 1,
+      "threshold_activation": 1,
+      "total_conservation": 1,
+      "tree_conservation": 1,
+      "weighted_selection": 1
     },
     "family_split_counts": {
-      "active": 3,
-      "backlog": 4
+      "active": 5,
+      "backlog": 2
     }
   },
   "families": [
@@ -76,14 +82,14 @@
     {
       "family_id": "kleros",
       "display_name": "Kleros",
-      "split": "backlog",
-      "status": "backlog",
-      "description": "Backlog intake for Kleros v2 protocol contracts waiting on narrowed target selection and benchmark property scoping.",
+      "split": "active",
+      "status": "active",
+      "description": "Active benchmark family for Kleros protocol slices focused on proving conservation and selection properties over jury-sampling logic.",
       "implementation_ids": [
         "kleros_v2"
       ],
       "case_ids": [
-        "kleros/placeholder"
+        "kleros/sortition_trees"
       ],
       "source_languages": [
         "solidity"
@@ -93,14 +99,14 @@
     {
       "family_id": "nexus_mutual",
       "display_name": "Nexus Mutual",
-      "split": "backlog",
-      "status": "backlog",
-      "description": "Backlog intake for Nexus Mutual protocol contracts pending concrete target and invariant selection.",
+      "split": "active",
+      "status": "active",
+      "description": "Active benchmark family for Nexus Mutual protocol slices centered on proving arithmetic and behavioral properties over real contract pricing logic.",
       "implementation_ids": [
         "smart_contracts"
       ],
       "case_ids": [
-        "nexus_mutual/placeholder"
+        "nexus_mutual/ramm_price_band"
       ],
       "source_languages": [
         "solidity"
@@ -213,32 +219,32 @@
       "family_id": "kleros",
       "implementation_id": "kleros_v2",
       "display_name": "Kleros V2",
-      "split": "backlog",
-      "status": "candidate",
+      "split": "active",
+      "status": "translated",
       "upstream_repo": "https://github.com/kleros/kleros-v2",
-      "upstream_commit": "982af06592f1c48747481ab39999b776f05cac36",
+      "upstream_commit": "75125dfa54eee723cac239f20e5746d15786196b",
       "source_language": "solidity",
-      "source_artifact_path": "TBD",
+      "source_artifact_path": "contracts/src/libraries/SortitionTrees.sol",
       "case_ids": [
-        "kleros/placeholder"
+        "kleros/sortition_trees"
       ],
-      "notes": "Upstream source is pinned, but the benchmark still needs a final contract and invariant selection before translation work starts.",
+      "notes": "Active implementation entry for Kleros V2, currently benchmarking a fixed-tree slice of the sortition library.",
       "manifest_path": "families/kleros/implementations/kleros_v2/implementation.yaml"
     },
     {
       "family_id": "nexus_mutual",
       "implementation_id": "smart_contracts",
       "display_name": "Nexus Mutual Smart Contracts",
-      "split": "backlog",
-      "status": "candidate",
+      "split": "active",
+      "status": "translated",
       "upstream_repo": "https://github.com/NexusMutual/smart-contracts",
-      "upstream_commit": "070972503a471b6e14d01213aca4cf41e156c215",
+      "upstream_commit": "ad212043a78953a2cd98cd02b06c8e3e354c6023",
       "source_language": "solidity",
-      "source_artifact_path": "TBD",
+      "source_artifact_path": "contracts/modules/capital/Ramm.sol",
       "case_ids": [
-        "nexus_mutual/placeholder"
+        "nexus_mutual/ramm_price_band"
       ],
-      "notes": "Public repository is pinned, but the benchmark has not yet selected a stable contract/function slice to translate.",
+      "notes": "Active implementation entry for the Nexus Mutual smart-contract repository, currently benchmarking the RAMM price-band slice.",
       "manifest_path": "families/nexus_mutual/implementations/smart_contracts/implementation.yaml"
     },
     {
@@ -333,7 +339,7 @@
       "failure_reason": "missing_implementation_artifact",
       "notes": "Candidate selected, but the benchmark currently lacks a pinned implementation artifact beyond the EIP text.",
       "buildable": false,
-      "verity_commit": "34a6b2b2e91713f870572fef1e1c4b5131812dfb",
+      "verity_commit": "4ebe4931d25e5a1594fcd3f43ff040ecc3c4225a",
       "lean_toolchain": "leanprover/lean4:v4.22.0",
       "abstraction_level": "protocol_slice",
       "abstraction_tags": [
@@ -373,7 +379,7 @@
       "failure_reason": null,
       "notes": "Counter-oriented slice of the deposit path. Merkle tree, SSZ hashing, and log emission are omitted so the benchmark can focus on threshold-driven state updates.",
       "buildable": true,
-      "verity_commit": "34a6b2b2e91713f870572fef1e1c4b5131812dfb",
+      "verity_commit": "4ebe4931d25e5a1594fcd3f43ff040ecc3c4225a",
       "lean_toolchain": "leanprover/lean4:v4.22.0",
       "abstraction_level": "protocol_slice",
       "abstraction_tags": [
@@ -386,6 +392,89 @@
       "unsupported_feature_codes": [],
       "spec_target": "Benchmark.Cases.Ethereum.DepositContractMinimal.Specs",
       "proof_target": "Benchmark.Cases.Ethereum.DepositContractMinimal.Specs"
+    },
+    {
+      "case_id": "kleros/sortition_trees",
+      "project": "kleros",
+      "case_name": "sortition_trees",
+      "suite": "active",
+      "schema_version": 1,
+      "manifest_path": "cases/kleros/sortition_trees/case.yaml",
+      "split": "active",
+      "family_id": "kleros",
+      "implementation_id": "kleros_v2",
+      "stage": "build_green",
+      "translation_status": "translated",
+      "spec_status": "frozen",
+      "proof_status": "not_started",
+      "source_language": "solidity",
+      "upstream_repo": "https://github.com/kleros/kleros-v2",
+      "upstream_commit": "75125dfa54eee723cac239f20e5746d15786196b",
+      "original_contract_path": "contracts/src/libraries/SortitionTrees.sol",
+      "selected_functions": [
+        "set",
+        "updateParents",
+        "draw"
+      ],
+      "lean_target": "Benchmark.Cases.Kleros.SortitionTrees.Compile",
+      "failure_reason": null,
+      "notes": "Sortition-tree slice focused on additive parent invariants, root conservation, interval-based draws, and ID/index correspondence.",
+      "buildable": true,
+      "verity_commit": "4ebe4931d25e5a1594fcd3f43ff040ecc3c4225a",
+      "lean_toolchain": "leanprover/lean4:v4.22.0",
+      "abstraction_level": "protocol_slice",
+      "abstraction_tags": [
+        "fixed_arity_slice",
+        "four_leaf_specialization",
+        "bytes32_id_elided_to_uint",
+        "hash_randomness_elided_to_ticket"
+      ],
+      "abstraction_notes": "The benchmark specializes the dynamic K-ary sortition tree to a balanced four-leaf binary slice. It preserves the parent-update and draw-interval logic while abstracting dynamic arrays, bytes32 stake-path packing, and the hash used to derive the draw ticket.",
+      "unsupported_feature_codes": [],
+      "spec_target": "Benchmark.Cases.Kleros.SortitionTrees.Specs",
+      "proof_target": "Benchmark.Cases.Kleros.SortitionTrees.Specs"
+    },
+    {
+      "case_id": "nexus_mutual/ramm_price_band",
+      "project": "nexus_mutual",
+      "case_name": "ramm_price_band",
+      "suite": "active",
+      "schema_version": 1,
+      "manifest_path": "cases/nexus_mutual/ramm_price_band/case.yaml",
+      "split": "active",
+      "family_id": "nexus_mutual",
+      "implementation_id": "smart_contracts",
+      "stage": "build_green",
+      "translation_status": "translated",
+      "spec_status": "frozen",
+      "proof_status": "not_started",
+      "source_language": "solidity",
+      "upstream_repo": "https://github.com/NexusMutual/smart-contracts",
+      "upstream_commit": "ad212043a78953a2cd98cd02b06c8e3e354c6023",
+      "original_contract_path": "contracts/modules/capital/Ramm.sol",
+      "selected_functions": [
+        "calculateNxm",
+        "_getReserves",
+        "getSpotPrices",
+        "getBookValue"
+      ],
+      "lean_target": "Benchmark.Cases.NexusMutual.RammPriceBand.Compile",
+      "failure_reason": null,
+      "notes": "Price-band slice of Nexus Mutual RAMM. The Verity model keeps the buffered book-value computation behind buy and sell spot prices and omits unrelated state evolution machinery.",
+      "buildable": true,
+      "verity_commit": "4ebe4931d25e5a1594fcd3f43ff040ecc3c4225a",
+      "lean_toolchain": "leanprover/lean4:v4.22.0",
+      "abstraction_level": "protocol_slice",
+      "abstraction_tags": [
+        "reserve_dynamics_elided",
+        "ratchet_elided",
+        "twap_elided",
+        "price_band_slice"
+      ],
+      "abstraction_notes": "The benchmark freezes the 1 percent buy/sell band around book value that the RAMM exposes through its reserve-derived spot prices. Reserve ratchets, swap execution, and oracle accumulation are omitted so the tasks focus on the arithmetic safety band itself.",
+      "unsupported_feature_codes": [],
+      "spec_target": "Benchmark.Cases.NexusMutual.RammPriceBand.Specs",
+      "proof_target": "Benchmark.Cases.NexusMutual.RammPriceBand.Specs"
     },
     {
       "case_id": "paladin_votes/stream_recovery_claim_usdc",
@@ -413,7 +502,7 @@
       "failure_reason": null,
       "notes": "Single-round accounting slice of the USDC claim path. Merkle verification is abstracted as a boolean witness and token transfer side effects are omitted.",
       "buildable": true,
-      "verity_commit": "34a6b2b2e91713f870572fef1e1c4b5131812dfb",
+      "verity_commit": "4ebe4931d25e5a1594fcd3f43ff040ecc3c4225a",
       "lean_toolchain": "leanprover/lean4:v4.22.0",
       "abstraction_level": "protocol_slice",
       "abstraction_tags": [
@@ -452,7 +541,7 @@
       "failure_reason": "missing_verity_feature",
       "notes": "Selected as requested, but blocked because the contract depends on encrypted euint64 values and FHE-specific runtime semantics that are not benchmarked in this v1 scaffold.",
       "buildable": false,
-      "verity_commit": "34a6b2b2e91713f870572fef1e1c4b5131812dfb",
+      "verity_commit": "4ebe4931d25e5a1594fcd3f43ff040ecc3c4225a",
       "lean_toolchain": "leanprover/lean4:v4.22.0",
       "abstraction_level": "unsupported_runtime",
       "abstraction_tags": [
@@ -470,80 +559,6 @@
     }
   ],
   "backlog": [
-    {
-      "case_id": "kleros/placeholder",
-      "project": "kleros",
-      "case_name": "placeholder",
-      "suite": "backlog",
-      "schema_version": 1,
-      "manifest_path": "backlog/kleros/placeholder/case.yaml",
-      "split": "backlog",
-      "family_id": "kleros",
-      "implementation_id": "kleros_v2",
-      "stage": "candidate",
-      "translation_status": "not_started",
-      "spec_status": "not_started",
-      "proof_status": "blocked",
-      "source_language": "solidity",
-      "upstream_repo": "https://github.com/kleros/kleros-v2",
-      "upstream_commit": "982af06592f1c48747481ab39999b776f05cac36",
-      "original_contract_path": "TBD",
-      "selected_functions": [],
-      "lean_target": null,
-      "failure_reason": "selection_pending",
-      "notes": "Waiting for protocol-side contract/function selection.",
-      "buildable": false,
-      "verity_commit": "34a6b2b2e91713f870572fef1e1c4b5131812dfb",
-      "lean_toolchain": "leanprover/lean4:v4.22.0",
-      "abstraction_level": "unscoped",
-      "abstraction_tags": [
-        "intake_placeholder",
-        "selection_pending"
-      ],
-      "abstraction_notes": "Upstream source is pinned, but the benchmark has not yet selected the contract slice, abstractions, or proof targets worth formalizing.",
-      "unsupported_feature_codes": [
-        "selection_pending"
-      ],
-      "spec_target": null,
-      "proof_target": null
-    },
-    {
-      "case_id": "nexus_mutual/placeholder",
-      "project": "nexus_mutual",
-      "case_name": "placeholder",
-      "suite": "backlog",
-      "schema_version": 1,
-      "manifest_path": "backlog/nexus_mutual/placeholder/case.yaml",
-      "split": "backlog",
-      "family_id": "nexus_mutual",
-      "implementation_id": "smart_contracts",
-      "stage": "candidate",
-      "translation_status": "not_started",
-      "spec_status": "not_started",
-      "proof_status": "blocked",
-      "source_language": "solidity",
-      "upstream_repo": "https://github.com/NexusMutual/smart-contracts",
-      "upstream_commit": "070972503a471b6e14d01213aca4cf41e156c215",
-      "original_contract_path": "TBD",
-      "selected_functions": [],
-      "lean_target": null,
-      "failure_reason": "selection_pending",
-      "notes": "Waiting for protocol-side invariant and target contract selection.",
-      "buildable": false,
-      "verity_commit": "34a6b2b2e91713f870572fef1e1c4b5131812dfb",
-      "lean_toolchain": "leanprover/lean4:v4.22.0",
-      "abstraction_level": "unscoped",
-      "abstraction_tags": [
-        "intake_placeholder",
-        "selection_pending"
-      ],
-      "abstraction_notes": "The family is pinned to a public repository, but no benchmark slice or contract abstraction boundary has been selected yet.",
-      "unsupported_feature_codes": [
-        "selection_pending"
-      ],
-      "spec_target": null,
-      "proof_target": null
-    },
     {
       "case_id": "unlink_xyz/placeholder",
       "project": "unlink_xyz",
@@ -567,7 +582,7 @@
       "failure_reason": "upstream_unavailable",
       "notes": "Referenced repository was not resolvable during setup, so no candidate contract was pinned.",
       "buildable": false,
-      "verity_commit": "34a6b2b2e91713f870572fef1e1c4b5131812dfb",
+      "verity_commit": "4ebe4931d25e5a1594fcd3f43ff040ecc3c4225a",
       "lean_toolchain": "leanprover/lean4:v4.22.0",
       "abstraction_level": "inaccessible_upstream",
       "abstraction_tags": [
@@ -604,7 +619,7 @@
       "failure_reason": "private_access",
       "notes": "Pending private repository access and target selection.",
       "buildable": false,
-      "verity_commit": "34a6b2b2e91713f870572fef1e1c4b5131812dfb",
+      "verity_commit": "4ebe4931d25e5a1594fcd3f43ff040ecc3c4225a",
       "lean_toolchain": "leanprover/lean4:v4.22.0",
       "abstraction_level": "inaccessible_upstream",
       "abstraction_tags": [
@@ -687,6 +702,237 @@
       }
     },
     {
+      "task_ref": "kleros/sortition_trees/draw_interval_matches_weights",
+      "task_id": "draw_interval_matches_weights",
+      "case_id": "kleros/sortition_trees",
+      "suite": "active",
+      "schema_version": 1,
+      "manifest_path": "cases/kleros/sortition_trees/tasks/draw_interval_matches_weights.yaml",
+      "split": "active",
+      "family_id": "kleros",
+      "implementation_id": "kleros_v2",
+      "track": "proof-only",
+      "property_class": "weighted_selection",
+      "category": "probabilistic-encoding",
+      "difficulty": "hard",
+      "statement_id": "draw_interval_matches_weights_spec",
+      "translation_status": "translated",
+      "spec_status": "frozen",
+      "proof_status": "not_started",
+      "allowed_files": [
+        "cases/kleros/sortition_trees/verity/Specs.lean",
+        "Benchmark/Cases/Kleros/SortitionTrees/Specs.lean"
+      ],
+      "abstraction_level": "protocol_slice",
+      "abstraction_notes": "The probabilistic claim is encoded as interval preservation: each leaf owns a contiguous ticket interval whose width equals its weight.",
+      "unsupported_feature_codes": [],
+      "spec_target": "Benchmark.Cases.Kleros.SortitionTrees.Specs",
+      "proof_target": null,
+      "readiness": {
+        "translation": "ready",
+        "spec": "ready",
+        "proof": "planned"
+      }
+    },
+    {
+      "task_ref": "kleros/sortition_trees/node_id_bijection",
+      "task_id": "node_id_bijection",
+      "case_id": "kleros/sortition_trees",
+      "suite": "active",
+      "schema_version": 1,
+      "manifest_path": "cases/kleros/sortition_trees/tasks/node_id_bijection.yaml",
+      "split": "active",
+      "family_id": "kleros",
+      "implementation_id": "kleros_v2",
+      "track": "proof-only",
+      "property_class": "mapping_consistency",
+      "category": "state-transition",
+      "difficulty": "medium",
+      "statement_id": "node_id_bijection_spec",
+      "translation_status": "translated",
+      "spec_status": "frozen",
+      "proof_status": "not_started",
+      "allowed_files": [
+        "cases/kleros/sortition_trees/verity/Specs.lean",
+        "Benchmark/Cases/Kleros/SortitionTrees/Specs.lean"
+      ],
+      "abstraction_level": "protocol_slice",
+      "abstraction_notes": "This task checks the explicit two-way correspondence between node indexes and stake-path IDs in the fixed tree slice.",
+      "unsupported_feature_codes": [],
+      "spec_target": "Benchmark.Cases.Kleros.SortitionTrees.Specs",
+      "proof_target": null,
+      "readiness": {
+        "translation": "ready",
+        "spec": "ready",
+        "proof": "planned"
+      }
+    },
+    {
+      "task_ref": "kleros/sortition_trees/parent_equals_sum_of_children",
+      "task_id": "parent_equals_sum_of_children",
+      "case_id": "kleros/sortition_trees",
+      "suite": "active",
+      "schema_version": 1,
+      "manifest_path": "cases/kleros/sortition_trees/tasks/parent_equals_sum_of_children.yaml",
+      "split": "active",
+      "family_id": "kleros",
+      "implementation_id": "kleros_v2",
+      "track": "proof-only",
+      "property_class": "tree_conservation",
+      "category": "state-transition",
+      "difficulty": "medium",
+      "statement_id": "parent_equals_sum_of_children_spec",
+      "translation_status": "translated",
+      "spec_status": "frozen",
+      "proof_status": "not_started",
+      "allowed_files": [
+        "cases/kleros/sortition_trees/verity/Specs.lean",
+        "Benchmark/Cases/Kleros/SortitionTrees/Specs.lean"
+      ],
+      "abstraction_level": "protocol_slice",
+      "abstraction_notes": "This task checks that each internal node remains the sum of its direct children after a leaf update.",
+      "unsupported_feature_codes": [],
+      "spec_target": "Benchmark.Cases.Kleros.SortitionTrees.Specs",
+      "proof_target": null,
+      "readiness": {
+        "translation": "ready",
+        "spec": "ready",
+        "proof": "planned"
+      }
+    },
+    {
+      "task_ref": "kleros/sortition_trees/root_equals_sum_of_leaves",
+      "task_id": "root_equals_sum_of_leaves",
+      "case_id": "kleros/sortition_trees",
+      "suite": "active",
+      "schema_version": 1,
+      "manifest_path": "cases/kleros/sortition_trees/tasks/root_equals_sum_of_leaves.yaml",
+      "split": "active",
+      "family_id": "kleros",
+      "implementation_id": "kleros_v2",
+      "track": "proof-only",
+      "property_class": "total_conservation",
+      "category": "state-transition",
+      "difficulty": "medium",
+      "statement_id": "root_equals_sum_of_leaves_spec",
+      "translation_status": "translated",
+      "spec_status": "frozen",
+      "proof_status": "not_started",
+      "allowed_files": [
+        "cases/kleros/sortition_trees/verity/Specs.lean",
+        "Benchmark/Cases/Kleros/SortitionTrees/Specs.lean"
+      ],
+      "abstraction_level": "protocol_slice",
+      "abstraction_notes": "This task checks that the root always equals the total stake stored in the leaves of the benchmarked tree slice.",
+      "unsupported_feature_codes": [],
+      "spec_target": "Benchmark.Cases.Kleros.SortitionTrees.Specs",
+      "proof_target": null,
+      "readiness": {
+        "translation": "ready",
+        "spec": "ready",
+        "proof": "planned"
+      }
+    },
+    {
+      "task_ref": "nexus_mutual/ramm_price_band/buy_price_ge_bv_plus_1pct",
+      "task_id": "buy_price_ge_bv_plus_1pct",
+      "case_id": "nexus_mutual/ramm_price_band",
+      "suite": "active",
+      "schema_version": 1,
+      "manifest_path": "cases/nexus_mutual/ramm_price_band/tasks/buy_price_ge_bv_plus_1pct.yaml",
+      "split": "active",
+      "family_id": "nexus_mutual",
+      "implementation_id": "smart_contracts",
+      "track": "proof-only",
+      "property_class": "price_lower_bound",
+      "category": "arithmetic-invariant",
+      "difficulty": "easy",
+      "statement_id": "buy_price_above_book_value_buffer_spec",
+      "translation_status": "translated",
+      "spec_status": "frozen",
+      "proof_status": "not_started",
+      "allowed_files": [
+        "cases/nexus_mutual/ramm_price_band/verity/Specs.lean",
+        "Benchmark/Cases/NexusMutual/RammPriceBand/Specs.lean"
+      ],
+      "abstraction_level": "protocol_slice",
+      "abstraction_notes": "The task isolates the 1 percent buy-side buffer over book value after the price band is synchronized.",
+      "unsupported_feature_codes": [],
+      "spec_target": "Benchmark.Cases.NexusMutual.RammPriceBand.Specs",
+      "proof_target": null,
+      "readiness": {
+        "translation": "ready",
+        "spec": "ready",
+        "proof": "planned"
+      }
+    },
+    {
+      "task_ref": "nexus_mutual/ramm_price_band/sell_price_le_buy_price",
+      "task_id": "sell_price_le_buy_price",
+      "case_id": "nexus_mutual/ramm_price_band",
+      "suite": "active",
+      "schema_version": 1,
+      "manifest_path": "cases/nexus_mutual/ramm_price_band/tasks/sell_price_le_buy_price.yaml",
+      "split": "active",
+      "family_id": "nexus_mutual",
+      "implementation_id": "smart_contracts",
+      "track": "proof-only",
+      "property_class": "price_ordering",
+      "category": "arithmetic-invariant",
+      "difficulty": "easy",
+      "statement_id": "sell_price_below_buy_price_spec",
+      "translation_status": "translated",
+      "spec_status": "frozen",
+      "proof_status": "not_started",
+      "allowed_files": [
+        "cases/nexus_mutual/ramm_price_band/verity/Specs.lean",
+        "Benchmark/Cases/NexusMutual/RammPriceBand/Specs.lean"
+      ],
+      "abstraction_level": "protocol_slice",
+      "abstraction_notes": "The task checks that the sell quote remains no greater than the buy quote in the buffered book-value band.",
+      "unsupported_feature_codes": [],
+      "spec_target": "Benchmark.Cases.NexusMutual.RammPriceBand.Specs",
+      "proof_target": null,
+      "readiness": {
+        "translation": "ready",
+        "spec": "ready",
+        "proof": "planned"
+      }
+    },
+    {
+      "task_ref": "nexus_mutual/ramm_price_band/sell_price_le_bv_minus_1pct",
+      "task_id": "sell_price_le_bv_minus_1pct",
+      "case_id": "nexus_mutual/ramm_price_band",
+      "suite": "active",
+      "schema_version": 1,
+      "manifest_path": "cases/nexus_mutual/ramm_price_band/tasks/sell_price_le_bv_minus_1pct.yaml",
+      "split": "active",
+      "family_id": "nexus_mutual",
+      "implementation_id": "smart_contracts",
+      "track": "proof-only",
+      "property_class": "price_upper_bound",
+      "category": "arithmetic-invariant",
+      "difficulty": "easy",
+      "statement_id": "sell_price_below_book_value_buffer_spec",
+      "translation_status": "translated",
+      "spec_status": "frozen",
+      "proof_status": "not_started",
+      "allowed_files": [
+        "cases/nexus_mutual/ramm_price_band/verity/Specs.lean",
+        "Benchmark/Cases/NexusMutual/RammPriceBand/Specs.lean"
+      ],
+      "abstraction_level": "protocol_slice",
+      "abstraction_notes": "The task isolates the 1 percent sell-side discount below book value after the price band is synchronized.",
+      "unsupported_feature_codes": [],
+      "spec_target": "Benchmark.Cases.NexusMutual.RammPriceBand.Specs",
+      "proof_target": null,
+      "readiness": {
+        "translation": "ready",
+        "spec": "ready",
+        "proof": "planned"
+      }
+    },
+    {
       "task_ref": "paladin_votes/stream_recovery_claim_usdc/claim_marks_user",
       "task_id": "claim_marks_user",
       "case_id": "paladin_votes/stream_recovery_claim_usdc",
@@ -754,5 +1000,5 @@
     }
   ],
   "backlog_tasks": [],
-  "generated_at": "2026-03-18T10:14:40.900205+00:00"
+  "generated_at": "2026-03-18T15:29:02.512902+00:00"
 }
