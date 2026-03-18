@@ -1,10 +1,10 @@
 {
   "schema_version": 1,
-  "agent_id": "verity-benchmark-default",
+  "agent_id": "openai-compatible",
   "adapter": "openai_compatible",
-  "base_url": "https://agent-backend.thomas.md/v1",
+  "base_url": null,
   "base_url_env": "VERITY_BENCHMARK_AGENT_BASE_URL",
-  "model": "builtin/fast",
+  "model": null,
   "model_env": "VERITY_BENCHMARK_AGENT_MODEL",
   "api_key_env": "VERITY_BENCHMARK_AGENT_API_KEY",
   "chat_completions_path": "/chat/completions",

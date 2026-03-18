@@ -42,6 +42,7 @@
       "additionalProperties": false,
       "required": [
         "profile",
+        "agent_id",
         "adapter",
         "config_path",
         "base_url",
@@ -59,6 +60,9 @@
       "properties": {
         "profile": {
           "type": ["string", "null"]
+        },
+        "agent_id": {
+          "type": "string"
         },
         "adapter": {
           "type": "string"
