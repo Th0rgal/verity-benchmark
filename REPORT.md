@@ -8,7 +8,7 @@ This report is generated from the benchmark manifests.
 - Implementations: 6
 - Active cases: 4
 - Buildable active cases: 4
-- Active tasks: 16
+- Active tasks: 17
 - Backlog cases: 2
 
 ## Buildable active cases
@@ -99,6 +99,13 @@ This report is generated from the benchmark manifests.
 - Readiness: proof=`ready`, evaluation=`ready`
 - Statement id: `draw_interval_matches_weights`
 - Evaluation: engine=`lean_build`, target_kind=`proof`, target=`Benchmark.Cases.Kleros.SortitionTrees.Proofs`, declaration=`draw_interval_matches_weights`
+- Proof target: `Benchmark.Cases.Kleros.SortitionTrees.Proofs`
+
+### `kleros/sortition_trees/draw_selects_valid_leaf`
+- Track / property class: `proof-only` / `output_range`
+- Readiness: proof=`ready`, evaluation=`ready`
+- Statement id: `draw_selects_valid_leaf`
+- Evaluation: engine=`lean_build`, target_kind=`proof`, target=`Benchmark.Cases.Kleros.SortitionTrees.Proofs`, declaration=`draw_selects_valid_leaf`
 - Proof target: `Benchmark.Cases.Kleros.SortitionTrees.Proofs`
 
 ### `kleros/sortition_trees/node_id_bijection`

@@ -1,0 +1,31 @@
+manifest_kind: task
+schema_version: 1
+task_id: draw_selects_valid_leaf
+case_id: kleros/sortition_trees
+split: active
+family_id: kleros
+implementation_id: kleros_v2
+source_ref: https://github.com/kleros/kleros-v2@75125dfa54eee723cac239f20e5746d15786196b:contracts/src/libraries/SortitionTrees.sol
+task_interface_version: 1
+statement_id: draw_selects_valid_leaf
+property_class: output_range
+difficulty: medium
+category: bounds
+track: proof-only
+translation_status: translated
+proof_status: partial
+proof_target: Benchmark.Cases.Kleros.SortitionTrees.Proofs
+evaluation_engine: lean_build
+evaluation_target: Benchmark.Cases.Kleros.SortitionTrees.Proofs
+evaluation_declaration: draw_selects_valid_leaf
+allowed_files:
+  - cases/kleros/sortition_trees/tasks/draw_selects_valid_leaf.yaml
+  - cases/kleros/sortition_trees/verity/Specs.lean
+  - Benchmark/Cases/Kleros/SortitionTrees/Specs.lean
+  - Benchmark/Cases/Kleros/SortitionTrees/Proofs.lean
+abstraction_level: protocol_slice
+abstraction_notes: >
+  This task turns the interval-based draw semantics into a concrete range
+  guarantee: every in-range draw must resolve to one of the four leaf indices in
+  the fixed benchmark tree.
+unsupported_feature_codes: []

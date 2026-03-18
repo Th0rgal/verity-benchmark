@@ -11,6 +11,7 @@ Frozen specs:
 - each parent equals the sum of its children
 - the root equals the sum of all leaves
 - draw intervals match leaf weights
+- every successful draw resolves to a valid leaf node index
 - `IDsToNodeIndexes` and `nodeIndexesToIDs` remain aligned
 
 Intentionally left out:

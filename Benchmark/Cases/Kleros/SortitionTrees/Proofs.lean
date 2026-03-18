@@ -43,6 +43,29 @@ theorem draw_interval_matches_weights
   exact hDraw hInRange
 
 /--
+Any successful draw in the benchmark slice resolves to one of the four leaf
+node indices.
+-/
+theorem draw_selects_valid_leaf
+    (ticket : Uint256) (s s' : ContractState) :
+    draw_interval_matches_weights_spec ticket s s' ->
+    ticket < s.storage 0 ->
+    3 <= s'.storage 9 /\ s'.storage 9 <= 6 := by
+  intro hDraw hInRange
+  rcases hDraw hInRange with ⟨hLeaf0, hLeaf1, hLeaf2, hLeaf3⟩
+  by_cases hLeft : ticket < s.storage 1
+  · by_cases hLeaf0Range : ticket < s.storage 3
+    · have hSelected : s'.storage 9 = 3 := hLeaf0 hLeaf0Range
+      simpa [hSelected]
+    · have hSelected : s'.storage 9 = 4 := hLeaf1 ⟨le_of_not_gt hLeaf0Range, hLeft⟩
+      simpa [hSelected]
+  · by_cases hLeaf2Range : ticket < add (s.storage 1) (s.storage 5)
+    · have hSelected : s'.storage 9 = 5 := hLeaf2 ⟨le_of_not_gt hLeft, hLeaf2Range⟩
+      simpa [hSelected]
+    · have hSelected : s'.storage 9 = 6 := hLeaf3 (le_of_not_gt hLeaf2Range)
+      simpa [hSelected]
+
+/--
 The explicit node-id tables are inverse on the four benchmark leaves.
 -/
 theorem node_id_bijection
