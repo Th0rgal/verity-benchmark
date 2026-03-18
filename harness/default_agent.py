@@ -23,6 +23,7 @@ AGENT_PROFILES_DIR = ROOT / "harness" / "agents"
 @dataclass(frozen=True)
 class ResolvedAgentConfig:
     profile: str | None
+    agent_id: str
     adapter: str
     config_path: str
     base_url: str
@@ -220,6 +221,7 @@ def resolve_config(path: Path, *, require_secrets: bool, profile: str | None = N
 
     return ResolvedAgentConfig(
         profile=profile,
+        agent_id=str(config["agent_id"]),
         adapter=str(config["adapter"]),
         config_path=str(path.relative_to(ROOT)),
         base_url=(resolve_field(config, "base_url", required=require_secrets) or "").rstrip("/"),
@@ -383,6 +385,7 @@ def build_result(task_ref: str, config: ResolvedAgentConfig, messages: list[dict
         "status": "dry_run" if dry_run else "completed",
         "agent": {
             "profile": config.profile,
+            "agent_id": config.agent_id,
             "adapter": config.adapter,
             "config_path": config.config_path,
             "base_url": config.base_url,
@@ -425,6 +428,7 @@ def describe_command(config_path: Path) -> int:
         json.dumps(
             {
                 "adapter": config.adapter,
+                "agent_id": config.agent_id,
                 "config_path": config.config_path,
                 "base_url": config.base_url or None,
                 "base_url_env": config_data.get("base_url_env"),
@@ -503,10 +507,22 @@ def run_command(config_path: Path, task_ref: str, dry_run: bool, *, profile: str
 
 
 def profiles_command() -> int:
+    profiles: list[dict[str, Any]] = []
+    for name in discover_profiles():
+        path = profile_path(name)
+        config = load_config(path)
+        profiles.append(
+            {
+                "name": name,
+                "agent_id": config["agent_id"],
+                "adapter": config["adapter"],
+                "config_path": config_label(path),
+            }
+        )
     payload = {
         "profiles_dir": config_label(AGENT_PROFILES_DIR),
         "default_profile": DEFAULT_PROFILE,
-        "profiles": discover_profiles(),
+        "profiles": profiles,
     }
     print(json.dumps(payload, indent=2))
     return 0

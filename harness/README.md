@@ -21,9 +21,11 @@ The default benchmark agent now has its own explicit entrypoint:
 - `scripts/run_default_agent_all.sh` invokes the same path for all active tasks
 - `harness/agent_runner.py` is the first-class runner for task, case, and suite default-agent execution
 - bundled reusable profiles live in `harness/agents/*.json`
-- the default profile is `default`, and the proxy example profile is `openai-proxy-fast`
-- the current adapter is `openai_compatible`
-- credentials and endpoint selection are injected through env vars instead of being hard-coded
+- the default profile is `default`, which is the repo-owned benchmark agent identity
+- the generic external profile is `openai-compatible`
+- the direct proxy profile is `openai-proxy-fast`
+- the current transport adapter contract is `openai_compatible`
+- credentials and endpoint selection are injected through env vars where the profile does not pin them
 - the default-agent run artifact is schema-backed by `schemas/agent-run.schema.json`
 - aggregated case/suite agent-run status is written to `results/agent_summary.json`
 
@@ -35,8 +37,9 @@ Default OpenAI-compatible env contract:
 
 Bundled profile contract:
 
-- `default`: expects all three env vars above
-- `openai-proxy-fast`: pins base URL to `https://agent-backend.thomas.md/v1` and model to `builtin/fast`, and only requires `VERITY_BENCHMARK_AGENT_API_KEY`
+- `default`: repo-owned default benchmark agent; pins base URL to `https://agent-backend.thomas.md/v1` and model to `builtin/fast`, and only requires `VERITY_BENCHMARK_AGENT_API_KEY`
+- `openai-compatible`: generic external OpenAI-compatible backend; expects all three env vars above
+- `openai-proxy-fast`: direct pinned proxy profile for `https://agent-backend.thomas.md/v1` and `builtin/fast`; only requires `VERITY_BENCHMARK_AGENT_API_KEY`
 
 Optional config-only extensions for OpenAI-compatible backends:
 
@@ -50,12 +53,15 @@ Useful commands:
 - `python3 harness/agent_runner.py list --suite active`
 - `python3 harness/default_agent.py profiles`
 - `python3 harness/default_agent.py validate-config harness/agents/default.json`
+- `python3 harness/default_agent.py validate-config harness/agents/openai-compatible.json`
 - `python3 harness/default_agent.py describe --profile default`
+- `python3 harness/default_agent.py describe --profile openai-compatible`
 - `python3 harness/default_agent.py probe --profile openai-proxy-fast --ensure-model`
 - `python3 harness/default_agent.py prompt ethereum/deposit_contract_minimal/deposit_count --profile default`
-- `VERITY_BENCHMARK_AGENT_PROFILE=openai-proxy-fast ./scripts/run_default_agent.sh ethereum/deposit_contract_minimal/deposit_count`
-- `VERITY_BENCHMARK_AGENT_PROFILE=openai-proxy-fast ./scripts/run_default_agent_case.sh ethereum/deposit_contract_minimal`
-- `VERITY_BENCHMARK_AGENT_PROFILE=openai-proxy-fast ./scripts/run_default_agent_all.sh`
+- `./scripts/run_default_agent.sh ethereum/deposit_contract_minimal/deposit_count`
+- `VERITY_BENCHMARK_AGENT_PROFILE=openai-compatible ./scripts/run_default_agent.sh ethereum/deposit_contract_minimal/deposit_count`
+- `./scripts/run_default_agent_case.sh ethereum/deposit_contract_minimal`
+- `./scripts/run_default_agent_all.sh`
 
 Supported task manifest interface fields:
 
