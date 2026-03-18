@@ -7,23 +7,21 @@ family_id: paladin_votes
 implementation_id: stream_recovery_claim
 source_ref: https://github.com/Figu3/sonic-earn-recovery-system@699cbbc79def374cab9739e451acbbf866293d12:src/StreamRecoveryClaim.sol
 task_interface_version: 1
-statement_id: claimUsdc_marks_claimed_spec
+statement_id: claimUsdc_marks_user_claimed
 property_class: authorization_state
 difficulty: easy
 category: state-transition
 track: proof-only
 translation_status: translated
-spec_status: frozen
-proof_status: not_started
-spec_target: Benchmark.Cases.PaladinVotes.StreamRecoveryClaimUsdc.Specs
-proof_target: null
+proof_status: partial
+proof_target: Benchmark.Cases.PaladinVotes.StreamRecoveryClaimUsdc.Proofs
 evaluation_engine: lean_build
-evaluation_target_kind: spec
-evaluation_target: Benchmark.Cases.PaladinVotes.StreamRecoveryClaimUsdc.Specs
-evaluation_declaration: claimUsdc_marks_claimed_spec
+evaluation_target: Benchmark.Cases.PaladinVotes.StreamRecoveryClaimUsdc.Proofs
+evaluation_declaration: claimUsdc_marks_user_claimed
 allowed_files:
   - cases/paladin_votes/stream_recovery_claim_usdc/verity/Specs.lean
   - Benchmark/Cases/PaladinVotes/StreamRecoveryClaimUsdc/Specs.lean
+  - Benchmark/Cases/PaladinVotes/StreamRecoveryClaimUsdc/Proofs.lean
 abstraction_level: protocol_slice
 abstraction_notes: >
   The task checks the claimed flag update in isolation from Merkle validation and

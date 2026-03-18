@@ -13,12 +13,9 @@ difficulty: medium
 category: accounting
 track: proof-only
 translation_status: translated
-spec_status: frozen
 proof_status: partial
-spec_target: Benchmark.Cases.PaladinVotes.StreamRecoveryClaimUsdc.Specs
 proof_target: Benchmark.Cases.PaladinVotes.StreamRecoveryClaimUsdc.Proofs
 evaluation_engine: lean_build
-evaluation_target_kind: proof
 evaluation_target: Benchmark.Cases.PaladinVotes.StreamRecoveryClaimUsdc.Proofs
 evaluation_declaration: claimUsdc_claimed_plus_allocated_conserved
 allowed_files:

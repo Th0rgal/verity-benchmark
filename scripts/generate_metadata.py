@@ -25,7 +25,6 @@ ALLOWED_STAGES = {
 }
 BUILDABLE_STAGES = {"build_green", "proof_partial", "proof_complete"}
 RUNNABLE_TRANSLATION_STATUSES = {"translated"}
-RUNNABLE_SPEC_STATUSES = {"draft", "frozen", "partial", "complete"}
 RUNNABLE_PROOF_STATUSES = {"partial", "complete"}
 
 
@@ -54,30 +53,20 @@ def normalize_string_list(path: Path, key: str, value: object) -> list[str]:
     return [str(item).strip() for item in value]
 
 
-def derive_spec_target(compile_target: str | None) -> str | None:
-    if compile_target and compile_target.endswith(".Compile"):
-        return compile_target[: -len(".Compile")] + ".Specs"
-    return None
-
-
 def evaluation_ready(
-    target_kind: str,
     case_entry: dict,
     evaluation_target: str | None,
     evaluation_declaration: str | None,
     translation_status: str | None,
-    spec_status: str | None,
     proof_status: str | None,
 ) -> bool:
     if case_entry["stage"] not in BUILDABLE_STAGES:
         return False
-    if target_kind == "translation":
-        return bool(evaluation_target) and translation_status in RUNNABLE_TRANSLATION_STATUSES
-    if target_kind == "spec":
-        return bool(evaluation_target and evaluation_declaration) and spec_status in RUNNABLE_SPEC_STATUSES
-    if target_kind == "proof":
-        return bool(evaluation_target and evaluation_declaration) and proof_status in RUNNABLE_PROOF_STATUSES
-    return False
+    return (
+        bool(evaluation_target and evaluation_declaration)
+        and translation_status in RUNNABLE_TRANSLATION_STATUSES
+        and proof_status in RUNNABLE_PROOF_STATUSES
+    )
 
 
 def load_case_manifest(path: Path, suite: str) -> dict:
@@ -154,13 +143,10 @@ def load_task_manifest(path: Path, suite: str) -> dict:
     project = case_dir.parent.name
     case_name = case_dir.name
     task_id = normalize_optional_string(data.get("task_id")) or path.stem
-    spec_target = normalize_optional_string(data.get("spec_target")) or derive_spec_target(case_entry["lean_target"])
     proof_target = normalize_optional_string(data.get("proof_target"))
     statement_id = normalize_optional_string(data.get("statement_id"))
     translation_status = normalize_optional_string(data.get("translation_status")) or case_entry["translation_status"]
-    spec_status = normalize_optional_string(data.get("spec_status")) or case_entry["spec_status"]
     proof_status = normalize_optional_string(data.get("proof_status")) or case_entry["proof_status"]
-    evaluation_target_kind = normalize_optional_string(data.get("evaluation_target_kind")) or "translation"
     evaluation_target = normalize_optional_string(data.get("evaluation_target"))
     evaluation_declaration = normalize_optional_string(data.get("evaluation_declaration"))
 
@@ -182,7 +168,6 @@ def load_task_manifest(path: Path, suite: str) -> dict:
         "difficulty": normalize_optional_string(data.get("difficulty")) or "unspecified",
         "statement_id": statement_id,
         "translation_status": translation_status,
-        "spec_status": spec_status,
         "proof_status": proof_status,
         "allowed_files": normalize_string_list(path, "allowed_files", data.get("allowed_files")),
         "abstraction_level": normalize_optional_string(data.get("abstraction_level")),
@@ -190,33 +175,22 @@ def load_task_manifest(path: Path, suite: str) -> dict:
         "unsupported_feature_codes": normalize_string_list(
             path, "unsupported_feature_codes", data.get("unsupported_feature_codes")
         ),
-        "spec_target": spec_target,
         "proof_target": proof_target,
         "evaluation": {
             "engine": normalize_optional_string(data.get("evaluation_engine")) or "lean_build",
-            "target_kind": evaluation_target_kind,
+            "target_kind": "proof",
             "target": evaluation_target,
             "declaration": evaluation_declaration,
         },
         "readiness": {
-            "translation": (
-                "ready"
-                if case_entry["lean_target"]
-                and case_entry["stage"] in BUILDABLE_STAGES
-                and translation_status in RUNNABLE_TRANSLATION_STATUSES
-                else "blocked"
-            ),
-            "spec": "ready" if spec_target and statement_id and spec_status in RUNNABLE_SPEC_STATUSES else "planned",
             "proof": "ready" if proof_target and statement_id and proof_status in RUNNABLE_PROOF_STATUSES else "planned",
             "evaluation": (
                 "ready"
                 if evaluation_ready(
-                    evaluation_target_kind,
                     case_entry,
                     evaluation_target,
                     evaluation_declaration,
                     translation_status,
-                    spec_status,
                     proof_status,
                 )
                 else "blocked"
@@ -298,9 +272,7 @@ def render_task(entry: dict) -> list[str]:
         f"- Track / property class: `{entry['track']}` / `{entry['property_class']}`",
         (
             "- Readiness:"
-            f" translation=`{entry['readiness']['translation']}`"
-            f", spec=`{entry['readiness']['spec']}`"
-            f", proof=`{entry['readiness']['proof']}`"
+            f" proof=`{entry['readiness']['proof']}`"
             f", evaluation=`{entry['readiness']['evaluation']}`"
         ),
     ]
@@ -313,8 +285,6 @@ def render_task(entry: dict) -> list[str]:
         f", target=`{entry['evaluation']['target']}`"
         f", declaration=`{entry['evaluation']['declaration']}`"
     )
-    if entry["spec_target"]:
-        lines.append(f"- Spec target: `{entry['spec_target']}`")
     if entry["proof_target"]:
         lines.append(f"- Proof target: `{entry['proof_target']}`")
     return lines
@@ -360,7 +330,6 @@ def write_inventory(
             ),
             "case_stage_counts": summary_counts(all_cases, "stage"),
             "translation_status_counts": summary_counts(all_cases, "translation_status"),
-            "spec_status_counts": summary_counts(all_cases, "spec_status"),
             "proof_status_counts": summary_counts(all_cases, "proof_status"),
             "task_track_counts": summary_counts(all_tasks, "track"),
             "task_property_class_counts": summary_counts(all_tasks, "property_class"),

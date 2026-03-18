@@ -186,31 +186,15 @@ def main() -> int:
         interface_version = data.get("task_interface_version")
         if not isinstance(interface_version, int) or interface_version < 1:
             errors.append(f"{rel}: task_interface_version must be an integer >= 1")
-        evaluation_target_kind = data.get("evaluation_target_kind")
         evaluation_target = data.get("evaluation_target")
         evaluation_declaration = data.get("evaluation_declaration")
-        spec_target = data.get("spec_target")
         proof_target = data.get("proof_target")
         if not isinstance(source_ref, str) or not source_ref:
             errors.append(f"{rel}: source_ref must be a non-empty string")
-        if evaluation_target_kind == "translation":
-            case_target = cases.get(case_id, {}).get("lean_target")
-            if evaluation_target != case_target:
-                errors.append(
-                    f"{rel}: translation evaluation_target must match parent case lean_target {case_target!r}"
-                )
-            if evaluation_declaration is not None:
-                errors.append(f"{rel}: translation tasks must set evaluation_declaration to null")
-        elif evaluation_target_kind == "spec":
-            if evaluation_target != spec_target:
-                errors.append(f"{rel}: spec evaluation_target must match spec_target")
-            if not isinstance(evaluation_declaration, str) or not evaluation_declaration:
-                errors.append(f"{rel}: spec tasks must declare evaluation_declaration")
-        elif evaluation_target_kind == "proof":
-            if evaluation_target != proof_target:
-                errors.append(f"{rel}: proof evaluation_target must match proof_target")
-            if not isinstance(evaluation_declaration, str) or not evaluation_declaration:
-                errors.append(f"{rel}: proof tasks must declare evaluation_declaration")
+        if evaluation_target != proof_target:
+            errors.append(f"{rel}: evaluation_target must match proof_target")
+        if not isinstance(evaluation_declaration, str) or not evaluation_declaration:
+            errors.append(f"{rel}: tasks must declare evaluation_declaration")
         allowed_files = data.get("allowed_files")
         if isinstance(allowed_files, list):
             for allowed in allowed_files:

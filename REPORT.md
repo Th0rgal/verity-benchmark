@@ -8,7 +8,7 @@ This report is generated from the benchmark manifests.
 - Implementations: 6
 - Active cases: 4
 - Buildable active cases: 4
-- Active tasks: 14
+- Active tasks: 15
 - Backlog cases: 2
 
 ## Buildable active cases
@@ -36,7 +36,7 @@ This report is generated from the benchmark manifests.
 ### `nexus_mutual/ramm_price_band`
 - Family / implementation: `nexus_mutual` / `smart_contracts`
 - Stage: `build_green`
-- Status dimensions: translation=`translated`, spec=`frozen`, proof=`not_started`
+- Status dimensions: translation=`translated`, spec=`frozen`, proof=`partial`
 - Lean target: `Benchmark.Cases.NexusMutual.RammPriceBand.Compile`
 - Source ref: `https://github.com/NexusMutual/smart-contracts@ad212043a78953a2cd98cd02b06c8e3e354c6023:contracts/modules/capital/Ramm.sol`
 - Selected functions: `calculateNxm`, `_getReserves`, `getSpotPrices`, `getBookValue`
@@ -46,7 +46,7 @@ This report is generated from the benchmark manifests.
 ### `paladin_votes/stream_recovery_claim_usdc`
 - Family / implementation: `paladin_votes` / `stream_recovery_claim`
 - Stage: `build_green`
-- Status dimensions: translation=`translated`, spec=`frozen`, proof=`not_started`
+- Status dimensions: translation=`translated`, spec=`frozen`, proof=`partial`
 - Lean target: `Benchmark.Cases.PaladinVotes.StreamRecoveryClaimUsdc.Compile`
 - Source ref: `https://github.com/Figu3/sonic-earn-recovery-system@699cbbc79def374cab9739e451acbbf866293d12:src/StreamRecoveryClaim.sol`
 - Selected functions: `claimUsdc`, `_claimUsdc`
@@ -61,104 +61,108 @@ This report is generated from the benchmark manifests.
 
 ### `ethereum/deposit_contract_minimal/chain_start_threshold`
 - Track / property class: `proof-only` / `threshold_activation`
-- Readiness: translation=`ready`, spec=`ready`, proof=`planned`, evaluation=`ready`
-- Statement id: `deposit_starts_chain_at_threshold_spec`
-- Evaluation: engine=`lean_build`, target_kind=`spec`, target=`Benchmark.Cases.Ethereum.DepositContractMinimal.Specs`, declaration=`deposit_starts_chain_at_threshold_spec`
-- Spec target: `Benchmark.Cases.Ethereum.DepositContractMinimal.Specs`
+- Readiness: proof=`ready`, evaluation=`ready`
+- Statement id: `full_deposit_starts_chain_at_threshold`
+- Evaluation: engine=`lean_build`, target_kind=`proof`, target=`Benchmark.Cases.Ethereum.DepositContractMinimal.Proofs`, declaration=`full_deposit_starts_chain_at_threshold`
+- Proof target: `Benchmark.Cases.Ethereum.DepositContractMinimal.Proofs`
 
 ### `ethereum/deposit_contract_minimal/deposit_count`
 - Track / property class: `proof-only` / `monotonic_counter`
-- Readiness: translation=`ready`, spec=`ready`, proof=`planned`, evaluation=`ready`
-- Statement id: `deposit_increments_deposit_count_spec`
-- Evaluation: engine=`lean_build`, target_kind=`spec`, target=`Benchmark.Cases.Ethereum.DepositContractMinimal.Specs`, declaration=`deposit_increments_deposit_count_spec`
-- Spec target: `Benchmark.Cases.Ethereum.DepositContractMinimal.Specs`
+- Readiness: proof=`ready`, evaluation=`ready`
+- Statement id: `deposit_increments_deposit_count`
+- Evaluation: engine=`lean_build`, target_kind=`proof`, target=`Benchmark.Cases.Ethereum.DepositContractMinimal.Proofs`, declaration=`deposit_increments_deposit_count`
+- Proof target: `Benchmark.Cases.Ethereum.DepositContractMinimal.Proofs`
 
 ### `ethereum/deposit_contract_minimal/full_deposit_preserves_partial_gap`
 - Track / property class: `proof-only` / `accounting_conservation`
-- Readiness: translation=`ready`, spec=`ready`, proof=`ready`, evaluation=`ready`
+- Readiness: proof=`ready`, evaluation=`ready`
 - Statement id: `full_deposit_preserves_partial_gap`
 - Evaluation: engine=`lean_build`, target_kind=`proof`, target=`Benchmark.Cases.Ethereum.DepositContractMinimal.Proofs`, declaration=`full_deposit_preserves_partial_gap`
-- Spec target: `Benchmark.Cases.Ethereum.DepositContractMinimal.Specs`
+- Proof target: `Benchmark.Cases.Ethereum.DepositContractMinimal.Proofs`
+
+### `ethereum/deposit_contract_minimal/small_deposit_preserves_full_count`
+- Track / property class: `proof-only` / `threshold_partition`
+- Readiness: proof=`ready`, evaluation=`ready`
+- Statement id: `small_deposit_preserves_full_count`
+- Evaluation: engine=`lean_build`, target_kind=`proof`, target=`Benchmark.Cases.Ethereum.DepositContractMinimal.Proofs`, declaration=`small_deposit_preserves_full_count`
 - Proof target: `Benchmark.Cases.Ethereum.DepositContractMinimal.Proofs`
 
 ### `kleros/sortition_trees/draw_interval_matches_weights`
 - Track / property class: `proof-only` / `weighted_selection`
-- Readiness: translation=`ready`, spec=`ready`, proof=`planned`, evaluation=`ready`
-- Statement id: `draw_interval_matches_weights_spec`
-- Evaluation: engine=`lean_build`, target_kind=`spec`, target=`Benchmark.Cases.Kleros.SortitionTrees.Specs`, declaration=`draw_interval_matches_weights_spec`
-- Spec target: `Benchmark.Cases.Kleros.SortitionTrees.Specs`
+- Readiness: proof=`ready`, evaluation=`ready`
+- Statement id: `draw_interval_matches_weights`
+- Evaluation: engine=`lean_build`, target_kind=`proof`, target=`Benchmark.Cases.Kleros.SortitionTrees.Proofs`, declaration=`draw_interval_matches_weights`
+- Proof target: `Benchmark.Cases.Kleros.SortitionTrees.Proofs`
 
 ### `kleros/sortition_trees/node_id_bijection`
 - Track / property class: `proof-only` / `mapping_consistency`
-- Readiness: translation=`ready`, spec=`ready`, proof=`planned`, evaluation=`ready`
-- Statement id: `node_id_bijection_spec`
-- Evaluation: engine=`lean_build`, target_kind=`spec`, target=`Benchmark.Cases.Kleros.SortitionTrees.Specs`, declaration=`node_id_bijection_spec`
-- Spec target: `Benchmark.Cases.Kleros.SortitionTrees.Specs`
+- Readiness: proof=`ready`, evaluation=`ready`
+- Statement id: `node_id_bijection`
+- Evaluation: engine=`lean_build`, target_kind=`proof`, target=`Benchmark.Cases.Kleros.SortitionTrees.Proofs`, declaration=`node_id_bijection`
+- Proof target: `Benchmark.Cases.Kleros.SortitionTrees.Proofs`
 
 ### `kleros/sortition_trees/parent_equals_sum_of_children`
 - Track / property class: `proof-only` / `tree_conservation`
-- Readiness: translation=`ready`, spec=`ready`, proof=`planned`, evaluation=`ready`
-- Statement id: `parent_equals_sum_of_children_spec`
-- Evaluation: engine=`lean_build`, target_kind=`spec`, target=`Benchmark.Cases.Kleros.SortitionTrees.Specs`, declaration=`parent_equals_sum_of_children_spec`
-- Spec target: `Benchmark.Cases.Kleros.SortitionTrees.Specs`
+- Readiness: proof=`ready`, evaluation=`ready`
+- Statement id: `parent_equals_sum_of_children`
+- Evaluation: engine=`lean_build`, target_kind=`proof`, target=`Benchmark.Cases.Kleros.SortitionTrees.Proofs`, declaration=`parent_equals_sum_of_children`
+- Proof target: `Benchmark.Cases.Kleros.SortitionTrees.Proofs`
 
 ### `kleros/sortition_trees/root_equals_sum_of_leaves`
 - Track / property class: `proof-only` / `total_conservation`
-- Readiness: translation=`ready`, spec=`ready`, proof=`planned`, evaluation=`ready`
-- Statement id: `root_equals_sum_of_leaves_spec`
-- Evaluation: engine=`lean_build`, target_kind=`spec`, target=`Benchmark.Cases.Kleros.SortitionTrees.Specs`, declaration=`root_equals_sum_of_leaves_spec`
-- Spec target: `Benchmark.Cases.Kleros.SortitionTrees.Specs`
+- Readiness: proof=`ready`, evaluation=`ready`
+- Statement id: `root_equals_sum_of_leaves`
+- Evaluation: engine=`lean_build`, target_kind=`proof`, target=`Benchmark.Cases.Kleros.SortitionTrees.Proofs`, declaration=`root_equals_sum_of_leaves`
+- Proof target: `Benchmark.Cases.Kleros.SortitionTrees.Proofs`
 
 ### `kleros/sortition_trees/root_minus_left_equals_right_subtree`
 - Track / property class: `proof-only` / `subtree_partition`
-- Readiness: translation=`ready`, spec=`ready`, proof=`ready`, evaluation=`ready`
+- Readiness: proof=`ready`, evaluation=`ready`
 - Statement id: `root_minus_left_equals_right_subtree`
 - Evaluation: engine=`lean_build`, target_kind=`proof`, target=`Benchmark.Cases.Kleros.SortitionTrees.Proofs`, declaration=`root_minus_left_equals_right_subtree`
-- Spec target: `Benchmark.Cases.Kleros.SortitionTrees.Specs`
 - Proof target: `Benchmark.Cases.Kleros.SortitionTrees.Proofs`
 
 ### `nexus_mutual/ramm_price_band/buy_price_ge_bv_plus_1pct`
 - Track / property class: `proof-only` / `price_lower_bound`
-- Readiness: translation=`ready`, spec=`ready`, proof=`planned`, evaluation=`ready`
-- Statement id: `buy_price_above_book_value_buffer_spec`
-- Evaluation: engine=`lean_build`, target_kind=`spec`, target=`Benchmark.Cases.NexusMutual.RammPriceBand.Specs`, declaration=`buy_price_above_book_value_buffer_spec`
-- Spec target: `Benchmark.Cases.NexusMutual.RammPriceBand.Specs`
+- Readiness: proof=`ready`, evaluation=`ready`
+- Statement id: `buy_price_ge_book_value_buffer`
+- Evaluation: engine=`lean_build`, target_kind=`proof`, target=`Benchmark.Cases.NexusMutual.RammPriceBand.Proofs`, declaration=`buy_price_ge_book_value_buffer`
+- Proof target: `Benchmark.Cases.NexusMutual.RammPriceBand.Proofs`
 
 ### `nexus_mutual/ramm_price_band/sell_price_le_buy_price`
 - Track / property class: `proof-only` / `price_ordering`
-- Readiness: translation=`ready`, spec=`ready`, proof=`planned`, evaluation=`ready`
-- Statement id: `sell_price_below_buy_price_spec`
-- Evaluation: engine=`lean_build`, target_kind=`spec`, target=`Benchmark.Cases.NexusMutual.RammPriceBand.Specs`, declaration=`sell_price_below_buy_price_spec`
-- Spec target: `Benchmark.Cases.NexusMutual.RammPriceBand.Specs`
+- Readiness: proof=`ready`, evaluation=`ready`
+- Statement id: `sell_price_le_buy_price`
+- Evaluation: engine=`lean_build`, target_kind=`proof`, target=`Benchmark.Cases.NexusMutual.RammPriceBand.Proofs`, declaration=`sell_price_le_buy_price`
+- Proof target: `Benchmark.Cases.NexusMutual.RammPriceBand.Proofs`
 
 ### `nexus_mutual/ramm_price_band/sell_price_le_bv_minus_1pct`
 - Track / property class: `proof-only` / `price_upper_bound`
-- Readiness: translation=`ready`, spec=`ready`, proof=`planned`, evaluation=`ready`
-- Statement id: `sell_price_below_book_value_buffer_spec`
-- Evaluation: engine=`lean_build`, target_kind=`spec`, target=`Benchmark.Cases.NexusMutual.RammPriceBand.Specs`, declaration=`sell_price_below_book_value_buffer_spec`
-- Spec target: `Benchmark.Cases.NexusMutual.RammPriceBand.Specs`
+- Readiness: proof=`ready`, evaluation=`ready`
+- Statement id: `sell_price_le_book_value_buffer`
+- Evaluation: engine=`lean_build`, target_kind=`proof`, target=`Benchmark.Cases.NexusMutual.RammPriceBand.Proofs`, declaration=`sell_price_le_book_value_buffer`
+- Proof target: `Benchmark.Cases.NexusMutual.RammPriceBand.Proofs`
 
 ### `paladin_votes/stream_recovery_claim_usdc/claim_marks_user`
 - Track / property class: `proof-only` / `authorization_state`
-- Readiness: translation=`ready`, spec=`ready`, proof=`planned`, evaluation=`ready`
-- Statement id: `claimUsdc_marks_claimed_spec`
-- Evaluation: engine=`lean_build`, target_kind=`spec`, target=`Benchmark.Cases.PaladinVotes.StreamRecoveryClaimUsdc.Specs`, declaration=`claimUsdc_marks_claimed_spec`
-- Spec target: `Benchmark.Cases.PaladinVotes.StreamRecoveryClaimUsdc.Specs`
+- Readiness: proof=`ready`, evaluation=`ready`
+- Statement id: `claimUsdc_marks_user_claimed`
+- Evaluation: engine=`lean_build`, target_kind=`proof`, target=`Benchmark.Cases.PaladinVotes.StreamRecoveryClaimUsdc.Proofs`, declaration=`claimUsdc_marks_user_claimed`
+- Proof target: `Benchmark.Cases.PaladinVotes.StreamRecoveryClaimUsdc.Proofs`
 
 ### `paladin_votes/stream_recovery_claim_usdc/claimed_plus_allocated_conserved`
 - Track / property class: `proof-only` / `accounting_conservation`
-- Readiness: translation=`ready`, spec=`ready`, proof=`ready`, evaluation=`ready`
+- Readiness: proof=`ready`, evaluation=`ready`
 - Statement id: `claimUsdc_claimed_plus_allocated_conserved`
 - Evaluation: engine=`lean_build`, target_kind=`proof`, target=`Benchmark.Cases.PaladinVotes.StreamRecoveryClaimUsdc.Proofs`, declaration=`claimUsdc_claimed_plus_allocated_conserved`
-- Spec target: `Benchmark.Cases.PaladinVotes.StreamRecoveryClaimUsdc.Specs`
 - Proof target: `Benchmark.Cases.PaladinVotes.StreamRecoveryClaimUsdc.Proofs`
 
 ### `paladin_votes/stream_recovery_claim_usdc/no_overclaim`
 - Track / property class: `proof-only` / `accounting_bound`
-- Readiness: translation=`ready`, spec=`ready`, proof=`planned`, evaluation=`ready`
-- Statement id: `claimUsdc_preserves_round_bound_spec`
-- Evaluation: engine=`lean_build`, target_kind=`spec`, target=`Benchmark.Cases.PaladinVotes.StreamRecoveryClaimUsdc.Specs`, declaration=`claimUsdc_preserves_round_bound_spec`
-- Spec target: `Benchmark.Cases.PaladinVotes.StreamRecoveryClaimUsdc.Specs`
+- Readiness: proof=`ready`, evaluation=`ready`
+- Statement id: `claimUsdc_preserves_round_bound`
+- Evaluation: engine=`lean_build`, target_kind=`proof`, target=`Benchmark.Cases.PaladinVotes.StreamRecoveryClaimUsdc.Proofs`, declaration=`claimUsdc_preserves_round_bound`
+- Proof target: `Benchmark.Cases.PaladinVotes.StreamRecoveryClaimUsdc.Proofs`
 
 ## Backlog
 

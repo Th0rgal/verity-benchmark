@@ -13,12 +13,9 @@ difficulty: medium
 category: data-structure
 track: proof-only
 translation_status: translated
-spec_status: frozen
 proof_status: partial
-spec_target: Benchmark.Cases.Kleros.SortitionTrees.Specs
 proof_target: Benchmark.Cases.Kleros.SortitionTrees.Proofs
 evaluation_engine: lean_build
-evaluation_target_kind: proof
 evaluation_target: Benchmark.Cases.Kleros.SortitionTrees.Proofs
 evaluation_declaration: root_minus_left_equals_right_subtree
 allowed_files:

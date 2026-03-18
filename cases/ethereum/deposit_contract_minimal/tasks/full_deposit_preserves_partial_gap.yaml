@@ -13,12 +13,9 @@ difficulty: medium
 category: accounting
 track: proof-only
 translation_status: translated
-spec_status: frozen
 proof_status: partial
-spec_target: Benchmark.Cases.Ethereum.DepositContractMinimal.Specs
 proof_target: Benchmark.Cases.Ethereum.DepositContractMinimal.Proofs
 evaluation_engine: lean_build
-evaluation_target_kind: proof
 evaluation_target: Benchmark.Cases.Ethereum.DepositContractMinimal.Proofs
 evaluation_declaration: full_deposit_preserves_partial_gap
 allowed_files:

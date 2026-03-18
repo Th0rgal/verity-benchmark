@@ -1,5 +1,5 @@
 import Benchmark.Cases.Kleros.SortitionTrees.Contract
-import Benchmark.Cases.Kleros.SortitionTrees.Specs
+import Benchmark.Cases.Kleros.SortitionTrees.Proofs
 
 namespace Benchmark.Cases.Kleros.SortitionTrees
 

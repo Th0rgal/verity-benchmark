@@ -1,17 +1,9 @@
 # Task API Architecture Note
 
-## Current limitations
+## Current model
 
-The repository already stores tasks under `cases/*/*/tasks/*.yaml`, but before this
-change the runnable semantics were still partly implicit:
-
-- the runner could derive a spec module from `case.yaml`
-- the runner selected translation/spec/proof targets through fallback rules
-- task provenance depended mostly on the parent case manifest
-
-That shape was workable for early curation, but it left the benchmark API weaker than
-the provenance model. The repo knew how to organize cases, but it was less explicit
-about what an evaluator should execute for a task.
+The repository stores benchmark tasks under `cases/*/*/tasks/*.yaml`. Each task is a
+proof target with an explicit Lean module and declaration to check.
 
 ## Target model
 
@@ -35,18 +27,12 @@ manifest is now the place that explicitly declares:
 - which pinned source snapshot the task belongs to via `source_ref`
 - which artifacts are in scope via `allowed_files`
 - which evaluation engine is used via `evaluation_engine`
-- which semantic layer is evaluated via `evaluation_target_kind`
-- which module is executed via `evaluation_target`
-- which declaration must exist via `evaluation_declaration`
+- which proof module is executed via `evaluation_target`
+- which proof declaration must exist via `evaluation_declaration`
 
 This removes hidden execution semantics from runner conventions. A task can still share
 provenance with its parent case, but it no longer relies on the runner to guess the
 evaluation contract.
-
-The current suite is still transitioning. Most tasks target frozen spec declarations,
-but the architecture now also supports explicit proof modules and proof declarations as
-first-class task targets. That is the direction of travel for proof-centric benchmark
-expansion.
 
 ## Case vs Task vs Source Snapshot
 

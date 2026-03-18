@@ -23,7 +23,6 @@ from manifest_utils import load_manifest_data
 
 RUNNABLE_STAGES = {"build_green", "proof_partial", "proof_complete"}
 PROOF_READY_STATUSES = {"partial", "complete"}
-SPEC_READY_STATUSES = {"draft", "frozen", "partial", "complete"}
 
 
 def normalize_optional_string(value: object) -> str | None:
@@ -43,25 +42,16 @@ def normalize_list(value: object) -> list[str]:
     return [str(item).strip() for item in value]
 
 
-def derive_spec_module(compile_target: str | None) -> str | None:
-    if compile_target and compile_target.endswith(".Compile"):
-        return compile_target[: -len(".Compile")] + ".Specs"
-    return None
-
-
 def evaluation_ready(task: dict[str, Any]) -> bool:
-    target_kind = task["evaluation"]["target_kind"]
     evaluation_target = task["evaluation"]["target"]
     evaluation_declaration = task["evaluation"]["declaration"]
     if task["stage"] not in RUNNABLE_STAGES:
         return False
-    if target_kind == "translation":
-        return bool(evaluation_target) and task["translation_status"] == "translated"
-    if target_kind == "spec":
-        return bool(evaluation_target and evaluation_declaration) and task["spec_status"] in SPEC_READY_STATUSES
-    if target_kind == "proof":
-        return bool(evaluation_target and evaluation_declaration) and task["proof_status"] in PROOF_READY_STATUSES
-    return False
+    return (
+        bool(evaluation_target and evaluation_declaration)
+        and task["translation_status"] == "translated"
+        and task["proof_status"] in PROOF_READY_STATUSES
+    )
 
 
 def task_ref_from_manifest(task_manifest: Path) -> str:
@@ -126,21 +116,14 @@ def load_task_record(task_manifest: Path) -> dict[str, Any]:
     task_id = normalize_optional_string(task_data.get("task_id")) or task_manifest.stem
     task_ref = f"{case_data['case_id']}/{task_id}"
 
-    spec_module = normalize_optional_string(task_data.get("spec_target")) or derive_spec_module(
-        case_data["lean_target"]
-    )
     proof_module = normalize_optional_string(task_data.get("proof_target"))
-    evaluation_target_kind = normalize_optional_string(task_data.get("evaluation_target_kind")) or "translation"
     evaluation_target = normalize_optional_string(task_data.get("evaluation_target"))
     evaluation_declaration = normalize_optional_string(task_data.get("evaluation_declaration"))
 
     translation_status = normalize_optional_string(task_data.get("translation_status")) or case_data["translation_status"]
-    spec_status = normalize_optional_string(task_data.get("spec_status")) or case_data["spec_status"]
     proof_status = normalize_optional_string(task_data.get("proof_status")) or case_data["proof_status"]
 
     readiness = {
-        "translation": "ready" if case_data["lean_target"] and translation_status == "translated" and case_data["stage"] in RUNNABLE_STAGES else "blocked",
-        "spec": "ready" if spec_module and normalize_optional_string(task_data.get("statement_id")) and spec_status in SPEC_READY_STATUSES else "planned",
         "proof": "ready" if proof_module and normalize_optional_string(task_data.get("statement_id")) and proof_status in PROOF_READY_STATUSES else "planned",
     }
 
@@ -161,21 +144,18 @@ def load_task_record(task_manifest: Path) -> dict[str, Any]:
         "task_interface_version": int(task_data.get("task_interface_version", 1)),
         "allowed_files": normalize_list(task_data.get("allowed_files")),
         "translation_status": translation_status,
-        "spec_status": spec_status,
         "proof_status": proof_status,
         "failure_reason": case_data["failure_reason"],
         "manifest_path": str(task_manifest.relative_to(ROOT)),
         "case_manifest_path": case_data["manifest_path"],
         "targets": {
             "compile_target": case_data["lean_target"],
-            "spec_target_module": spec_module,
-            "spec_target_decl": normalize_optional_string(task_data.get("statement_id")),
             "proof_target_module": proof_module,
             "proof_target_decl": normalize_optional_string(task_data.get("statement_id")) if proof_module else None,
         },
         "evaluation": {
             "engine": normalize_optional_string(task_data.get("evaluation_engine")) or "lean_build",
-            "target_kind": evaluation_target_kind,
+            "target_kind": "proof",
             "target": evaluation_target,
             "declaration": evaluation_declaration,
         },
@@ -245,7 +225,7 @@ def execute_task(task_ref: str) -> tuple[int, Path]:
         failure_mode = task["failure_reason"] or "stage_blocked"
     elif task["readiness"]["evaluation"] != "ready":
         failure_mode = task["failure_reason"] or "evaluation_not_ready"
-    elif selected_kind == "proof":
+    else:
         command = ["lake", "build", selected_target]
         code, execution_output = run_command(command)
         if code == 0 and selected_decl:
@@ -260,29 +240,6 @@ def execute_task(task_ref: str) -> tuple[int, Path]:
             execution_status = "passed" if code == 0 else "failed"
         if code != 0:
             failure_mode = "proof_target_check_failed"
-    elif selected_kind == "spec":
-        command = ["lake", "build", selected_target]
-        code, execution_output = run_command(command)
-        if code == 0 and selected_decl:
-            exists, decl_output = declaration_exists(selected_target, selected_decl)
-            if exists:
-                execution_status = "passed"
-            else:
-                execution_status = "failed"
-                failure_mode = "spec_declaration_missing"
-                execution_output = "\n".join(filter(None, [execution_output, decl_output]))
-        else:
-            execution_status = "passed" if code == 0 else "failed"
-        if code != 0:
-            failure_mode = "spec_target_check_failed"
-    elif selected_kind == "translation":
-        command = ["lake", "build", selected_target]
-        code, execution_output = run_command(command)
-        execution_status = "passed" if code == 0 else "failed"
-        if code != 0:
-            failure_mode = "translation_target_failed"
-    else:
-        failure_mode = task["failure_reason"] or "no_executable_target"
 
     completed_at = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
     duration_seconds = round(time.time() - start, 3)
@@ -322,7 +279,6 @@ def execute_task(task_ref: str) -> tuple[int, Path]:
         "environment": {
             "stage": task["stage"],
             "translation_status": task["translation_status"],
-            "spec_status": task["spec_status"],
             "proof_status": task["proof_status"],
             "evaluation_engine": task["evaluation"]["engine"],
             "selected_target_kind": selected_kind,
@@ -377,7 +333,7 @@ def aggregate_results(task_refs: list[str], suite: str) -> dict[str, Any]:
         by_property_class[item["property_class"]][item["status"]] += 1
         by_case[item["case_id"]].append(item)
 
-    for key in ("translation", "spec", "proof", "evaluation"):
+    for key in ("proof", "evaluation"):
         readiness_counts[key] = dict(
             sorted(Counter(item["readiness"][key] for item in results).items())
         )

@@ -1,6 +1,6 @@
 # verity-benchmark
 
-Reproducible benchmark scaffold for evaluating Verity-based specification and proof workflows on real protocol slices. The repository is task-oriented: cases curate translated artifacts, while tasks define the benchmark API, evaluation unit, and explicit execution contract for concrete invariants or specifications.
+Reproducible benchmark scaffold for evaluating Verity-based proof workflows on real protocol slices. The repository is task-oriented: cases curate translated artifacts, while tasks define the benchmark API, evaluation unit, and explicit execution contract for concrete invariants.
 
 This repository pins:
 - Lean toolchain: `leanprover/lean4:v4.22.0`
@@ -8,7 +8,7 @@ This repository pins:
 
 Current status:
 - Active `cases/`: 4 concrete benchmark cases
-- Active `tasks/`: 14 concrete benchmark tasks
+- Active `tasks/`: 15 concrete benchmark tasks
 - Buildable active cases: 4
 - Non-buildable active cases: 0
 - `backlog/`: placeholder intake entries kept visible without polluting the active suite
@@ -43,13 +43,13 @@ Design choices:
 - Families and implementations are tracked explicitly so source provenance stays stable even as case slices evolve
 - Each task declares its own evaluation contract instead of relying on runner inference
 - Pinned `source_ref` values are the reproducibility unit; local paths are supporting metadata
-- Tasks can target either a spec declaration or an explicit proof module/declaration
+- Tasks target explicit proof modules and proof declarations
 - The default-agent path is adapter-driven and uses the `openai_compatible` contract for both the repo-default setup and external backends
 - The default-agent path uses named profiles in `harness/agents/` so the repo-owned reference agent and custom OpenAI-compatible backends share one runner
 - The default-agent path is now runner-backed at task, case, and suite scope through `harness/agent_runner.py`
 - Default-agent artifacts are partitioned by `track/run_slug` under `results/agent_runs/` with summaries under `results/agent_summaries/`
 - One selected contract per project unless scope is still ambiguous
-- The active suite is still mostly spec-oriented, but proof manifests now support and exercise explicit proof targets
+- The active suite is proof-only at the task level; internal `Specs` modules remain as proof premises inside Lean
 - `case.yaml` plus `tasks/*.yaml` are the source of truth for benchmark state
 - Stages are intentionally small: `candidate`, `scoped`, `build_green`, `proof_partial`, `proof_complete`
 - `build_green` means the Verity slice typechecks today; it does not mean the case is fully proved

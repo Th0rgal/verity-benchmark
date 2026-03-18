@@ -1,5 +1,5 @@
 import Benchmark.Cases.NexusMutual.RammPriceBand.Contract
-import Benchmark.Cases.NexusMutual.RammPriceBand.Specs
+import Benchmark.Cases.NexusMutual.RammPriceBand.Proofs
 
 namespace Benchmark.Cases.NexusMutual.RammPriceBand
 

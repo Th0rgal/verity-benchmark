@@ -8,7 +8,7 @@ implementation_id: smart_contracts
 stage: build_green
 translation_status: translated
 spec_status: frozen
-proof_status: not_started
+proof_status: partial
 upstream_repo: https://github.com/NexusMutual/smart-contracts
 upstream_commit: ad212043a78953a2cd98cd02b06c8e3e354c6023
 original_contract_path: contracts/modules/capital/Ramm.sol
@@ -35,7 +35,7 @@ abstraction_notes: >
   arithmetic safety band itself.
 unsupported_feature_codes: []
 spec_target: Benchmark.Cases.NexusMutual.RammPriceBand.Specs
-proof_target: Benchmark.Cases.NexusMutual.RammPriceBand.Specs
+proof_target: Benchmark.Cases.NexusMutual.RammPriceBand.Proofs
 notes: >
   Price-band slice of Nexus Mutual RAMM. The Verity model keeps the buffered
   book-value computation behind buy and sell spot prices and omits unrelated

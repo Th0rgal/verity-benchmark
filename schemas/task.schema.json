@@ -20,12 +20,9 @@
     "category",
     "track",
     "translation_status",
-    "spec_status",
     "proof_status",
-    "spec_target",
     "proof_target",
     "evaluation_engine",
-    "evaluation_target_kind",
     "evaluation_target",
     "evaluation_declaration",
     "allowed_files",
@@ -79,23 +76,14 @@
     "translation_status": {
       "enum": ["not_started", "scoped", "translated", "blocked"]
     },
-    "spec_status": {
-      "enum": ["not_started", "draft", "frozen", "blocked"]
-    },
     "proof_status": {
       "enum": ["not_started", "in_progress", "partial", "complete", "blocked"]
-    },
-    "spec_target": {
-      "type": ["string", "null"]
     },
     "proof_target": {
       "type": ["string", "null"]
     },
     "evaluation_engine": {
       "enum": ["lean_build"]
-    },
-    "evaluation_target_kind": {
-      "enum": ["translation", "spec", "proof"]
     },
     "evaluation_target": {
       "type": "string"

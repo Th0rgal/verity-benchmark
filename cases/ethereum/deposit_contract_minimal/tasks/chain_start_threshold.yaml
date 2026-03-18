@@ -7,23 +7,21 @@ family_id: ethereum
 implementation_id: deposit_contract
 source_ref: https://github.com/ethereum/deposit_contract@691feb18330d3d102b5a4b3d4434fac7571f51b8:deposit_contract/contracts/validator_registration.v.py
 task_interface_version: 1
-statement_id: deposit_starts_chain_at_threshold_spec
+statement_id: full_deposit_starts_chain_at_threshold
 property_class: threshold_activation
 difficulty: medium
 category: bounds
 track: proof-only
 translation_status: translated
-spec_status: frozen
-proof_status: not_started
-spec_target: Benchmark.Cases.Ethereum.DepositContractMinimal.Specs
-proof_target: null
+proof_status: partial
+proof_target: Benchmark.Cases.Ethereum.DepositContractMinimal.Proofs
 evaluation_engine: lean_build
-evaluation_target_kind: spec
-evaluation_target: Benchmark.Cases.Ethereum.DepositContractMinimal.Specs
-evaluation_declaration: deposit_starts_chain_at_threshold_spec
+evaluation_target: Benchmark.Cases.Ethereum.DepositContractMinimal.Proofs
+evaluation_declaration: full_deposit_starts_chain_at_threshold
 allowed_files:
   - cases/ethereum/deposit_contract_minimal/verity/Specs.lean
   - Benchmark/Cases/Ethereum/DepositContractMinimal/Specs.lean
+  - Benchmark/Cases/Ethereum/DepositContractMinimal/Proofs.lean
 abstraction_level: protocol_slice
 abstraction_notes: >
   The task focuses on the threshold-triggered state flip after enough full deposits,

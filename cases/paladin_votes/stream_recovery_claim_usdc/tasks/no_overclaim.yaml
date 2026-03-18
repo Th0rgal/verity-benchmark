@@ -7,23 +7,21 @@ family_id: paladin_votes
 implementation_id: stream_recovery_claim
 source_ref: https://github.com/Figu3/sonic-earn-recovery-system@699cbbc79def374cab9739e451acbbf866293d12:src/StreamRecoveryClaim.sol
 task_interface_version: 1
-statement_id: claimUsdc_preserves_round_bound_spec
+statement_id: claimUsdc_preserves_round_bound
 property_class: accounting_bound
 difficulty: easy
 category: accounting
 track: proof-only
 translation_status: translated
-spec_status: frozen
-proof_status: not_started
-spec_target: Benchmark.Cases.PaladinVotes.StreamRecoveryClaimUsdc.Specs
-proof_target: null
+proof_status: partial
+proof_target: Benchmark.Cases.PaladinVotes.StreamRecoveryClaimUsdc.Proofs
 evaluation_engine: lean_build
-evaluation_target_kind: spec
-evaluation_target: Benchmark.Cases.PaladinVotes.StreamRecoveryClaimUsdc.Specs
-evaluation_declaration: claimUsdc_preserves_round_bound_spec
+evaluation_target: Benchmark.Cases.PaladinVotes.StreamRecoveryClaimUsdc.Proofs
+evaluation_declaration: claimUsdc_preserves_round_bound
 allowed_files:
   - cases/paladin_votes/stream_recovery_claim_usdc/verity/Specs.lean
   - Benchmark/Cases/PaladinVotes/StreamRecoveryClaimUsdc/Specs.lean
+  - Benchmark/Cases/PaladinVotes/StreamRecoveryClaimUsdc/Proofs.lean
 abstraction_level: protocol_slice
 abstraction_notes: >
   The task captures the round-level accounting bound after a claim while staying

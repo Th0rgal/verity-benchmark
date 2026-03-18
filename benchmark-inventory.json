@@ -14,10 +14,10 @@
     "implementation_count": 6,
     "active_case_count": 4,
     "backlog_case_count": 2,
-    "active_task_count": 14,
+    "active_task_count": 15,
     "backlog_task_count": 0,
     "buildable_case_count": 4,
-    "runnable_task_count": 14,
+    "runnable_task_count": 15,
     "case_stage_counts": {
       "build_green": 4,
       "candidate": 2
@@ -26,17 +26,12 @@
       "blocked": 2,
       "translated": 4
     },
-    "spec_status_counts": {
-      "frozen": 4,
-      "not_started": 2
-    },
     "proof_status_counts": {
       "blocked": 2,
-      "not_started": 2,
-      "partial": 2
+      "partial": 4
     },
     "task_track_counts": {
-      "proof-only": 14
+      "proof-only": 15
     },
     "task_property_class_counts": {
       "accounting_bound": 1,
@@ -49,6 +44,7 @@
       "price_upper_bound": 1,
       "subtree_partition": 1,
       "threshold_activation": 1,
+      "threshold_partition": 1,
       "total_conservation": 1,
       "tree_conservation": 1,
       "weighted_selection": 1
@@ -356,7 +352,7 @@
       "stage": "build_green",
       "translation_status": "translated",
       "spec_status": "frozen",
-      "proof_status": "not_started",
+      "proof_status": "partial",
       "source_language": "solidity",
       "upstream_repo": "https://github.com/NexusMutual/smart-contracts",
       "upstream_commit": "ad212043a78953a2cd98cd02b06c8e3e354c6023",
@@ -384,7 +380,7 @@
       "abstraction_notes": "The benchmark freezes the 1 percent buy/sell band around book value that the RAMM exposes through its reserve-derived spot prices. Reserve ratchets, swap execution, and oracle accumulation are omitted so the tasks focus on the arithmetic safety band itself.",
       "unsupported_feature_codes": [],
       "spec_target": "Benchmark.Cases.NexusMutual.RammPriceBand.Specs",
-      "proof_target": "Benchmark.Cases.NexusMutual.RammPriceBand.Specs"
+      "proof_target": "Benchmark.Cases.NexusMutual.RammPriceBand.Proofs"
     },
     {
       "case_id": "paladin_votes/stream_recovery_claim_usdc",
@@ -399,7 +395,7 @@
       "stage": "build_green",
       "translation_status": "translated",
       "spec_status": "frozen",
-      "proof_status": "not_started",
+      "proof_status": "partial",
       "source_language": "solidity",
       "upstream_repo": "https://github.com/Figu3/sonic-earn-recovery-system",
       "upstream_commit": "699cbbc79def374cab9739e451acbbf866293d12",
@@ -522,29 +518,26 @@
       "property_class": "threshold_activation",
       "category": "bounds",
       "difficulty": "medium",
-      "statement_id": "deposit_starts_chain_at_threshold_spec",
+      "statement_id": "full_deposit_starts_chain_at_threshold",
       "translation_status": "translated",
-      "spec_status": "frozen",
-      "proof_status": "not_started",
+      "proof_status": "partial",
       "allowed_files": [
         "cases/ethereum/deposit_contract_minimal/verity/Specs.lean",
-        "Benchmark/Cases/Ethereum/DepositContractMinimal/Specs.lean"
+        "Benchmark/Cases/Ethereum/DepositContractMinimal/Specs.lean",
+        "Benchmark/Cases/Ethereum/DepositContractMinimal/Proofs.lean"
       ],
       "abstraction_level": "protocol_slice",
       "abstraction_notes": "The task focuses on the threshold-triggered state flip after enough full deposits, not on global beacon chain initialization mechanics.",
       "unsupported_feature_codes": [],
-      "spec_target": "Benchmark.Cases.Ethereum.DepositContractMinimal.Specs",
-      "proof_target": null,
+      "proof_target": "Benchmark.Cases.Ethereum.DepositContractMinimal.Proofs",
       "evaluation": {
         "engine": "lean_build",
-        "target_kind": "spec",
-        "target": "Benchmark.Cases.Ethereum.DepositContractMinimal.Specs",
-        "declaration": "deposit_starts_chain_at_threshold_spec"
+        "target_kind": "proof",
+        "target": "Benchmark.Cases.Ethereum.DepositContractMinimal.Proofs",
+        "declaration": "full_deposit_starts_chain_at_threshold"
       },
       "readiness": {
-        "translation": "ready",
-        "spec": "ready",
-        "proof": "planned",
+        "proof": "ready",
         "evaluation": "ready"
       }
     },
@@ -564,29 +557,26 @@
       "property_class": "monotonic_counter",
       "category": "state-transition",
       "difficulty": "easy",
-      "statement_id": "deposit_increments_deposit_count_spec",
+      "statement_id": "deposit_increments_deposit_count",
       "translation_status": "translated",
-      "spec_status": "frozen",
-      "proof_status": "not_started",
+      "proof_status": "partial",
       "allowed_files": [
         "cases/ethereum/deposit_contract_minimal/verity/Specs.lean",
-        "Benchmark/Cases/Ethereum/DepositContractMinimal/Specs.lean"
+        "Benchmark/Cases/Ethereum/DepositContractMinimal/Specs.lean",
+        "Benchmark/Cases/Ethereum/DepositContractMinimal/Proofs.lean"
       ],
       "abstraction_level": "protocol_slice",
       "abstraction_notes": "This task isolates the counter increment effect of a successful deposit without exposing the omitted Merkle tree or event machinery.",
       "unsupported_feature_codes": [],
-      "spec_target": "Benchmark.Cases.Ethereum.DepositContractMinimal.Specs",
-      "proof_target": null,
+      "proof_target": "Benchmark.Cases.Ethereum.DepositContractMinimal.Proofs",
       "evaluation": {
         "engine": "lean_build",
-        "target_kind": "spec",
-        "target": "Benchmark.Cases.Ethereum.DepositContractMinimal.Specs",
-        "declaration": "deposit_increments_deposit_count_spec"
+        "target_kind": "proof",
+        "target": "Benchmark.Cases.Ethereum.DepositContractMinimal.Proofs",
+        "declaration": "deposit_increments_deposit_count"
       },
       "readiness": {
-        "translation": "ready",
-        "spec": "ready",
-        "proof": "planned",
+        "proof": "ready",
         "evaluation": "ready"
       }
     },
@@ -608,7 +598,6 @@
       "difficulty": "medium",
       "statement_id": "full_deposit_preserves_partial_gap",
       "translation_status": "translated",
-      "spec_status": "frozen",
       "proof_status": "partial",
       "allowed_files": [
         "cases/ethereum/deposit_contract_minimal/tasks/full_deposit_preserves_partial_gap.yaml",
@@ -619,7 +608,6 @@
       "abstraction_level": "protocol_slice",
       "abstraction_notes": "This task treats the difference between all deposits and full deposits as the \"partial deposit\" mass. A full-sized deposit increments both counters in lockstep, so that gap must remain unchanged.",
       "unsupported_feature_codes": [],
-      "spec_target": "Benchmark.Cases.Ethereum.DepositContractMinimal.Specs",
       "proof_target": "Benchmark.Cases.Ethereum.DepositContractMinimal.Proofs",
       "evaluation": {
         "engine": "lean_build",
@@ -628,8 +616,45 @@
         "declaration": "full_deposit_preserves_partial_gap"
       },
       "readiness": {
-        "translation": "ready",
-        "spec": "ready",
+        "proof": "ready",
+        "evaluation": "ready"
+      }
+    },
+    {
+      "task_ref": "ethereum/deposit_contract_minimal/small_deposit_preserves_full_count",
+      "task_id": "small_deposit_preserves_full_count",
+      "case_id": "ethereum/deposit_contract_minimal",
+      "suite": "active",
+      "schema_version": 1,
+      "manifest_path": "cases/ethereum/deposit_contract_minimal/tasks/small_deposit_preserves_full_count.yaml",
+      "split": "active",
+      "family_id": "ethereum",
+      "implementation_id": "deposit_contract",
+      "source_ref": "https://github.com/ethereum/deposit_contract@691feb18330d3d102b5a4b3d4434fac7571f51b8:deposit_contract/contracts/validator_registration.v.py",
+      "task_interface_version": 1,
+      "track": "proof-only",
+      "property_class": "threshold_partition",
+      "category": "accounting",
+      "difficulty": "easy",
+      "statement_id": "small_deposit_preserves_full_count",
+      "translation_status": "translated",
+      "proof_status": "partial",
+      "allowed_files": [
+        "cases/ethereum/deposit_contract_minimal/verity/Specs.lean",
+        "Benchmark/Cases/Ethereum/DepositContractMinimal/Specs.lean",
+        "Benchmark/Cases/Ethereum/DepositContractMinimal/Proofs.lean"
+      ],
+      "abstraction_level": "protocol_slice",
+      "abstraction_notes": "This task isolates the non-full-deposit branch: deposits below the full threshold must leave the full-deposit counter unchanged.",
+      "unsupported_feature_codes": [],
+      "proof_target": "Benchmark.Cases.Ethereum.DepositContractMinimal.Proofs",
+      "evaluation": {
+        "engine": "lean_build",
+        "target_kind": "proof",
+        "target": "Benchmark.Cases.Ethereum.DepositContractMinimal.Proofs",
+        "declaration": "small_deposit_preserves_full_count"
+      },
+      "readiness": {
         "proof": "ready",
         "evaluation": "ready"
       }
@@ -650,29 +675,26 @@
       "property_class": "weighted_selection",
       "category": "probabilistic-encoding",
       "difficulty": "hard",
-      "statement_id": "draw_interval_matches_weights_spec",
+      "statement_id": "draw_interval_matches_weights",
       "translation_status": "translated",
-      "spec_status": "frozen",
-      "proof_status": "not_started",
+      "proof_status": "partial",
       "allowed_files": [
         "cases/kleros/sortition_trees/verity/Specs.lean",
-        "Benchmark/Cases/Kleros/SortitionTrees/Specs.lean"
+        "Benchmark/Cases/Kleros/SortitionTrees/Specs.lean",
+        "Benchmark/Cases/Kleros/SortitionTrees/Proofs.lean"
       ],
       "abstraction_level": "protocol_slice",
       "abstraction_notes": "The probabilistic claim is encoded as interval preservation: each leaf owns a contiguous ticket interval whose width equals its weight.",
       "unsupported_feature_codes": [],
-      "spec_target": "Benchmark.Cases.Kleros.SortitionTrees.Specs",
-      "proof_target": null,
+      "proof_target": "Benchmark.Cases.Kleros.SortitionTrees.Proofs",
       "evaluation": {
         "engine": "lean_build",
-        "target_kind": "spec",
-        "target": "Benchmark.Cases.Kleros.SortitionTrees.Specs",
-        "declaration": "draw_interval_matches_weights_spec"
+        "target_kind": "proof",
+        "target": "Benchmark.Cases.Kleros.SortitionTrees.Proofs",
+        "declaration": "draw_interval_matches_weights"
       },
       "readiness": {
-        "translation": "ready",
-        "spec": "ready",
-        "proof": "planned",
+        "proof": "ready",
         "evaluation": "ready"
       }
     },
@@ -692,29 +714,26 @@
       "property_class": "mapping_consistency",
       "category": "state-transition",
       "difficulty": "medium",
-      "statement_id": "node_id_bijection_spec",
+      "statement_id": "node_id_bijection",
       "translation_status": "translated",
-      "spec_status": "frozen",
-      "proof_status": "not_started",
+      "proof_status": "partial",
       "allowed_files": [
         "cases/kleros/sortition_trees/verity/Specs.lean",
-        "Benchmark/Cases/Kleros/SortitionTrees/Specs.lean"
+        "Benchmark/Cases/Kleros/SortitionTrees/Specs.lean",
+        "Benchmark/Cases/Kleros/SortitionTrees/Proofs.lean"
       ],
       "abstraction_level": "protocol_slice",
       "abstraction_notes": "This task checks the explicit two-way correspondence between node indexes and stake-path IDs in the fixed tree slice.",
       "unsupported_feature_codes": [],
-      "spec_target": "Benchmark.Cases.Kleros.SortitionTrees.Specs",
-      "proof_target": null,
+      "proof_target": "Benchmark.Cases.Kleros.SortitionTrees.Proofs",
       "evaluation": {
         "engine": "lean_build",
-        "target_kind": "spec",
-        "target": "Benchmark.Cases.Kleros.SortitionTrees.Specs",
-        "declaration": "node_id_bijection_spec"
+        "target_kind": "proof",
+        "target": "Benchmark.Cases.Kleros.SortitionTrees.Proofs",
+        "declaration": "node_id_bijection"
       },
       "readiness": {
-        "translation": "ready",
-        "spec": "ready",
-        "proof": "planned",
+        "proof": "ready",
         "evaluation": "ready"
       }
     },
@@ -734,29 +753,26 @@
       "property_class": "tree_conservation",
       "category": "state-transition",
       "difficulty": "medium",
-      "statement_id": "parent_equals_sum_of_children_spec",
+      "statement_id": "parent_equals_sum_of_children",
       "translation_status": "translated",
-      "spec_status": "frozen",
-      "proof_status": "not_started",
+      "proof_status": "partial",
       "allowed_files": [
         "cases/kleros/sortition_trees/verity/Specs.lean",
-        "Benchmark/Cases/Kleros/SortitionTrees/Specs.lean"
+        "Benchmark/Cases/Kleros/SortitionTrees/Specs.lean",
+        "Benchmark/Cases/Kleros/SortitionTrees/Proofs.lean"
       ],
       "abstraction_level": "protocol_slice",
       "abstraction_notes": "This task checks that each internal node remains the sum of its direct children after a leaf update.",
       "unsupported_feature_codes": [],
-      "spec_target": "Benchmark.Cases.Kleros.SortitionTrees.Specs",
-      "proof_target": null,
+      "proof_target": "Benchmark.Cases.Kleros.SortitionTrees.Proofs",
       "evaluation": {
         "engine": "lean_build",
-        "target_kind": "spec",
-        "target": "Benchmark.Cases.Kleros.SortitionTrees.Specs",
-        "declaration": "parent_equals_sum_of_children_spec"
+        "target_kind": "proof",
+        "target": "Benchmark.Cases.Kleros.SortitionTrees.Proofs",
+        "declaration": "parent_equals_sum_of_children"
       },
       "readiness": {
-        "translation": "ready",
-        "spec": "ready",
-        "proof": "planned",
+        "proof": "ready",
         "evaluation": "ready"
       }
     },
@@ -776,29 +792,26 @@
       "property_class": "total_conservation",
       "category": "state-transition",
       "difficulty": "medium",
-      "statement_id": "root_equals_sum_of_leaves_spec",
+      "statement_id": "root_equals_sum_of_leaves",
       "translation_status": "translated",
-      "spec_status": "frozen",
-      "proof_status": "not_started",
+      "proof_status": "partial",
       "allowed_files": [
         "cases/kleros/sortition_trees/verity/Specs.lean",
-        "Benchmark/Cases/Kleros/SortitionTrees/Specs.lean"
+        "Benchmark/Cases/Kleros/SortitionTrees/Specs.lean",
+        "Benchmark/Cases/Kleros/SortitionTrees/Proofs.lean"
       ],
       "abstraction_level": "protocol_slice",
       "abstraction_notes": "This task checks that the root always equals the total stake stored in the leaves of the benchmarked tree slice.",
       "unsupported_feature_codes": [],
-      "spec_target": "Benchmark.Cases.Kleros.SortitionTrees.Specs",
-      "proof_target": null,
+      "proof_target": "Benchmark.Cases.Kleros.SortitionTrees.Proofs",
       "evaluation": {
         "engine": "lean_build",
-        "target_kind": "spec",
-        "target": "Benchmark.Cases.Kleros.SortitionTrees.Specs",
-        "declaration": "root_equals_sum_of_leaves_spec"
+        "target_kind": "proof",
+        "target": "Benchmark.Cases.Kleros.SortitionTrees.Proofs",
+        "declaration": "root_equals_sum_of_leaves"
       },
       "readiness": {
-        "translation": "ready",
-        "spec": "ready",
-        "proof": "planned",
+        "proof": "ready",
         "evaluation": "ready"
       }
     },
@@ -820,7 +833,6 @@
       "difficulty": "medium",
       "statement_id": "root_minus_left_equals_right_subtree",
       "translation_status": "translated",
-      "spec_status": "frozen",
       "proof_status": "partial",
       "allowed_files": [
         "cases/kleros/sortition_trees/tasks/root_minus_left_equals_right_subtree.yaml",
@@ -831,7 +843,6 @@
       "abstraction_level": "protocol_slice",
       "abstraction_notes": "This task turns the tree conservation slice into a partition theorem: once the root and parent sums are established, subtracting the left subtree mass from the root must leave exactly the right subtree mass.",
       "unsupported_feature_codes": [],
-      "spec_target": "Benchmark.Cases.Kleros.SortitionTrees.Specs",
       "proof_target": "Benchmark.Cases.Kleros.SortitionTrees.Proofs",
       "evaluation": {
         "engine": "lean_build",
@@ -840,8 +851,6 @@
         "declaration": "root_minus_left_equals_right_subtree"
       },
       "readiness": {
-        "translation": "ready",
-        "spec": "ready",
         "proof": "ready",
         "evaluation": "ready"
       }
@@ -862,29 +871,26 @@
       "property_class": "price_lower_bound",
       "category": "arithmetic-invariant",
       "difficulty": "easy",
-      "statement_id": "buy_price_above_book_value_buffer_spec",
+      "statement_id": "buy_price_ge_book_value_buffer",
       "translation_status": "translated",
-      "spec_status": "frozen",
-      "proof_status": "not_started",
+      "proof_status": "partial",
       "allowed_files": [
         "cases/nexus_mutual/ramm_price_band/verity/Specs.lean",
-        "Benchmark/Cases/NexusMutual/RammPriceBand/Specs.lean"
+        "Benchmark/Cases/NexusMutual/RammPriceBand/Specs.lean",
+        "Benchmark/Cases/NexusMutual/RammPriceBand/Proofs.lean"
       ],
       "abstraction_level": "protocol_slice",
       "abstraction_notes": "The task isolates the 1 percent buy-side buffer over book value after the price band is synchronized.",
       "unsupported_feature_codes": [],
-      "spec_target": "Benchmark.Cases.NexusMutual.RammPriceBand.Specs",
-      "proof_target": null,
+      "proof_target": "Benchmark.Cases.NexusMutual.RammPriceBand.Proofs",
       "evaluation": {
         "engine": "lean_build",
-        "target_kind": "spec",
-        "target": "Benchmark.Cases.NexusMutual.RammPriceBand.Specs",
-        "declaration": "buy_price_above_book_value_buffer_spec"
+        "target_kind": "proof",
+        "target": "Benchmark.Cases.NexusMutual.RammPriceBand.Proofs",
+        "declaration": "buy_price_ge_book_value_buffer"
       },
       "readiness": {
-        "translation": "ready",
-        "spec": "ready",
-        "proof": "planned",
+        "proof": "ready",
         "evaluation": "ready"
       }
     },
@@ -904,29 +910,26 @@
       "property_class": "price_ordering",
       "category": "arithmetic-invariant",
       "difficulty": "easy",
-      "statement_id": "sell_price_below_buy_price_spec",
+      "statement_id": "sell_price_le_buy_price",
       "translation_status": "translated",
-      "spec_status": "frozen",
-      "proof_status": "not_started",
+      "proof_status": "partial",
       "allowed_files": [
         "cases/nexus_mutual/ramm_price_band/verity/Specs.lean",
-        "Benchmark/Cases/NexusMutual/RammPriceBand/Specs.lean"
+        "Benchmark/Cases/NexusMutual/RammPriceBand/Specs.lean",
+        "Benchmark/Cases/NexusMutual/RammPriceBand/Proofs.lean"
       ],
       "abstraction_level": "protocol_slice",
       "abstraction_notes": "The task checks that the sell quote remains no greater than the buy quote in the buffered book-value band.",
       "unsupported_feature_codes": [],
-      "spec_target": "Benchmark.Cases.NexusMutual.RammPriceBand.Specs",
-      "proof_target": null,
+      "proof_target": "Benchmark.Cases.NexusMutual.RammPriceBand.Proofs",
       "evaluation": {
         "engine": "lean_build",
-        "target_kind": "spec",
-        "target": "Benchmark.Cases.NexusMutual.RammPriceBand.Specs",
-        "declaration": "sell_price_below_buy_price_spec"
+        "target_kind": "proof",
+        "target": "Benchmark.Cases.NexusMutual.RammPriceBand.Proofs",
+        "declaration": "sell_price_le_buy_price"
       },
       "readiness": {
-        "translation": "ready",
-        "spec": "ready",
-        "proof": "planned",
+        "proof": "ready",
         "evaluation": "ready"
       }
     },
@@ -946,29 +949,26 @@
       "property_class": "price_upper_bound",
       "category": "arithmetic-invariant",
       "difficulty": "easy",
-      "statement_id": "sell_price_below_book_value_buffer_spec",
+      "statement_id": "sell_price_le_book_value_buffer",
       "translation_status": "translated",
-      "spec_status": "frozen",
-      "proof_status": "not_started",
+      "proof_status": "partial",
       "allowed_files": [
         "cases/nexus_mutual/ramm_price_band/verity/Specs.lean",
-        "Benchmark/Cases/NexusMutual/RammPriceBand/Specs.lean"
+        "Benchmark/Cases/NexusMutual/RammPriceBand/Specs.lean",
+        "Benchmark/Cases/NexusMutual/RammPriceBand/Proofs.lean"
       ],
       "abstraction_level": "protocol_slice",
       "abstraction_notes": "The task isolates the 1 percent sell-side discount below book value after the price band is synchronized.",
       "unsupported_feature_codes": [],
-      "spec_target": "Benchmark.Cases.NexusMutual.RammPriceBand.Specs",
-      "proof_target": null,
+      "proof_target": "Benchmark.Cases.NexusMutual.RammPriceBand.Proofs",
       "evaluation": {
         "engine": "lean_build",
-        "target_kind": "spec",
-        "target": "Benchmark.Cases.NexusMutual.RammPriceBand.Specs",
-        "declaration": "sell_price_below_book_value_buffer_spec"
+        "target_kind": "proof",
+        "target": "Benchmark.Cases.NexusMutual.RammPriceBand.Proofs",
+        "declaration": "sell_price_le_book_value_buffer"
       },
       "readiness": {
-        "translation": "ready",
-        "spec": "ready",
-        "proof": "planned",
+        "proof": "ready",
         "evaluation": "ready"
       }
     },
@@ -988,29 +988,26 @@
       "property_class": "authorization_state",
       "category": "state-transition",
       "difficulty": "easy",
-      "statement_id": "claimUsdc_marks_claimed_spec",
+      "statement_id": "claimUsdc_marks_user_claimed",
       "translation_status": "translated",
-      "spec_status": "frozen",
-      "proof_status": "not_started",
+      "proof_status": "partial",
       "allowed_files": [
         "cases/paladin_votes/stream_recovery_claim_usdc/verity/Specs.lean",
-        "Benchmark/Cases/PaladinVotes/StreamRecoveryClaimUsdc/Specs.lean"
+        "Benchmark/Cases/PaladinVotes/StreamRecoveryClaimUsdc/Specs.lean",
+        "Benchmark/Cases/PaladinVotes/StreamRecoveryClaimUsdc/Proofs.lean"
       ],
       "abstraction_level": "protocol_slice",
       "abstraction_notes": "The task checks the claimed flag update in isolation from Merkle validation and ERC20 transfer side effects.",
       "unsupported_feature_codes": [],
-      "spec_target": "Benchmark.Cases.PaladinVotes.StreamRecoveryClaimUsdc.Specs",
-      "proof_target": null,
+      "proof_target": "Benchmark.Cases.PaladinVotes.StreamRecoveryClaimUsdc.Proofs",
       "evaluation": {
         "engine": "lean_build",
-        "target_kind": "spec",
-        "target": "Benchmark.Cases.PaladinVotes.StreamRecoveryClaimUsdc.Specs",
-        "declaration": "claimUsdc_marks_claimed_spec"
+        "target_kind": "proof",
+        "target": "Benchmark.Cases.PaladinVotes.StreamRecoveryClaimUsdc.Proofs",
+        "declaration": "claimUsdc_marks_user_claimed"
       },
       "readiness": {
-        "translation": "ready",
-        "spec": "ready",
-        "proof": "planned",
+        "proof": "ready",
         "evaluation": "ready"
       }
     },
@@ -1032,7 +1029,6 @@
       "difficulty": "medium",
       "statement_id": "claimUsdc_claimed_plus_allocated_conserved",
       "translation_status": "translated",
-      "spec_status": "frozen",
       "proof_status": "partial",
       "allowed_files": [
         "cases/paladin_votes/stream_recovery_claim_usdc/tasks/claimed_plus_allocated_conserved.yaml",
@@ -1043,7 +1039,6 @@
       "abstraction_level": "protocol_slice",
       "abstraction_notes": "This task composes the claim path's two accounting updates into a single conservation theorem: claimed USDC increases by exactly the amount removed from total allocated USDC in the benchmark's single-round slice.",
       "unsupported_feature_codes": [],
-      "spec_target": "Benchmark.Cases.PaladinVotes.StreamRecoveryClaimUsdc.Specs",
       "proof_target": "Benchmark.Cases.PaladinVotes.StreamRecoveryClaimUsdc.Proofs",
       "evaluation": {
         "engine": "lean_build",
@@ -1052,8 +1047,6 @@
         "declaration": "claimUsdc_claimed_plus_allocated_conserved"
       },
       "readiness": {
-        "translation": "ready",
-        "spec": "ready",
         "proof": "ready",
         "evaluation": "ready"
       }
@@ -1074,33 +1067,30 @@
       "property_class": "accounting_bound",
       "category": "accounting",
       "difficulty": "easy",
-      "statement_id": "claimUsdc_preserves_round_bound_spec",
+      "statement_id": "claimUsdc_preserves_round_bound",
       "translation_status": "translated",
-      "spec_status": "frozen",
-      "proof_status": "not_started",
+      "proof_status": "partial",
       "allowed_files": [
         "cases/paladin_votes/stream_recovery_claim_usdc/verity/Specs.lean",
-        "Benchmark/Cases/PaladinVotes/StreamRecoveryClaimUsdc/Specs.lean"
+        "Benchmark/Cases/PaladinVotes/StreamRecoveryClaimUsdc/Specs.lean",
+        "Benchmark/Cases/PaladinVotes/StreamRecoveryClaimUsdc/Proofs.lean"
       ],
       "abstraction_level": "protocol_slice",
       "abstraction_notes": "The task captures the round-level accounting bound after a claim while staying inside the benchmark's simplified single-round model.",
       "unsupported_feature_codes": [],
-      "spec_target": "Benchmark.Cases.PaladinVotes.StreamRecoveryClaimUsdc.Specs",
-      "proof_target": null,
+      "proof_target": "Benchmark.Cases.PaladinVotes.StreamRecoveryClaimUsdc.Proofs",
       "evaluation": {
         "engine": "lean_build",
-        "target_kind": "spec",
-        "target": "Benchmark.Cases.PaladinVotes.StreamRecoveryClaimUsdc.Specs",
-        "declaration": "claimUsdc_preserves_round_bound_spec"
+        "target_kind": "proof",
+        "target": "Benchmark.Cases.PaladinVotes.StreamRecoveryClaimUsdc.Proofs",
+        "declaration": "claimUsdc_preserves_round_bound"
       },
       "readiness": {
-        "translation": "ready",
-        "spec": "ready",
-        "proof": "planned",
+        "proof": "ready",
         "evaluation": "ready"
       }
     }
   ],
   "backlog_tasks": [],
-  "generated_at": "2026-03-18T16:46:31.378562+00:00"
+  "generated_at": "2026-03-18T19:05:05.330721+00:00"
 }

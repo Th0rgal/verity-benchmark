@@ -2,7 +2,7 @@
 
 The fixed harness currently uses only repository-local tools:
 
-- `lake build <target>` for translation, specification-module, or proof-module checks
+- `lake build <target>` for proof-module checks
 - `scripts/run_task.sh` for one task
 - `scripts/run_all.sh` for sorted task discovery and aggregation
 
