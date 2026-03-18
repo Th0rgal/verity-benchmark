@@ -155,6 +155,8 @@ Use `python3 harness/default_agent.py describe --profile <name>` to inspect the 
 The repo-owned `default` profile and the reusable `openai-proxy-fast` profile both speak the same `openai_compatible` contract to `https://agent-backend.thomas.md/v1` with `builtin/fast`; the difference is the run track and whether you select them through the benchmark default profile or an explicit external profile/config.
 `harness/agent_runner.py` resolves one explicit config per invocation and reuses it across all tasks in that run scope, so live runs fail fast when required env vars such as `base_url`, `model`, or `api_key` are missing or invalid.
 `python3 harness/default_agent.py probe --profile <name> --ensure-model` now also fails when `/models` cannot confirm the configured model because the response contains no parseable model ids.
+The one-shot default-agent prompt now embeds the contents of the task manifest's `allowed_files`, so external OpenAI-compatible backends receive the proof-relevant Lean context through the same default-agent runner path instead of only file names.
+Run artifacts now also record `elapsed_seconds` in `schemas/agent-run.schema.json` so live proxy/backend timing is preserved alongside the resolved endpoint and model contract.
 
 Run all active tasks:
 

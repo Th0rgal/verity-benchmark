@@ -28,6 +28,8 @@ The default benchmark agent now has its own explicit entrypoint:
 - each connection field is explicit in config: `base_url`, `model`, and `api_key` may be pinned directly or sourced from `*_env`
 - the default-agent run artifact is schema-backed by `schemas/agent-run.schema.json`
 - each run artifact records the resolved `base_url` and `model` plus the originating `*_env` contract for reproducibility
+- each one-shot task prompt now embeds the contents of the task manifest's `allowed_files`, so external OpenAI-compatible backends receive the benchmark-approved proof context directly through the shared runner
+- each live or dry-run artifact records `elapsed_seconds` for reproducible timing checks
 - task artifacts are partitioned under `results/agent_runs/<track>/<run_slug>/...`
 - aggregated case/suite agent-run status is written to `results/agent_summaries/<track>/<run_slug>.json`
 - `benchmark.toml` only names the benchmark-owned default summary paths: `results/agent_summaries/reference/default.json` for the repo profile and `results/agent_summaries/custom/openai-compatible.json` for the generic external profile

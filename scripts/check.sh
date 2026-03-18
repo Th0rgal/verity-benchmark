@@ -11,11 +11,43 @@ python3 harness/default_agent.py validate-config "harness/agents/${CUSTOM_AGENT_
 python3 harness/default_agent.py validate-config harness/agents/openai-proxy-fast.json
 python3 harness/default_agent.py validate-config harness/default-agent.example.json
 python3 harness/default_agent.py validate-config "$(pwd)/harness/default-agent.example.json"
+python3 - <<'PY'
+from pathlib import Path
+import sys
+
+sys.path.insert(0, str(Path("harness").resolve()))
+
+from default_agent import build_user_prompt, resolve_task
+
+prompt = build_user_prompt(resolve_task("ethereum/deposit_contract_minimal/deposit_count"))
+required_snippets = [
+    "This is a one-shot harness invocation.",
+    "Allowed file contents:",
+    "[Benchmark/Cases/Ethereum/DepositContractMinimal/Proofs.lean]",
+    "deposit_increments_deposit_count",
+]
+missing = [snippet for snippet in required_snippets if snippet not in prompt]
+if missing:
+    raise SystemExit(f"default-agent prompt is missing expected context: {missing}")
+PY
 python3 harness/agent_runner.py run ethereum/deposit_contract_minimal/deposit_count --profile "$DEFAULT_AGENT_PROFILE" --dry-run
 python3 harness/agent_runner.py run-case ethereum/deposit_contract_minimal --profile "$DEFAULT_AGENT_PROFILE" --dry-run
 python3 harness/agent_runner.py run ethereum/deposit_contract_minimal/deposit_count --profile "$CUSTOM_AGENT_PROFILE" --dry-run
 python3 harness/agent_runner.py run ethereum/deposit_contract_minimal/deposit_count --profile openai-proxy-fast --dry-run
 python3 harness/agent_runner.py run ethereum/deposit_contract_minimal/deposit_count --config harness/default-agent.example.json --dry-run
+python3 - <<'PY'
+from pathlib import Path
+import json
+
+payload = json.loads(
+    Path("results/agent_runs/reference/default/ethereum__deposit_contract_minimal__deposit_count.json").read_text(
+        encoding="utf-8"
+    )
+)
+elapsed = payload.get("elapsed_seconds")
+if not isinstance(elapsed, (int, float)) or elapsed < 0:
+    raise SystemExit(f"expected non-negative elapsed_seconds in run artifact, got {elapsed!r}")
+PY
 python3 - <<'PY'
 from pathlib import Path
 import tomllib

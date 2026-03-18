@@ -5,6 +5,7 @@ import argparse
 import json
 import os
 import sys
+import time
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from pathlib import Path
@@ -386,12 +387,29 @@ def build_user_prompt(task: dict[str, Any]) -> str:
         "manifest_path": task["manifest_path"],
         "case_manifest_path": task["case_manifest_path"],
     }
+    allowed_file_sections = []
+    for rel_path in task["allowed_files"]:
+        path = ROOT / rel_path
+        if not path.is_file():
+            allowed_file_sections.append(f"[{rel_path}]\n<missing>")
+            continue
+        allowed_file_sections.append(f"[{rel_path}]\n{path.read_text(encoding='utf-8').strip()}")
+
+    allowed_file_bundle = "\n\n".join(allowed_file_sections).strip()
+
     return (
         "You are running the default benchmark agent for verity-benchmark.\n"
         "Treat this as a proof-task benchmark, not an implementation task.\n"
         "Respect the allowed file list.\n\n"
+        "This is a one-shot harness invocation.\n"
+        "Do not claim that you will inspect more files or run commands.\n"
+        "Reason only from the task payload and the allowed file contents included below.\n"
+        "If the proof already looks sufficient, say so and explain why.\n"
+        "If it looks wrong or incomplete, propose the smallest concrete Lean edit within the allowed files.\n\n"
         "Task payload:\n"
-        f"{json.dumps(task_payload, indent=2)}\n"
+        f"{json.dumps(task_payload, indent=2)}\n\n"
+        "Allowed file contents:\n"
+        f"{allowed_file_bundle}\n"
     )
 
 
@@ -528,9 +546,16 @@ def write_result(task_ref: str, config: ResolvedAgentConfig, payload: dict[str, 
     return result_path
 
 
-def build_result(task_ref: str, config: ResolvedAgentConfig, messages: list[dict[str, str]], *, dry_run: bool) -> dict[str, Any]:
+def build_result(
+    task_ref: str,
+    config: ResolvedAgentConfig,
+    messages: list[dict[str, str]],
+    *,
+    dry_run: bool,
+    elapsed_seconds: float | None = None,
+) -> dict[str, Any]:
     task = resolve_task(task_ref)
-    return {
+    payload = {
         "schema_version": 1,
         "task_ref": task_ref,
         "task_id": task["task_id"],
@@ -563,6 +588,9 @@ def build_result(task_ref: str, config: ResolvedAgentConfig, messages: list[dict
         },
         "messages": messages,
     }
+    if elapsed_seconds is not None:
+        payload["elapsed_seconds"] = round(elapsed_seconds, 3)
+    return payload
 
 
 def validate_result_payload(payload: dict[str, Any], label: str) -> None:
@@ -695,13 +723,16 @@ def execute_agent_task(
     config = resolved_config or resolve_config(config_path, require_secrets=not dry_run, profile=profile)
     task = resolve_task(task_ref)
     messages = build_messages(config, task)
-    result = build_result(task_ref, config, messages, dry_run=dry_run)
     if dry_run:
+        result = build_result(task_ref, config, messages, dry_run=dry_run, elapsed_seconds=0.0)
         validate_result_payload(result, task_ref)
         result_path = write_result(task_ref, config, result)
         return 0, result_path
 
+    start = time.perf_counter()
     response = send_chat_completion(config, messages)
+    elapsed_seconds = time.perf_counter() - start
+    result = build_result(task_ref, config, messages, dry_run=dry_run, elapsed_seconds=elapsed_seconds)
     result["response"] = response
     result["response_text"] = extract_text(response)
     validate_result_payload(result, task_ref)

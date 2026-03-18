@@ -177,6 +177,12 @@ def run_command(command: list[str]) -> tuple[int, str]:
     return completed.returncode, output
 
 
+def classify_lean_build_failure(output: str) -> str:
+    if "external command 'git' exited with code 1" in output and "checking out revision" in output:
+        return "dependency_checkout_failed"
+    return "proof_target_check_failed"
+
+
 def declaration_exists(module_name: str, declaration_name: str) -> tuple[bool, str]:
     candidates = [declaration_name]
     qualified_name = f"{module_name}.{declaration_name}"
@@ -239,7 +245,7 @@ def execute_task(task_ref: str) -> tuple[int, Path]:
         else:
             execution_status = "passed" if code == 0 else "failed"
         if code != 0:
-            failure_mode = "proof_target_check_failed"
+            failure_mode = classify_lean_build_failure(execution_output)
 
     completed_at = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
     duration_seconds = round(time.time() - start, 3)

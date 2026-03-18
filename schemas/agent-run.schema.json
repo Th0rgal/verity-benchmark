@@ -34,6 +34,10 @@
     "dry_run": {
       "type": "boolean"
     },
+    "elapsed_seconds": {
+      "type": "number",
+      "minimum": 0
+    },
     "status": {
       "enum": ["dry_run", "completed"]
     },
