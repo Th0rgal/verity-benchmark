@@ -4,7 +4,8 @@ from __future__ import annotations
 from dataclasses import dataclass
 from functools import lru_cache
 from pathlib import Path
-import tomllib
+
+from toml_compat import load_toml_file
 
 ROOT = Path(__file__).resolve().parent.parent
 BENCHMARK_TOML = ROOT / "benchmark.toml"
@@ -39,9 +40,7 @@ def _path_setting(raw: object, fallback: Path) -> Path:
 def load_benchmark_agent_defaults() -> BenchmarkAgentDefaults:
     data: dict[str, object] = {}
     if BENCHMARK_TOML.is_file():
-        loaded = tomllib.loads(BENCHMARK_TOML.read_text(encoding="utf-8"))
-        if isinstance(loaded, dict):
-            data = loaded
+        data = load_toml_file(BENCHMARK_TOML)
     return BenchmarkAgentDefaults(
         default_agent_profiles_dir=_path_setting(data.get("default_agent_profiles_dir"), DEFAULT_AGENT_PROFILES_DIR),
         default_agent_default_profile=_string_setting(

@@ -4,7 +4,9 @@ from __future__ import annotations
 import argparse
 import json
 import os
+import re
 import sys
+import tempfile
 import time
 from dataclasses import dataclass
 from datetime import datetime, timezone
@@ -13,7 +15,7 @@ from typing import Any
 from urllib import error, request
 
 from benchmark_config import load_benchmark_agent_defaults
-from task_runner import ROOT, load_task_record, resolve_task_manifest
+from task_runner import ROOT, load_task_record, resolve_task_manifest, run_command as lean_run_command
 
 AGENT_RESULTS_DIR = ROOT / "results" / "agent_runs"
 SCHEMA_PATH = ROOT / "schemas" / "agent-config.schema.json"
@@ -22,6 +24,7 @@ BENCHMARK_DEFAULTS = load_benchmark_agent_defaults()
 DEFAULT_PROFILE = BENCHMARK_DEFAULTS.default_agent_default_profile
 AGENT_PROFILES_DIR = ROOT / BENCHMARK_DEFAULTS.default_agent_profiles_dir
 DEFAULT_AGENT_CONFIG_PATH = ROOT / BENCHMARK_DEFAULTS.default_agent_config
+PLACEHOLDER_PATTERN = re.compile(r"\b(sorry|admit|axiom)\b")
 
 
 @dataclass(frozen=True)
@@ -370,6 +373,17 @@ def build_system_prompt(config: ResolvedAgentConfig) -> str:
     return "\n\n".join(sections).strip()
 
 
+def render_file_bundle(paths: list[str]) -> str:
+    sections = []
+    for rel_path in paths:
+        path = ROOT / rel_path
+        if not path.is_file():
+            sections.append(f"[{rel_path}]\n<missing>")
+            continue
+        sections.append(f"[{rel_path}]\n{path.read_text(encoding='utf-8').strip()}")
+    return "\n\n".join(sections).strip()
+
+
 def build_user_prompt(task: dict[str, Any]) -> str:
     task_payload = {
         "task_ref": task["task_ref"],
@@ -379,37 +393,34 @@ def build_user_prompt(task: dict[str, Any]) -> str:
         "property_class": task["property_class"],
         "category": task["category"],
         "difficulty": task["difficulty"],
-        "statement_id": task["statement_id"],
-        "allowed_files": task["allowed_files"],
+        "theorem_name": task["theorem_name"],
+        "proof_family": task["proof_family"],
+        "implementation_files": task["implementation_files"],
+        "specification_files": task["specification_files"],
+        "editable_files": task["editable_files"],
         "targets": task["targets"],
         "evaluation": task["evaluation"],
         "readiness": task["readiness"],
         "manifest_path": task["manifest_path"],
         "case_manifest_path": task["case_manifest_path"],
     }
-    allowed_file_sections = []
-    for rel_path in task["allowed_files"]:
-        path = ROOT / rel_path
-        if not path.is_file():
-            allowed_file_sections.append(f"[{rel_path}]\n<missing>")
-            continue
-        allowed_file_sections.append(f"[{rel_path}]\n{path.read_text(encoding='utf-8').strip()}")
-
-    allowed_file_bundle = "\n\n".join(allowed_file_sections).strip()
-
     return (
         "You are running the default benchmark agent for verity-benchmark.\n"
-        "Treat this as a proof-task benchmark, not an implementation task.\n"
-        "Respect the allowed file list.\n\n"
+        "Treat this as a strict proof-generation benchmark.\n"
+        "Do not invent specs, modify implementations, or rely on hidden reference proofs.\n\n"
         "This is a one-shot harness invocation.\n"
         "Do not claim that you will inspect more files or run commands.\n"
-        "Reason only from the task payload and the allowed file contents included below.\n"
-        "If the proof already looks sufficient, say so and explain why.\n"
-        "If it looks wrong or incomplete, propose the smallest concrete Lean edit within the allowed files.\n\n"
+        "Reason only from the task payload and the file contents included below.\n"
+        "Return the complete contents of the single editable Lean proof file.\n"
+        "Return Lean code only, with no markdown fences or extra explanation.\n\n"
         "Task payload:\n"
         f"{json.dumps(task_payload, indent=2)}\n\n"
-        "Allowed file contents:\n"
-        f"{allowed_file_bundle}\n"
+        "Implementation file contents:\n"
+        f"{render_file_bundle(task['implementation_files'])}\n\n"
+        "Specification file contents:\n"
+        f"{render_file_bundle(task['specification_files'])}\n\n"
+        "Editable proof template contents:\n"
+        f"{render_file_bundle(task['editable_files'])}\n"
     )
 
 
@@ -519,6 +530,85 @@ def extract_text(response: dict[str, Any]) -> str:
     return ""
 
 
+def extract_candidate_file(response_text: str) -> str:
+    text = response_text.strip()
+    fenced = re.findall(r"```(?:lean)?\s*\n(.*?)```", text, flags=re.DOTALL)
+    if len(fenced) == 1:
+        return fenced[0].strip() + "\n"
+    return text + ("\n" if text and not text.endswith("\n") else "")
+
+
+def evaluate_candidate_submission(task: dict[str, Any], candidate_text: str) -> dict[str, Any]:
+    editable_files = task["editable_files"]
+    if len(editable_files) != 1:
+        return {
+            "status": "failed",
+            "failure_mode": "editable_file_contract_invalid",
+            "details": "tasks must declare exactly one editable Lean file",
+        }
+
+    if not candidate_text.strip():
+        return {
+            "status": "failed",
+            "failure_mode": "empty_response",
+            "details": "agent response was empty",
+        }
+
+    if PLACEHOLDER_PATTERN.search(candidate_text):
+        return {
+            "status": "failed",
+            "failure_mode": "placeholder_detected",
+            "details": "candidate proof contains a rejected placeholder token",
+        }
+
+    editable_rel_path = editable_files[0]
+    theorem_name = str(task["theorem_name"])
+
+    with tempfile.TemporaryDirectory(prefix="verity-benchmark-agent-") as tmp_dir:
+        workspace = Path(tmp_dir) / "workspace"
+        workspace.mkdir(parents=True, exist_ok=True)
+        for rel_path in ("lakefile.lean", "lake-manifest.json", "lean-toolchain", ".lake", "Benchmark.lean"):
+            source = ROOT / rel_path
+            target = workspace / rel_path
+            if source.exists():
+                os.symlink(source, target, target_is_directory=source.is_dir())
+        benchmark_dir = workspace / "Benchmark"
+        benchmark_dir.mkdir(parents=True, exist_ok=True)
+        for rel_path in ("Benchmark/Cases", "Benchmark/Cases.lean"):
+            source = ROOT / rel_path
+            target = workspace / rel_path
+            target.parent.mkdir(parents=True, exist_ok=True)
+            if source.exists():
+                os.symlink(source, target, target_is_directory=source.is_dir())
+        editable_path = workspace / editable_rel_path
+        editable_path.parent.mkdir(parents=True, exist_ok=True)
+        editable_path.write_text(candidate_text, encoding="utf-8")
+
+        check_path = workspace / "CandidateCheck.lean"
+        check_path.write_text(
+            candidate_text.rstrip() + f"\n\n#check {theorem_name}\n",
+            encoding="utf-8",
+        )
+        command = ["lake", "env", "lean", "--root=.", str(check_path.relative_to(workspace))]
+        code, output = lean_run_command(command, cwd=workspace)
+        if code != 0:
+            return {
+                "status": "failed",
+                "failure_mode": "lean_check_failed",
+                "details": output,
+                "command": command,
+                "candidate_workspace": str(editable_path.relative_to(workspace)),
+            }
+
+        return {
+            "status": "passed",
+            "failure_mode": None,
+            "details": output,
+            "command": command,
+            "candidate_workspace": str(editable_path.relative_to(workspace)),
+        }
+
+
 def legacy_result_path(task_ref: str) -> Path:
     return AGENT_RESULTS_DIR / f"{task_ref.replace('/', '__')}.json"
 
@@ -552,6 +642,7 @@ def build_result(
     messages: list[dict[str, str]],
     *,
     dry_run: bool,
+    evaluation: dict[str, Any] | None = None,
     elapsed_seconds: float | None = None,
 ) -> dict[str, Any]:
     task = resolve_task(task_ref)
@@ -562,7 +653,12 @@ def build_result(
         "case_id": task["case_id"],
         "timestamp": datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
         "dry_run": dry_run,
-        "status": "dry_run" if dry_run else "completed",
+        "status": "dry_run" if dry_run else str((evaluation or {}).get("status", "failed")),
+        "theorem_name": task["theorem_name"],
+        "proof_family": task["proof_family"],
+        "implementation_files": task["implementation_files"],
+        "specification_files": task["specification_files"],
+        "editable_files": task["editable_files"],
         "agent": {
             "profile": config.profile,
             "agent_id": config.agent_id,
@@ -588,6 +684,8 @@ def build_result(
         },
         "messages": messages,
     }
+    if evaluation is not None:
+        payload["evaluation"] = evaluation
     if elapsed_seconds is not None:
         payload["elapsed_seconds"] = round(elapsed_seconds, 3)
     return payload
@@ -692,6 +790,13 @@ def prompt_command(config_path: Path, task_ref: str) -> int:
     return 0
 
 
+def evaluate_candidate_command(task_ref: str, candidate_path: Path) -> int:
+    task = resolve_task(task_ref)
+    evaluation = evaluate_candidate_submission(task, candidate_path.read_text(encoding="utf-8"))
+    print(json.dumps(evaluation, indent=2))
+    return 0 if evaluation["status"] == "passed" else 1
+
+
 def probe_command(config_path: Path, ensure_model: bool) -> int:
     config = resolve_config(config_path, require_secrets=True)
     models_payload = list_models(config)
@@ -732,12 +837,23 @@ def execute_agent_task(
     start = time.perf_counter()
     response = send_chat_completion(config, messages)
     elapsed_seconds = time.perf_counter() - start
-    result = build_result(task_ref, config, messages, dry_run=dry_run, elapsed_seconds=elapsed_seconds)
+    response_text = extract_text(response)
+    candidate_text = extract_candidate_file(response_text)
+    evaluation = evaluate_candidate_submission(task, candidate_text)
+    result = build_result(
+        task_ref,
+        config,
+        messages,
+        dry_run=dry_run,
+        evaluation=evaluation,
+        elapsed_seconds=elapsed_seconds,
+    )
     result["response"] = response
-    result["response_text"] = extract_text(response)
+    result["response_text"] = response_text
+    result["candidate_file_contents"] = candidate_text
     validate_result_payload(result, task_ref)
     result_path = write_result(task_ref, config, result)
-    return 0, result_path
+    return (0 if evaluation["status"] == "passed" else 1), result_path
 
 
 def run_command(config_path: Path, task_ref: str, dry_run: bool, *, profile: str | None = None) -> int:
@@ -787,6 +903,13 @@ def main() -> int:
     prompt_parser.add_argument("--config")
     prompt_parser.add_argument("--profile")
 
+    evaluate_parser = subparsers.add_parser(
+        "evaluate-candidate",
+        help="Evaluate a candidate editable Lean file for one task",
+    )
+    evaluate_parser.add_argument("task_ref")
+    evaluate_parser.add_argument("candidate_path")
+
     probe_parser = subparsers.add_parser("probe", help="Probe the configured OpenAI-compatible backend")
     probe_parser.add_argument("--config")
     probe_parser.add_argument("--profile")
@@ -808,6 +931,8 @@ def main() -> int:
         return describe_command(resolve_config_path(args.config, args.profile))
     if args.command == "prompt":
         return prompt_command(resolve_config_path(args.config, args.profile), args.task_ref)
+    if args.command == "evaluate-candidate":
+        return evaluate_candidate_command(args.task_ref, Path(args.candidate_path))
     if args.command == "probe":
         return probe_command(resolve_config_path(args.config, args.profile), args.ensure_model)
     if args.command == "run":

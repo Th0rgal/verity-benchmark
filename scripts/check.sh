@@ -2,8 +2,26 @@
 set -euo pipefail
 
 cd "$(dirname "$0")/.."
-DEFAULT_AGENT_PROFILE="$(python3 -c 'import tomllib; print(tomllib.load(open("benchmark.toml", "rb"))["default_agent_default_profile"])')"
-CUSTOM_AGENT_PROFILE="$(python3 -c 'import tomllib; print(tomllib.load(open("benchmark.toml", "rb"))["custom_agent_default_profile"])')"
+DEFAULT_AGENT_PROFILE="$(python3 - <<'PY'
+from pathlib import Path
+import sys
+
+sys.path.insert(0, str(Path("harness").resolve()))
+from toml_compat import load_toml_file
+
+print(load_toml_file(Path("benchmark.toml"))["default_agent_default_profile"])
+PY
+)"
+CUSTOM_AGENT_PROFILE="$(python3 - <<'PY'
+from pathlib import Path
+import sys
+
+sys.path.insert(0, str(Path("harness").resolve()))
+from toml_compat import load_toml_file
+
+print(load_toml_file(Path("benchmark.toml"))["custom_agent_default_profile"])
+PY
+)"
 
 python3 harness/default_agent.py profiles
 python3 harness/default_agent.py validate-config "harness/agents/${DEFAULT_AGENT_PROFILE}.json"
@@ -22,8 +40,10 @@ from default_agent import build_user_prompt, resolve_task
 prompt = build_user_prompt(resolve_task("ethereum/deposit_contract_minimal/deposit_count"))
 required_snippets = [
     "This is a one-shot harness invocation.",
-    "Allowed file contents:",
-    "[Benchmark/Cases/Ethereum/DepositContractMinimal/Proofs.lean]",
+    "Implementation file contents:",
+    "Specification file contents:",
+    "Editable proof template contents:",
+    "[Benchmark/Generated/Ethereum/DepositContractMinimal/Tasks/DepositCount.lean]",
     "deposit_increments_deposit_count",
 ]
 missing = [snippet for snippet in required_snippets if snippet not in prompt]
@@ -50,10 +70,13 @@ if not isinstance(elapsed, (int, float)) or elapsed < 0:
 PY
 python3 - <<'PY'
 from pathlib import Path
-import tomllib
+import sys
+
+sys.path.insert(0, str(Path("harness").resolve()))
+from toml_compat import load_toml_file
 
 root = Path(".")
-config = tomllib.loads((root / "benchmark.toml").read_text(encoding="utf-8"))
+config = load_toml_file(root / "benchmark.toml")
 expected = [
     config["default_agent_summary"],
     config["custom_agent_summary"],

@@ -55,15 +55,16 @@ def normalize_string_list(path: Path, key: str, value: object) -> list[str]:
 
 def evaluation_ready(
     case_entry: dict,
-    evaluation_target: str | None,
-    evaluation_declaration: str | None,
+    editable_files: list[str],
+    theorem_name: str | None,
+    reference_solution_module: str | None,
     translation_status: str | None,
     proof_status: str | None,
 ) -> bool:
     if case_entry["stage"] not in BUILDABLE_STAGES:
         return False
     return (
-        bool(evaluation_target and evaluation_declaration)
+        bool(editable_files and theorem_name and reference_solution_module)
         and translation_status in RUNNABLE_TRANSLATION_STATUSES
         and proof_status in RUNNABLE_PROOF_STATUSES
     )
@@ -143,12 +144,14 @@ def load_task_manifest(path: Path, suite: str) -> dict:
     project = case_dir.parent.name
     case_name = case_dir.name
     task_id = normalize_optional_string(data.get("task_id")) or path.stem
-    proof_target = normalize_optional_string(data.get("proof_target"))
-    statement_id = normalize_optional_string(data.get("statement_id"))
+    theorem_name = normalize_optional_string(data.get("theorem_name"))
     translation_status = normalize_optional_string(data.get("translation_status")) or case_entry["translation_status"]
     proof_status = normalize_optional_string(data.get("proof_status")) or case_entry["proof_status"]
-    evaluation_target = normalize_optional_string(data.get("evaluation_target"))
-    evaluation_declaration = normalize_optional_string(data.get("evaluation_declaration"))
+    implementation_files = normalize_string_list(path, "implementation_files", data.get("implementation_files"))
+    specification_files = normalize_string_list(path, "specification_files", data.get("specification_files"))
+    editable_files = normalize_string_list(path, "editable_files", data.get("editable_files"))
+    reference_solution_module = normalize_optional_string(data.get("reference_solution_module"))
+    prompt_context_ready = bool(implementation_files and specification_files and editable_files)
 
     entry = {
         "task_ref": f"{project}/{case_name}/{task_id}",
@@ -166,30 +169,35 @@ def load_task_manifest(path: Path, suite: str) -> dict:
         "property_class": normalize_optional_string(data.get("property_class")) or "unspecified",
         "category": normalize_optional_string(data.get("category")) or "unspecified",
         "difficulty": normalize_optional_string(data.get("difficulty")) or "unspecified",
-        "statement_id": statement_id,
+        "theorem_name": theorem_name,
+        "proof_family": normalize_optional_string(data.get("proof_family")) or "unspecified",
         "translation_status": translation_status,
         "proof_status": proof_status,
-        "allowed_files": normalize_string_list(path, "allowed_files", data.get("allowed_files")),
+        "implementation_files": implementation_files,
+        "specification_files": specification_files,
+        "editable_files": editable_files,
         "abstraction_level": normalize_optional_string(data.get("abstraction_level")),
         "abstraction_notes": normalize_notes(path, data.get("abstraction_notes")),
         "unsupported_feature_codes": normalize_string_list(
             path, "unsupported_feature_codes", data.get("unsupported_feature_codes")
         ),
-        "proof_target": proof_target,
+        "reference_solution_module": reference_solution_module,
         "evaluation": {
-            "engine": normalize_optional_string(data.get("evaluation_engine")) or "lean_build",
-            "target_kind": "proof",
-            "target": evaluation_target,
-            "declaration": evaluation_declaration,
+            "engine": normalize_optional_string(data.get("evaluation_engine")) or "lean_proof_generation",
+            "target_kind": "proof_generation",
         },
         "readiness": {
-            "proof": "ready" if proof_target and statement_id and proof_status in RUNNABLE_PROOF_STATUSES else "planned",
-            "evaluation": (
+            "prompt_context": "ready" if prompt_context_ready else "blocked",
+            "editable_proof": (
+                "ready" if editable_files and theorem_name and proof_status in RUNNABLE_PROOF_STATUSES else "blocked"
+            ),
+            "reference_solution": (
                 "ready"
                 if evaluation_ready(
                     case_entry,
-                    evaluation_target,
-                    evaluation_declaration,
+                    editable_files,
+                    theorem_name,
+                    reference_solution_module,
                     translation_status,
                     proof_status,
                 )
@@ -269,24 +277,26 @@ def render_case(entry: dict) -> list[str]:
 def render_task(entry: dict) -> list[str]:
     lines = [
         f"### `{entry['task_ref']}`",
-        f"- Track / property class: `{entry['track']}` / `{entry['property_class']}`",
+        f"- Track / property class / proof family: `{entry['track']}` / `{entry['property_class']}` / `{entry['proof_family']}`",
         (
             "- Readiness:"
-            f" proof=`{entry['readiness']['proof']}`"
-            f", evaluation=`{entry['readiness']['evaluation']}`"
+            f" prompt_context=`{entry['readiness']['prompt_context']}`"
+            f", editable_proof=`{entry['readiness']['editable_proof']}`"
+            f", reference_solution=`{entry['readiness']['reference_solution']}`"
         ),
     ]
-    if entry["statement_id"]:
-        lines.append(f"- Statement id: `{entry['statement_id']}`")
+    if entry["theorem_name"]:
+        lines.append(f"- Theorem target: `{entry['theorem_name']}`")
     lines.append(
         "- Evaluation:"
         f" engine=`{entry['evaluation']['engine']}`"
         f", target_kind=`{entry['evaluation']['target_kind']}`"
-        f", target=`{entry['evaluation']['target']}`"
-        f", declaration=`{entry['evaluation']['declaration']}`"
     )
-    if entry["proof_target"]:
-        lines.append(f"- Proof target: `{entry['proof_target']}`")
+    lines.append(f"- Implementation files: {', '.join(f'`{item}`' for item in entry['implementation_files'])}")
+    lines.append(f"- Specification files: {', '.join(f'`{item}`' for item in entry['specification_files'])}")
+    lines.append(f"- Editable proof file: `{entry['editable_files'][0]}`")
+    if entry["reference_solution_module"]:
+        lines.append(f"- Hidden reference solution: `{entry['reference_solution_module']}`")
     return lines
 
 
@@ -326,13 +336,14 @@ def write_inventory(
             "runnable_task_count": sum(
                 1
                 for entry in active_tasks
-                if entry["readiness"]["evaluation"] == "ready"
+                if entry["readiness"]["editable_proof"] == "ready"
             ),
             "case_stage_counts": summary_counts(all_cases, "stage"),
             "translation_status_counts": summary_counts(all_cases, "translation_status"),
             "proof_status_counts": summary_counts(all_cases, "proof_status"),
             "task_track_counts": summary_counts(all_tasks, "track"),
             "task_property_class_counts": summary_counts(all_tasks, "property_class"),
+            "task_proof_family_counts": summary_counts(all_tasks, "proof_family"),
             "family_split_counts": summary_counts(families, "split"),
         },
         "families": families,

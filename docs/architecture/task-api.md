@@ -1,59 +1,53 @@
 # Task API Architecture Note
 
-## Current model
+## Benchmark contract
 
-The repository stores benchmark tasks under `cases/*/*/tasks/*.yaml`. Each task is a
-proof target with an explicit Lean module and declaration to check.
+Each benchmark task is now a strict proof-generation unit:
 
-## Target model
+- Input to the agent: a fixed Verity implementation, a fixed Lean specification, and one editable Lean proof template.
+- Output from the agent: the complete contents of that single editable Lean proof file.
+- Pass/fail: machine-checked by writing the returned file into a temp workspace, rejecting obvious placeholders, compiling it with Lean, and checking the target theorem declaration exists.
 
-The intended architecture is:
+The benchmark does not ask the agent to invent specs, modify implementations, or inspect hidden solved proofs.
 
-- `family`: semantic grouping across protocols and repositories
-- `implementation`: pinned upstream codebase identity
-- `case`: curation and provenance unit
-- `task`: benchmark API and evaluation unit
-- `source_ref`: pinned source snapshot reference used for reproducibility
+## Repository layout
 
-`case` remains the place where we record why a slice exists, what was translated, and
-what abstractions were introduced. `task` is the public contract that an evaluator
-consumes.
+- `Benchmark/Cases/...`: canonical solved Lean modules kept in the main package build. These remain the hidden reference solutions used for solvability checks and repository maintenance.
+- `Benchmark/Generated/<Family>/<Case>/Tasks/<Task>.lean`: public unsolved proof templates. These are valid package-path modules, but `lakefile.lean` does not import `Benchmark.Generated`, so the main package build stays solution-only.
+- `cases/*/*/tasks/*.yaml`: public task manifests. They point to the implementation files, specification files, editable proof template, explicit theorem target, and proof-family label.
 
-## Why task is the benchmark API
+## Task manifest fields
 
-A benchmark score is attached to a concrete property, not to a folder. The task
-manifest is now the place that explicitly declares:
+The public task API is the manifest. Each task declares:
 
-- which pinned source snapshot the task belongs to via `source_ref`
-- which artifacts are in scope via `allowed_files`
-- which evaluation engine is used via `evaluation_engine`
-- which proof module is executed via `evaluation_target`
-- which proof declaration must exist via `evaluation_declaration`
+- `implementation_files`: fixed Lean implementation context for the task
+- `specification_files`: fixed Lean theorem/specification context
+- `editable_files`: the single agent-editable Lean proof file
+- `theorem_name`: the explicit theorem declaration that must exist after evaluation
+- `proof_family`: one of the benchmark’s five proof families
 
-This removes hidden execution semantics from runner conventions. A task can still share
-provenance with its parent case, but it no longer relies on the runner to guess the
-evaluation contract.
+The repository also keeps hidden maintenance metadata in the same manifest:
 
-## Case vs Task vs Source Snapshot
+- `reference_solution_module`
+- `reference_solution_declaration`
 
-- `case` is the curation and abstraction boundary. It records selected functions,
-  abstraction notes, upstream origin, and the translated Lean target.
-- `task` is the scored unit. It packages the property class, task interface, artifacts
-  in scope, and explicit evaluation contract.
-- `source_ref` is the reproducibility unit. In the current repo it is a pinned string
-  of the form `<repo>@<commit>:<path>`.
+These fields support separate validation of the hidden solved modules without exposing any proof body in the public benchmark surface.
 
-This is intentionally separate from local workspace paths. Evaluation should depend on
-the pinned source reference and declared task artifacts, not on whichever checkout
-happens to be lying around on a contributor machine.
+## Proof-family taxonomy
 
-## Source snapshots and symlinks
+The benchmark uses five coarse proof families:
 
-This repository does not use symlinks as a canonical architecture.
+- `functional_correctness`: implementation output or post-state matches the stated spec
+- `state_preservation_local_effects`: only the intended state changes occur and preserved fields remain stable
+- `authorization_enablement`: successful execution implies the required guards or permissions
+- `protocol_transition_correctness`: state transitions follow the protocol’s phase or threshold rules
+- `refinement_equivalence`: the implementation refines an abstract spec or preserves an equivalence
 
-The canonical mechanism is the pinned `source_ref` recorded in manifests. A future
-materialization step can fetch or vendor those snapshots into a local cache, but that
-would be an implementation convenience layered on top of the manifest contract.
+## Evaluation split
 
-If symlinks are ever generated for local ergonomics, they should remain optional and
-derived. They must not become the benchmark's source of truth.
+Two checks are intentionally separate:
+
+- Reference-solution validation: `harness/task_runner.py` builds the hidden `Benchmark/Cases/...` module and checks the reference theorem exists.
+- Candidate-proof evaluation: `harness/default_agent.py` evaluates the agent’s returned editable file against the public task contract.
+
+This preserves a clean public benchmark interface while keeping hidden solvability checks available for repo maintenance.

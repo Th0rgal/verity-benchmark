@@ -23,6 +23,7 @@ from manifest_utils import load_manifest_data
 
 RUNNABLE_STAGES = {"build_green", "proof_partial", "proof_complete"}
 PROOF_READY_STATUSES = {"partial", "complete"}
+PLACEHOLDER_TOKENS = ("sorry", "admit", "axiom")
 
 
 def normalize_optional_string(value: object) -> str | None:
@@ -39,18 +40,33 @@ def normalize_list(value: object) -> list[str]:
         return []
     if not isinstance(value, list):
         raise ValueError(f"expected list, got {type(value).__name__}")
-    return [str(item).strip() for item in value]
+    return [str(item).strip() for item in value if str(item).strip()]
 
 
-def evaluation_ready(task: dict[str, Any]) -> bool:
-    evaluation_target = task["evaluation"]["target"]
-    evaluation_declaration = task["evaluation"]["declaration"]
-    if task["stage"] not in RUNNABLE_STAGES:
-        return False
+def lean_module_name(rel_path: str) -> str:
+    path = Path(rel_path)
+    if path.suffix != ".lean":
+        raise ValueError(f"expected Lean file path, got {rel_path!r}")
+    return ".".join(path.with_suffix("").parts)
+
+
+def editable_ready(task: dict[str, Any]) -> bool:
     return (
-        bool(evaluation_target and evaluation_declaration)
+        task["stage"] in RUNNABLE_STAGES
         and task["translation_status"] == "translated"
         and task["proof_status"] in PROOF_READY_STATUSES
+        and len(task["editable_files"]) == 1
+        and bool(task["theorem_name"])
+    )
+
+
+def reference_solution_ready(task: dict[str, Any]) -> bool:
+    reference = task["reference_solution"]
+    return (
+        task["stage"] in RUNNABLE_STAGES
+        and task["translation_status"] == "translated"
+        and task["proof_status"] in PROOF_READY_STATUSES
+        and bool(reference["module"] and reference["declaration"])
     )
 
 
@@ -115,17 +131,9 @@ def load_task_record(task_manifest: Path) -> dict[str, Any]:
 
     task_id = normalize_optional_string(task_data.get("task_id")) or task_manifest.stem
     task_ref = f"{case_data['case_id']}/{task_id}"
-
-    proof_module = normalize_optional_string(task_data.get("proof_target"))
-    evaluation_target = normalize_optional_string(task_data.get("evaluation_target"))
-    evaluation_declaration = normalize_optional_string(task_data.get("evaluation_declaration"))
-
     translation_status = normalize_optional_string(task_data.get("translation_status")) or case_data["translation_status"]
     proof_status = normalize_optional_string(task_data.get("proof_status")) or case_data["proof_status"]
-
-    readiness = {
-        "proof": "ready" if proof_module and normalize_optional_string(task_data.get("statement_id")) and proof_status in PROOF_READY_STATUSES else "planned",
-    }
+    editable_files = normalize_list(task_data.get("editable_files"))
 
     task = {
         "benchmark": "verity-benchmark",
@@ -139,36 +147,48 @@ def load_task_record(task_manifest: Path) -> dict[str, Any]:
         "property_class": normalize_optional_string(task_data.get("property_class")) or "unspecified",
         "category": normalize_optional_string(task_data.get("category")) or "unspecified",
         "difficulty": normalize_optional_string(task_data.get("difficulty")) or "unspecified",
-        "statement_id": normalize_optional_string(task_data.get("statement_id")),
+        "theorem_name": normalize_optional_string(task_data.get("theorem_name")),
+        "proof_family": normalize_optional_string(task_data.get("proof_family")) or "unspecified",
         "source_ref": normalize_optional_string(task_data.get("source_ref")) or None,
         "task_interface_version": int(task_data.get("task_interface_version", 1)),
-        "allowed_files": normalize_list(task_data.get("allowed_files")),
+        "implementation_files": normalize_list(task_data.get("implementation_files")),
+        "specification_files": normalize_list(task_data.get("specification_files")),
+        "editable_files": editable_files,
         "translation_status": translation_status,
         "proof_status": proof_status,
         "failure_reason": case_data["failure_reason"],
         "manifest_path": str(task_manifest.relative_to(ROOT)),
         "case_manifest_path": case_data["manifest_path"],
         "targets": {
-            "compile_target": case_data["lean_target"],
-            "proof_target_module": proof_module,
-            "proof_target_decl": normalize_optional_string(task_data.get("statement_id")) if proof_module else None,
+            "editable_file": editable_files[0] if len(editable_files) == 1 else None,
+            "editable_module": (
+                lean_module_name(editable_files[0]) if len(editable_files) == 1 else None
+            ),
+            "theorem_name": normalize_optional_string(task_data.get("theorem_name")),
         },
         "evaluation": {
-            "engine": normalize_optional_string(task_data.get("evaluation_engine")) or "lean_build",
-            "target_kind": "proof",
-            "target": evaluation_target,
-            "declaration": evaluation_declaration,
+            "engine": normalize_optional_string(task_data.get("evaluation_engine")) or "lean_proof_generation",
+            "target_kind": "proof_generation",
         },
-        "readiness": readiness,
+        "reference_solution": {
+            "module": normalize_optional_string(task_data.get("reference_solution_module")),
+            "declaration": normalize_optional_string(task_data.get("reference_solution_declaration"))
+            or normalize_optional_string(task_data.get("theorem_name")),
+        },
+        "readiness": {},
     }
-    task["readiness"]["evaluation"] = "ready" if evaluation_ready(task) else "blocked"
+    task["readiness"] = {
+        "prompt_context": "ready" if task["implementation_files"] and task["specification_files"] and editable_files else "blocked",
+        "editable_proof": "ready" if editable_ready(task) else "blocked",
+        "reference_solution": "ready" if reference_solution_ready(task) else "blocked",
+    }
     return task
 
 
-def run_command(command: list[str]) -> tuple[int, str]:
+def run_command(command: list[str], *, cwd: Path = ROOT) -> tuple[int, str]:
     completed = subprocess.run(
         command,
-        cwd=ROOT,
+        cwd=cwd,
         capture_output=True,
         text=True,
         check=False,
@@ -177,47 +197,30 @@ def run_command(command: list[str]) -> tuple[int, str]:
     return completed.returncode, output
 
 
-def classify_lean_build_failure(output: str) -> str:
+def classify_lean_failure(output: str) -> str:
     if "external command 'git' exited with code 1" in output and "checking out revision" in output:
         return "dependency_checkout_failed"
-    return "proof_target_check_failed"
+    return "lean_check_failed"
 
 
-def declaration_exists(module_name: str, declaration_name: str) -> tuple[bool, str]:
-    candidates = [declaration_name]
-    qualified_name = f"{module_name}.{declaration_name}"
-    if declaration_name != qualified_name:
-        candidates.append(qualified_name)
-    if "." in module_name:
-        namespace_name = module_name.rsplit(".", 1)[0]
-        namespaced_decl = f"{namespace_name}.{declaration_name}"
-        if namespaced_decl not in candidates:
-            candidates.append(namespaced_decl)
-
+def declaration_exists(module_name: str, declaration_name: str, *, cwd: Path = ROOT) -> tuple[bool, str]:
     with tempfile.TemporaryDirectory(prefix="verity-benchmark-check-") as tmp_dir:
         check_path = Path(tmp_dir) / "Check.lean"
-        last_output = ""
-        for candidate in candidates:
-            check_path.write_text(
-                f"import {module_name}\n#check {candidate}\n",
-                encoding="utf-8",
-            )
-            code, output = run_command(["lake", "env", "lean", str(check_path)])
-            if code == 0:
-                return True, output
-            last_output = output
-    return False, last_output
+        check_path.write_text(
+            f"import {module_name}\n#check {declaration_name}\n",
+            encoding="utf-8",
+        )
+        code, output = run_command(["lake", "env", "lean", str(check_path)], cwd=cwd)
+        return code == 0, output
 
 
-def execute_task(task_ref: str) -> tuple[int, Path]:
+def execute_reference_solution_task(task_ref: str) -> tuple[int, Path]:
     task_manifest = resolve_task_manifest(task_ref)
     task = load_task_record(task_manifest)
     TASK_RESULTS_DIR.mkdir(parents=True, exist_ok=True)
     result_path = TASK_RESULTS_DIR / f"{task_ref.replace('/', '__')}.json"
 
-    selected_kind = task["evaluation"]["target_kind"]
-    selected_target = task["evaluation"]["target"]
-    selected_decl = task["evaluation"]["declaration"]
+    reference = task["reference_solution"]
     started_at = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
     start = time.time()
     failure_mode: str | None = None
@@ -225,27 +228,25 @@ def execute_task(task_ref: str) -> tuple[int, Path]:
     execution_output = ""
     command: list[str] = []
 
-    if task["evaluation"]["engine"] != "lean_build":
+    if task["evaluation"]["engine"] != "lean_proof_generation":
         failure_mode = "unsupported_evaluation_engine"
-    elif task["stage"] not in RUNNABLE_STAGES:
-        failure_mode = task["failure_reason"] or "stage_blocked"
-    elif task["readiness"]["evaluation"] != "ready":
-        failure_mode = task["failure_reason"] or "evaluation_not_ready"
+    elif task["readiness"]["reference_solution"] != "ready":
+        failure_mode = task["failure_reason"] or "reference_solution_not_ready"
     else:
-        command = ["lake", "build", selected_target]
+        command = ["lake", "build", reference["module"]]
         code, execution_output = run_command(command)
-        if code == 0 and selected_decl:
-            exists, decl_output = declaration_exists(selected_target, selected_decl)
+        if code == 0 and reference["declaration"]:
+            exists, decl_output = declaration_exists(reference["module"], reference["declaration"])
             if exists:
                 execution_status = "passed"
             else:
                 execution_status = "failed"
-                failure_mode = "proof_declaration_missing"
+                failure_mode = "reference_declaration_missing"
                 execution_output = "\n".join(filter(None, [execution_output, decl_output]))
         else:
             execution_status = "passed" if code == 0 else "failed"
         if code != 0:
-            failure_mode = classify_lean_build_failure(execution_output)
+            failure_mode = classify_lean_failure(execution_output)
 
     completed_at = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
     duration_seconds = round(time.time() - start, 3)
@@ -263,7 +264,8 @@ def execute_task(task_ref: str) -> tuple[int, Path]:
         "property_class": task["property_class"],
         "category": task["category"],
         "difficulty": task["difficulty"],
-        "statement_id": task["statement_id"],
+        "theorem_name": task["theorem_name"],
+        "proof_family": task["proof_family"],
         "source_ref": task["source_ref"],
         "task_interface_version": task["task_interface_version"],
         "command": command,
@@ -287,14 +289,14 @@ def execute_task(task_ref: str) -> tuple[int, Path]:
             "translation_status": task["translation_status"],
             "proof_status": task["proof_status"],
             "evaluation_engine": task["evaluation"]["engine"],
-            "selected_target_kind": selected_kind,
-            "selected_target": selected_target,
-            "selected_declaration": selected_decl,
+            "target_kind": task["evaluation"]["target_kind"],
         },
-        "allowed_files": task["allowed_files"],
+        "implementation_files": task["implementation_files"],
+        "specification_files": task["specification_files"],
+        "editable_files": task["editable_files"],
         "readiness": task["readiness"],
         "targets": task["targets"],
-        "evaluation": task["evaluation"],
+        "reference_solution": task["reference_solution"],
         "output": execution_output,
     }
     result_path.write_text(json.dumps(payload, indent=2) + "\n", encoding="utf-8")
@@ -333,16 +335,15 @@ def aggregate_results(task_refs: list[str], suite: str) -> dict[str, Any]:
     by_property_class: dict[str, Counter[str]] = defaultdict(Counter)
     by_case: dict[str, list[dict[str, Any]]] = defaultdict(list)
     readiness_counts: dict[str, dict[str, int]] = {}
+    proof_family_counts = Counter(item["proof_family"] for item in results)
 
     for item in results:
         by_track[item["track"]][item["status"]] += 1
         by_property_class[item["property_class"]][item["status"]] += 1
         by_case[item["case_id"]].append(item)
 
-    for key in ("proof", "evaluation"):
-        readiness_counts[key] = dict(
-            sorted(Counter(item["readiness"][key] for item in results).items())
-        )
+    for key in ("prompt_context", "editable_proof", "reference_solution"):
+        readiness_counts[key] = dict(sorted(Counter(item["readiness"][key] for item in results).items()))
 
     case_rows = []
     for case_record in load_case_records_for_suite(suite):
@@ -389,6 +390,7 @@ def aggregate_results(task_refs: list[str], suite: str) -> dict[str, Any]:
             key: dict(sorted(value.items()))
             for key, value in sorted(by_property_class.items())
         },
+        "proof_family_counts": dict(sorted(proof_family_counts.items())),
         "readiness_counts": readiness_counts,
         "tasks": [item["task_ref"] for item in results],
     }
@@ -410,7 +412,7 @@ def main() -> int:
     list_parser = subparsers.add_parser("list", help="List task refs")
     list_parser.add_argument("--suite", choices=["active", "backlog", "all"], default="active")
 
-    run_parser = subparsers.add_parser("run", help="Run one task")
+    run_parser = subparsers.add_parser("run", help="Validate one hidden reference solution")
     run_parser.add_argument("task_ref")
 
     aggregate_parser = subparsers.add_parser("aggregate", help="Aggregate existing task results")
@@ -425,7 +427,7 @@ def main() -> int:
         return 0
 
     if args.command == "run":
-        code, result_path = execute_task(args.task_ref)
+        code, result_path = execute_reference_solution_task(args.task_ref)
         print(result_path.relative_to(ROOT))
         return code
 

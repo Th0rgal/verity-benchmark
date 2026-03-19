@@ -8,13 +8,14 @@ This repository pins:
 
 Current status:
 - Active `cases/`: 4 concrete benchmark cases
-- Active `tasks/`: 15 concrete benchmark tasks
+- Active `tasks/`: 17 concrete benchmark tasks
 - Buildable active cases: 4
 - Non-buildable active cases: 0
 - `backlog/`: placeholder intake entries kept visible without polluting the active suite
 
 Repository layout:
-- `Benchmark/`: canonical Lean modules that must compile under `lake build`
+- `Benchmark/`: canonical solved Lean modules that must compile under `lake build`
+- `Benchmark/Generated/`: public unsolved proof templates on Lean-importable paths, intentionally excluded from the main package build
 - `families/`: family and implementation manifests for benchmark source organization
 - `cases/`: active benchmark cases with canonical `case.yaml` manifests and `tasks/*.yaml` benchmark units
 - `backlog/`: non-runnable placeholders and intake candidates
@@ -44,7 +45,9 @@ Design choices:
 - Families and implementations are tracked explicitly so source provenance stays stable even as case slices evolve
 - Each task declares its own evaluation contract instead of relying on runner inference
 - Pinned `source_ref` values are the reproducibility unit; local paths are supporting metadata
-- Tasks target explicit proof modules and proof declarations
+- Tasks expose fixed implementation files, fixed specification files, one editable proof file, and an explicit implementation-to-spec theorem target
+- Every active task is tagged with one of five proof families: `functional_correctness`, `state_preservation_local_effects`, `authorization_enablement`, `protocol_transition_correctness`, or `refinement_equivalence`
+- Hidden reference solutions remain under `Benchmark/Cases/...` for solvability and maintenance checks
 - The default-agent path is adapter-driven and uses the `openai_compatible` contract for both the repo-default setup and external backends
 - The default-agent path uses named profiles in `harness/agents/` so the repo-owned reference agent and custom OpenAI-compatible backends share one runner
 - `benchmark.toml` declares the benchmark-owned defaults: `default_agent_default_profile = "default"` for the repo reference path and `custom_agent_default_profile = "openai-compatible"` for reusable external OpenAI-compatible backends
@@ -64,7 +67,7 @@ Manifest model:
 - `families/<family>/family.yaml`: semantic grouping and source-language coverage
 - `families/<family>/implementations/<impl>/implementation.yaml`: pinned upstream implementation metadata
 - `cases/<project>/<case>/case.yaml`: translated slice status, provenance, abstraction metadata, and pinned `source_ref`
-- `cases/<project>/<case>/tasks/*.yaml`: scored task unit with property class, task interface, artifacts in scope, and explicit evaluation target
+- `cases/<project>/<case>/tasks/*.yaml`: scored task unit with public proof-generation inputs plus hidden reference-solution metadata
 
 Architecture note:
 
@@ -155,7 +158,8 @@ Use `python3 harness/default_agent.py describe --profile <name>` to inspect the 
 The repo-owned `default` profile and the reusable `openai-proxy-fast` profile both speak the same `openai_compatible` contract to `https://agent-backend.thomas.md/v1` with `builtin/fast`; the difference is the run track and whether you select them through the benchmark default profile or an explicit external profile/config.
 `harness/agent_runner.py` resolves one explicit config per invocation and reuses it across all tasks in that run scope, so live runs fail fast when required env vars such as `base_url`, `model`, or `api_key` are missing or invalid.
 `python3 harness/default_agent.py probe --profile <name> --ensure-model` now also fails when `/models` cannot confirm the configured model because the response contains no parseable model ids.
-The one-shot default-agent prompt now embeds the contents of the task manifest's `allowed_files`, so external OpenAI-compatible backends receive the proof-relevant Lean context through the same default-agent runner path instead of only file names.
+The one-shot default-agent prompt now embeds `implementation_files`, `specification_files`, and the editable proof template, so external OpenAI-compatible backends receive the exact public proof surface through the shared runner.
+Live default-agent runs now evaluate the returned proof artifact: the harness writes the candidate file into a temp workspace, rejects `sorry` / `admit` / `axiom`, compiles it with Lean, and checks the declared theorem exists.
 Run artifacts now also record `elapsed_seconds` in `schemas/agent-run.schema.json` so live proxy/backend timing is preserved alongside the resolved endpoint and model contract.
 
 Run all active tasks:

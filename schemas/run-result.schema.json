@@ -17,7 +17,8 @@
     "property_class",
     "category",
     "difficulty",
-    "statement_id",
+    "theorem_name",
+    "proof_family",
     "command",
     "started_at",
     "completed_at",
@@ -32,6 +33,7 @@
     "environment",
     "readiness",
     "targets",
+    "reference_solution",
     "output"
   ],
   "properties": {
@@ -71,8 +73,11 @@
     "difficulty": {
       "type": "string"
     },
-    "statement_id": {
+    "theorem_name": {
       "type": ["string", "null"]
+    },
+    "proof_family": {
+      "type": "string"
     },
     "command": {
       "type": "array",
@@ -131,13 +136,31 @@
         "type": "string"
       }
     },
-    "allowed_files": {
+    "implementation_files": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "specification_files": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "editable_files": {
       "type": "array",
       "items": {
         "type": "string"
       }
     },
     "targets": {
+      "type": "object",
+      "additionalProperties": {
+        "type": ["string", "null"]
+      }
+    },
+    "reference_solution": {
       "type": "object",
       "additionalProperties": {
         "type": ["string", "null"]

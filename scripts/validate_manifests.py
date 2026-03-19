@@ -9,6 +9,13 @@ from manifest_utils import load_manifest_data
 
 ROOT = Path(__file__).resolve().parent.parent
 SCHEMA_ROOT = ROOT / "schemas"
+PROOF_FAMILIES = {
+    "functional_correctness",
+    "state_preservation_local_effects",
+    "authorization_enablement",
+    "protocol_transition_correctness",
+    "refinement_equivalence",
+}
 
 
 def load_json(path: Path) -> object:
@@ -186,21 +193,51 @@ def main() -> int:
         interface_version = data.get("task_interface_version")
         if not isinstance(interface_version, int) or interface_version < 1:
             errors.append(f"{rel}: task_interface_version must be an integer >= 1")
-        evaluation_target = data.get("evaluation_target")
-        evaluation_declaration = data.get("evaluation_declaration")
-        proof_target = data.get("proof_target")
+        evaluation_engine = data.get("evaluation_engine")
+        theorem_name = data.get("theorem_name")
+        proof_family = data.get("proof_family")
+        implementation_files = data.get("implementation_files")
+        specification_files = data.get("specification_files")
+        editable_files = data.get("editable_files")
+        reference_solution_module = data.get("reference_solution_module")
+        reference_solution_declaration = data.get("reference_solution_declaration")
         if not isinstance(source_ref, str) or not source_ref:
             errors.append(f"{rel}: source_ref must be a non-empty string")
-        if evaluation_target != proof_target:
-            errors.append(f"{rel}: evaluation_target must match proof_target")
-        if not isinstance(evaluation_declaration, str) or not evaluation_declaration:
-            errors.append(f"{rel}: tasks must declare evaluation_declaration")
-        allowed_files = data.get("allowed_files")
-        if isinstance(allowed_files, list):
-            for allowed in allowed_files:
-                allowed_path = ROOT / str(allowed)
-                if not allowed_path.exists():
-                    errors.append(f"{rel}: allowed_files entry does not exist: {allowed}")
+        if evaluation_engine != "lean_proof_generation":
+            errors.append(f"{rel}: evaluation_engine must be 'lean_proof_generation'")
+        if not isinstance(theorem_name, str) or not theorem_name:
+            errors.append(f"{rel}: theorem_name must be a non-empty string")
+        if proof_family not in PROOF_FAMILIES:
+            errors.append(f"{rel}: proof_family must be one of {sorted(PROOF_FAMILIES)}")
+        if not isinstance(implementation_files, list) or not implementation_files:
+            errors.append(f"{rel}: implementation_files must be a non-empty list")
+        if not isinstance(specification_files, list) or not specification_files:
+            errors.append(f"{rel}: specification_files must be a non-empty list")
+        if not isinstance(editable_files, list) or len(editable_files) != 1:
+            errors.append(f"{rel}: editable_files must contain exactly one editable Lean file")
+        for field_name, paths in (
+            ("implementation_files", implementation_files),
+            ("specification_files", specification_files),
+            ("editable_files", editable_files),
+        ):
+            if isinstance(paths, list):
+                for candidate in paths:
+                    candidate_path = ROOT / str(candidate)
+                    if not candidate_path.exists():
+                        errors.append(f"{rel}: {field_name} entry does not exist: {candidate}")
+        if isinstance(editable_files, list):
+            for editable in editable_files:
+                editable_path = str(editable)
+                if not editable_path.startswith("Benchmark/Generated/") or not editable_path.endswith(".lean"):
+                    errors.append(
+                        f"{rel}: editable_files entries must live under Benchmark/Generated/.../*.lean"
+                    )
+        if not isinstance(reference_solution_module, str) or not reference_solution_module:
+            errors.append(f"{rel}: reference_solution_module must be a non-empty string")
+        if not isinstance(reference_solution_declaration, str) or not reference_solution_declaration:
+            errors.append(f"{rel}: reference_solution_declaration must be a non-empty string")
+        elif theorem_name != reference_solution_declaration:
+            errors.append(f"{rel}: theorem_name must match reference_solution_declaration")
 
     for family_id, data in families.items():
         for case_id in data.get("case_ids", []):

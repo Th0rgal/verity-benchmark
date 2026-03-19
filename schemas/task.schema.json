@@ -14,18 +14,20 @@
     "implementation_id",
     "source_ref",
     "task_interface_version",
-    "statement_id",
+    "theorem_name",
+    "proof_family",
     "property_class",
     "difficulty",
     "category",
     "track",
     "translation_status",
     "proof_status",
-    "proof_target",
     "evaluation_engine",
-    "evaluation_target",
-    "evaluation_declaration",
-    "allowed_files",
+    "implementation_files",
+    "specification_files",
+    "editable_files",
+    "reference_solution_module",
+    "reference_solution_declaration",
     "abstraction_level",
     "abstraction_notes",
     "unsupported_feature_codes"
@@ -58,8 +60,17 @@
     "task_interface_version": {
       "type": "integer"
     },
-    "statement_id": {
+    "theorem_name": {
       "type": "string"
+    },
+    "proof_family": {
+      "enum": [
+        "functional_correctness",
+        "state_preservation_local_effects",
+        "authorization_enablement",
+        "protocol_transition_correctness",
+        "refinement_equivalence"
+      ]
     },
     "property_class": {
       "type": "string"
@@ -79,23 +90,38 @@
     "proof_status": {
       "enum": ["not_started", "in_progress", "partial", "complete", "blocked"]
     },
-    "proof_target": {
-      "type": ["string", "null"]
-    },
     "evaluation_engine": {
-      "enum": ["lean_build"]
+      "enum": ["lean_proof_generation"]
     },
-    "evaluation_target": {
-      "type": "string"
-    },
-    "evaluation_declaration": {
-      "type": ["string", "null"]
-    },
-    "allowed_files": {
+    "implementation_files": {
       "type": "array",
+      "minItems": 1,
       "items": {
         "type": "string"
-      }
+      },
+      "uniqueItems": true
+    },
+    "specification_files": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "string"
+      },
+      "uniqueItems": true
+    },
+    "editable_files": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "string"
+      },
+      "uniqueItems": true
+    },
+    "reference_solution_module": {
+      "type": ["string", "null"]
+    },
+    "reference_solution_declaration": {
+      "type": ["string", "null"]
     },
     "abstraction_level": {
       "type": "string"

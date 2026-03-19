@@ -12,6 +12,11 @@
     "timestamp",
     "dry_run",
     "status",
+    "theorem_name",
+    "proof_family",
+    "implementation_files",
+    "specification_files",
+    "editable_files",
     "agent",
     "messages"
   ],
@@ -39,7 +44,31 @@
       "minimum": 0
     },
     "status": {
-      "enum": ["dry_run", "completed"]
+      "enum": ["dry_run", "passed", "failed"]
+    },
+    "theorem_name": {
+      "type": ["string", "null"]
+    },
+    "proof_family": {
+      "type": "string"
+    },
+    "implementation_files": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "specification_files": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "editable_files": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
     },
     "agent": {
       "type": "object",
@@ -180,10 +209,42 @@
         }
       }
     },
+    "evaluation": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "status",
+        "failure_mode",
+        "details"
+      ],
+      "properties": {
+        "status": {
+          "enum": ["passed", "failed"]
+        },
+        "failure_mode": {
+          "type": ["string", "null"]
+        },
+        "details": {
+          "type": "string"
+        },
+        "command": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "candidate_workspace": {
+          "type": "string"
+        }
+      }
+    },
     "response": {
       "type": "object"
     },
     "response_text": {
+      "type": "string"
+    },
+    "candidate_file_contents": {
       "type": "string"
     }
   }

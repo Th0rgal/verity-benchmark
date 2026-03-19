@@ -2,9 +2,9 @@
 
 This directory holds the fixed-harness scaffold for task-oriented benchmark execution.
 
-Execution is centered on a single task at a time. The task manifest is the execution
-contract, and the runner consumes its explicit proof target instead of deriving the
-public benchmark interface from case-level conventions.
+Execution is centered on a single task at a time. The task manifest is the public
+execution contract: fixed implementation files, fixed specification files, one
+editable proof file, and an explicit theorem target.
 
 The shell entrypoints in `scripts/` delegate to `harness/task_runner.py`.
 
@@ -28,7 +28,9 @@ The default benchmark agent now has its own explicit entrypoint:
 - each connection field is explicit in config: `base_url`, `model`, and `api_key` may be pinned directly or sourced from `*_env`
 - the default-agent run artifact is schema-backed by `schemas/agent-run.schema.json`
 - each run artifact records the resolved `base_url` and `model` plus the originating `*_env` contract for reproducibility
-- each one-shot task prompt now embeds the contents of the task manifest's `allowed_files`, so external OpenAI-compatible backends receive the benchmark-approved proof context directly through the shared runner
+- each one-shot task prompt now embeds `implementation_files`, `specification_files`, and the editable proof template, so external OpenAI-compatible backends receive the exact public benchmark surface through the shared runner
+- live default-agent runs evaluate the returned proof artifact instead of just recording it
+- candidate evaluation writes the editable file into a temp workspace, rejects `sorry` / `admit` / `axiom`, compiles it with Lean, and checks the declared theorem exists
 - each live or dry-run artifact records `elapsed_seconds` for reproducible timing checks
 - task artifacts are partitioned under `results/agent_runs/<track>/<run_slug>/...`
 - aggregated case/suite agent-run status is written to `results/agent_summaries/<track>/<run_slug>.json`
@@ -101,10 +103,14 @@ Supported task manifest interface fields:
 
 - `source_ref`: pinned upstream source reference for reproducibility
 - `task_interface_version`: version of the task execution contract
-- `proof_target`: Lean module target for the task proof surface
-- `evaluation_engine`: currently `lean_build`
-- `evaluation_target`: the module passed to `lake build`
-- `evaluation_declaration`: declaration that must exist on the proof target
+- `implementation_files`: fixed Lean implementation context
+- `specification_files`: fixed Lean specification context
+- `editable_files`: the single editable Lean proof file presented to the agent
+- `theorem_name`: explicit theorem declaration that the candidate file must define
+- `proof_family`: one of `functional_correctness`, `state_preservation_local_effects`, `authorization_enablement`, `protocol_transition_correctness`, `refinement_equivalence`
+- `evaluation_engine`: currently `lean_proof_generation`
+- `reference_solution_module`: hidden solved Lean module used for maintenance checks
+- `reference_solution_declaration`: hidden theorem declaration used for maintenance checks
 
 `case.yaml` still carries curation and provenance metadata, but it is no longer the
 canonical description of how a task is executed.

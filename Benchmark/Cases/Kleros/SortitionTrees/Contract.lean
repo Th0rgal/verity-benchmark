@@ -29,25 +29,26 @@ verity_contract SortitionTrees where
     require (nodeIndex >= 3) "LeafIndexTooSmall"
     require (nodeIndex <= 6) "LeafIndexTooLarge"
 
-    if nodeIndex == 3 then
-      setStorage leaf0 weight
-    else if nodeIndex == 4 then
-      setStorage leaf1 weight
-    else if nodeIndex == 5 then
-      setStorage leaf2 weight
-    else
-      setStorage leaf3 weight
-
-    setMapping nodeIndexesToIDs nodeIndex stakePathID
-    setMapping IDsToNodeIndexes stakePathID nodeIndex
-
     let leaf0Value ← getStorage leaf0
     let leaf1Value ← getStorage leaf1
     let leaf2Value ← getStorage leaf2
     let leaf3Value ← getStorage leaf3
 
-    let nextLeft := add leaf0Value leaf1Value
-    let nextRight := add leaf2Value leaf3Value
+    let nextLeaf0 := ite (nodeIndex == 3) weight leaf0Value
+    let nextLeaf1 := ite (nodeIndex == 4) weight leaf1Value
+    let nextLeaf2 := ite (nodeIndex == 5) weight leaf2Value
+    let nextLeaf3 := ite (nodeIndex == 6) weight leaf3Value
+
+    setStorage leaf0 nextLeaf0
+    setStorage leaf1 nextLeaf1
+    setStorage leaf2 nextLeaf2
+    setStorage leaf3 nextLeaf3
+
+    setMappingUint nodeIndexesToIDs nodeIndex stakePathID
+    setMappingUint IDsToNodeIndexes stakePathID nodeIndex
+
+    let nextLeft := add nextLeaf0 nextLeaf1
+    let nextRight := add nextLeaf2 nextLeaf3
 
     setStorage leftSum nextLeft
     setStorage rightSum nextRight
@@ -62,12 +63,11 @@ verity_contract SortitionTrees where
     require (root != 0) "TreeEmpty"
     require (ticket < root) "TicketOutOfRange"
 
+    let rightTicket := sub ticket left
     let selected :=
-      if ticket < left then
-        if ticket < leaf0Value then 3 else 4
-      else
-        let rightTicket := sub ticket left
-        if rightTicket < leaf2Value then 5 else 6
+      ite (ticket < left)
+        (ite (ticket < leaf0Value) 3 4)
+        (ite (rightTicket < leaf2Value) 5 6)
 
     setStorage selectedNode selected
     return selected

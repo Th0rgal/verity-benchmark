@@ -41,14 +41,16 @@ def run_many(task_refs: list[str], config_path: Path, dry_run: bool, *, profile:
 
     for task_ref in task_refs:
         try:
-            _, result_path = execute_agent_task(
+            task_exit_code, result_path = execute_agent_task(
                 config_path,
                 task_ref,
                 dry_run,
                 profile=profile,
                 resolved_config=resolved_config,
             )
-            status = "dry_run" if dry_run else "completed"
+            status = "dry_run" if dry_run else ("passed" if task_exit_code == 0 else "failed")
+            if task_exit_code != 0:
+                exit_code = 1
             entries.append(
                 {
                     "task_ref": task_ref,
