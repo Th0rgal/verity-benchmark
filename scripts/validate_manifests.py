@@ -132,6 +132,7 @@ def main() -> int:
     implementations: dict[tuple[str, str], dict] = {}
     cases: dict[str, dict] = {}
     implementation_case_refs: dict[tuple[str, str], set[str]] = {}
+    discovered_case_ids: dict[str, list[str]] = {}
     discovered_task_refs: dict[str, list[str]] = {}
 
     for path in family_manifests:
@@ -186,6 +187,7 @@ def main() -> int:
             errors.append(f"{rel}: case_id must match containing directory ({expected_case_id!r})")
         if isinstance(project, str) and isinstance(case_id, str):
             full_case_id = f"{project}/{case_id}"
+            discovered_case_ids.setdefault(full_case_id, []).append(rel)
             cases[full_case_id] = data
             if family_id != project:
                 errors.append(f"{rel}: family_id must match project for current layout")
@@ -356,6 +358,11 @@ def main() -> int:
         if len(paths) > 1:
             joined = ", ".join(paths)
             errors.append(f"duplicate task ref {task_ref}: {joined}")
+
+    for case_id, paths in sorted(discovered_case_ids.items()):
+        if len(paths) > 1:
+            joined = ", ".join(paths)
+            errors.append(f"duplicate case id {case_id}: {joined}")
 
     if errors:
         print("manifest validation failed", file=sys.stderr)

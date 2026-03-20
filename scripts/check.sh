@@ -120,6 +120,44 @@ else:
 
 ensure_configured_model_available(config, ["builtin/fast"])
 PY
+python3 - <<'PY'
+from pathlib import Path
+import sys
+import tempfile
+
+sys.path.insert(0, str(Path("harness").resolve()))
+
+from default_agent import extract_text, resolve_task
+from interactive_runtime import TaskProofRuntime
+
+task = resolve_task("ethereum/deposit_contract_minimal/deposit_count")
+runtime = TaskProofRuntime(task)
+
+with tempfile.TemporaryDirectory() as tmp_dir:
+    workspace = Path(tmp_dir) / "workspace"
+    runtime._materialize_workspace(workspace)
+    editable_path = workspace / task["editable_files"][0]
+    if editable_path.is_symlink():
+        raise SystemExit("editable proof file should be copied into workspace, not symlinked")
+
+original = runtime.current_proof_text
+variant = original.replace(":= by", ":= (by", 1).rstrip() + "\n)\n"
+if runtime._extract_theorem_signature(original) != runtime._extract_theorem_signature(variant):
+    raise SystemExit("theorem signature extraction should accept equivalent proof-term syntax")
+
+reasoning_only = {
+    "choices": [
+        {
+            "message": {
+                "content": "",
+                "reasoning_content": "internal chain-of-thought",
+            }
+        }
+    ]
+}
+if extract_text(reasoning_only) != "":
+    raise SystemExit("reasoning-only responses should not be treated as candidate proof text")
+PY
 python3 harness/default_agent.py describe --profile "$DEFAULT_AGENT_PROFILE"
 python3 harness/default_agent.py describe --profile "$CUSTOM_AGENT_PROFILE"
 python3 harness/default_agent.py describe --profile openai-proxy-fast

@@ -736,9 +736,6 @@ def extract_text(response: dict[str, Any]) -> str:
         joined = "\n".join(parts).strip()
         if joined:
             return re.sub(r"(?s)<think>.*?</think>\s*", "", joined).strip()
-    reasoning_content = message.get("reasoning_content")
-    if isinstance(reasoning_content, str):
-        return reasoning_content
     return ""
 
 
@@ -1090,7 +1087,6 @@ def describe_command(config_path: Path) -> int:
                 "chat_completions_path": config.chat_completions_path,
                 "models_path": config.models_path,
                 "system_prompt_files": config.system_prompt_files,
-                "mode": config.mode,
                 "temperature": config.temperature,
                 "max_completion_tokens": config.max_completion_tokens,
                 "max_attempts": config.max_attempts,

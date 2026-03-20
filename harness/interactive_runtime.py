@@ -311,16 +311,19 @@ class TaskProofRuntime:
             os.symlink(source, target, target_is_directory=source.is_dir())
         for rel_path in self.paths.public_files:
             source = ROOT / rel_path
-            if not source.is_file():
-                continue
             target = workspace / rel_path
             target.parent.mkdir(parents=True, exist_ok=True)
+            if rel_path == self.paths.editable_rel_path:
+                target.write_text(self.current_proof_text, encoding="utf-8")
+                continue
+            if not source.is_file():
+                continue
             os.symlink(source, target)
 
     def _extract_theorem_signature(self, text: str) -> str | None:
         short_name = self.paths.theorem_name.rsplit(".", 1)[-1]
         pattern = re.compile(
-            rf"theorem\s+{re.escape(short_name)}\b(?P<signature>.*?)(?::=\s*by)",
+            rf"theorem\s+{re.escape(short_name)}\b(?P<signature>.*?)(?::=)",
             re.DOTALL,
         )
         match = pattern.search(text)
