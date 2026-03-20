@@ -8,6 +8,7 @@ import sys
 from manifest_utils import load_manifest_data
 
 ROOT = Path(__file__).resolve().parent.parent
+ROOT_RESOLVED = ROOT.resolve()
 SCHEMA_ROOT = ROOT / "schemas"
 PROOF_FAMILIES = {
     "functional_correctness",
@@ -102,6 +103,17 @@ def expected_source_ref(data: dict) -> str | None:
     return f"{upstream_repo}@{upstream_commit}:{original_contract_path}"
 
 
+def resolve_repo_file(candidate: object) -> Path | None:
+    if not isinstance(candidate, str) or not candidate.strip():
+        return None
+    resolved = (ROOT / candidate).resolve()
+    try:
+        resolved.relative_to(ROOT_RESOLVED)
+    except ValueError:
+        return None
+    return resolved
+
+
 def main() -> int:
     schema_files = {
         "family": load_json(SCHEMA_ROOT / "family.schema.json"),
@@ -139,6 +151,9 @@ def main() -> int:
         data = load_manifest(path)
         rel = str(path.relative_to(ROOT))
         errors.extend(validate(data, schema_files["case"], rel))
+        expected_split = "active" if path.parts[-4] == "cases" else "backlog"
+        if data.get("split") != expected_split:
+            errors.append(f"{rel}: split must match containing suite directory ({expected_split!r})")
         project = data.get("project")
         case_id = data.get("case_id")
         family_id = data.get("family_id")
@@ -222,9 +237,11 @@ def main() -> int:
         ):
             if isinstance(paths, list):
                 for candidate in paths:
-                    candidate_path = ROOT / str(candidate)
-                    if not candidate_path.exists():
-                        errors.append(f"{rel}: {field_name} entry does not exist: {candidate}")
+                    candidate_path = resolve_repo_file(candidate)
+                    if candidate_path is None:
+                        errors.append(f"{rel}: {field_name} entry must resolve inside the repository: {candidate}")
+                    elif not candidate_path.is_file():
+                        errors.append(f"{rel}: {field_name} entry must be a file inside the repository: {candidate}")
         if isinstance(editable_files, list):
             for editable in editable_files:
                 editable_path = str(editable)

@@ -272,7 +272,7 @@ def execute_reference_solution_task(task_ref: str) -> tuple[int, Path]:
         "started_at": started_at,
         "completed_at": completed_at,
         "outcome": execution_status,
-        "exit_code": 1 if execution_status == "failed" else 0,
+        "exit_code": 0 if execution_status == "passed" else 1,
         "status": execution_status,
         "failure_mode": failure_mode,
         "failure_reason": task["failure_reason"],
@@ -300,7 +300,7 @@ def execute_reference_solution_task(task_ref: str) -> tuple[int, Path]:
         "output": execution_output,
     }
     result_path.write_text(json.dumps(payload, indent=2) + "\n", encoding="utf-8")
-    return (1 if execution_status == "failed" else 0), result_path
+    return (0 if execution_status == "passed" else 1), result_path
 
 
 def load_case_records_for_suite(suite: str) -> list[dict[str, Any]]:

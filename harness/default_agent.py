@@ -268,6 +268,23 @@ def validate_agent_contract(config: dict[str, Any], label: str) -> list[str]:
             for index, item in enumerate(raw_command):
                 if not normalize_string(item):
                     errors.append(f"{label}: command[{index}] must be a non-empty string")
+            command_text = " ".join(str(item) for item in raw_command)
+            if "openai_compatible_adapter.py" in command_text:
+                for field in ("base_url", "model", "api_key"):
+                    direct_value = normalize_string(config.get(field))
+                    env_name = normalize_string(config.get(f"{field}_env"))
+                    if direct_value or env_name:
+                        continue
+                    errors.append(
+                        f"{label}: bundled openai-compatible command adapter requires "
+                        f"either {field!r} or {field + '_env'!r}"
+                    )
+                for field in ("chat_completions_path", "models_path"):
+                    value = normalize_string(config.get(field))
+                    if not value:
+                        errors.append(f"{label}: {field!r} must be a non-empty string")
+                    elif not value.startswith("/"):
+                        errors.append(f"{label}: {field!r} must start with '/'")
     else:
         errors.append(f"{label}: unsupported adapter {adapter!r}")
 

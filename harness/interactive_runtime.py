@@ -289,10 +289,6 @@ class TaskProofRuntime:
             "lake-manifest.json",
             "lean-toolchain",
             ".lake",
-            "Benchmark.lean",
-            "Benchmark/Cases",
-            "Benchmark/Cases.lean",
-            "cases",
         ):
             source = ROOT / rel_path
             target = workspace / rel_path
@@ -300,6 +296,13 @@ class TaskProofRuntime:
                 continue
             target.parent.mkdir(parents=True, exist_ok=True)
             os.symlink(source, target, target_is_directory=source.is_dir())
+        for rel_path in self.paths.public_files:
+            source = ROOT / rel_path
+            if not source.is_file():
+                continue
+            target = workspace / rel_path
+            target.parent.mkdir(parents=True, exist_ok=True)
+            os.symlink(source, target)
 
     def _extract_theorem_signature(self, text: str) -> str | None:
         short_name = self.paths.theorem_name.rsplit(".", 1)[-1]
