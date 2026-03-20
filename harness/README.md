@@ -87,6 +87,7 @@ Optional config-only extensions for OpenAI-compatible backends:
 - `request_timeout_seconds`: request timeout for both probe and run
 - `max_attempts`: bounded number of propose-check-repair rounds per task
 - `max_tool_calls`: interactive-mode tool budget
+- `lean_checks_amount`: if no `run_lean_check` call has passed yet, keep requiring it until one passes or this cap is reached
 
 Mode summary:
 

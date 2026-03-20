@@ -512,8 +512,7 @@ def build_user_prompt(task: dict[str, Any], *, interactive: bool, lean_checks_am
     lean_check_instruction = ""
     if interactive and lean_checks_amount > 0:
         lean_check_instruction = (
-            "Before you finalize, use `run_lean_check`.\n"
-            f"If it has not passed yet, keep using it until it passes or you have used it {lean_checks_amount} time(s).\n"
+            f"Before you finalize, if no `run_lean_check` call has passed yet, keep using it until one passes or you have used it {lean_checks_amount} time(s).\n"
         )
     mode_instructions = (
         "You are in interactive mode.\n"
@@ -688,7 +687,7 @@ def build_interactive_tool_requirement_prompt(
             missing.append("run `run_lean_check` on the current proof")
         else:
             missing.append(
-                f"use `run_lean_check` again until it passes or you reach {lean_checks_amount} total check call(s)"
+                f"use `run_lean_check` again until one call passes or you reach {lean_checks_amount} total check call(s)"
             )
     requirement_text = " and ".join(missing) if missing else "use the interactive tools"
     return (
@@ -1363,8 +1362,8 @@ def execute_interactive_agent_task(
                     "status": "failed",
                     "failure_mode": "missing_required_tool_use",
                     "details": (
-                        "interactive mode requires enough run_lean_check calls before finalizing "
-                        "unless one has already passed"
+                        "interactive mode requires either a passing run_lean_check or exhausting "
+                        "the configured lean_checks_amount before finalizing"
                     ),
                 }
                 attempts[-1]["evaluation"] = evaluation

@@ -389,6 +389,91 @@ if evaluation.get("status") != "passed":
 if attempts[-1].get("missing_required_tool_use"):
     raise SystemExit("passing run_lean_check should satisfy lean_checks_amount early")
 PY
+python3 - <<'PY'
+from pathlib import Path
+import sys
+
+sys.path.insert(0, str(Path("harness").resolve()))
+
+import default_agent
+from default_agent import ResolvedAgentConfig, build_messages, execute_interactive_agent_task, resolve_task
+
+task = resolve_task("ethereum/deposit_contract_minimal/deposit_count")
+config = ResolvedAgentConfig(
+    profile="interactive-test",
+    agent_id="agent",
+    mode="interactive",
+    track="custom",
+    run_slug="interactive-test",
+    adapter="openai_compatible",
+    config_path="harness/agents/interactive.json",
+    base_url="https://example.invalid",
+    base_url_env=None,
+    model="builtin/smart",
+    model_env="VERITY_BENCHMARK_AGENT_MODEL",
+    api_key="sk-test",
+    api_key_env="VERITY_BENCHMARK_AGENT_API_KEY",
+    chat_completions_path="/chat/completions",
+    models_path="/models",
+    system_prompt_files=[],
+    temperature=0.0,
+    max_completion_tokens=1,
+    max_attempts=2,
+    max_tool_calls=2,
+    lean_checks_amount=1,
+    headers={},
+    header_envs={},
+    env_contract={"required": [], "optional": []},
+    extra_body={},
+    request_timeout_seconds=1,
+    command=[],
+)
+
+responses = iter([
+    {
+        "choices": [
+            {
+                "message": {
+                    "content": "",
+                    "tool_calls": [
+                        {
+                            "id": "call-1",
+                            "type": "function",
+                            "function": {"name": "run_lean_check", "arguments": "{}"},
+                        }
+                    ],
+                }
+            }
+        ]
+    },
+    {"choices": [{"message": {"content": ""}}]},
+])
+original_send = default_agent.send_chat_completion
+original_execute_tool = default_agent.TaskProofRuntime.execute_tool
+original_evaluate = default_agent.TaskProofRuntime.evaluate_current
+default_agent.send_chat_completion = lambda *_args, **_kwargs: next(responses)
+default_agent.TaskProofRuntime.execute_tool = lambda self, name, arguments: {
+    "status": "failed" if name == "run_lean_check" else "ok",
+    "failure_mode": "lean_check_failed" if name == "run_lean_check" else None,
+    "details": "simulated checker failure" if name == "run_lean_check" else "",
+}
+default_agent.TaskProofRuntime.evaluate_current = lambda self, **_kwargs: {
+    "status": "failed",
+    "failure_mode": "lean_check_failed",
+    "details": "simulated checker failure",
+}
+try:
+    _, _, _, evaluation, attempts, _ = execute_interactive_agent_task(config, task, build_messages(config, task))
+finally:
+    default_agent.send_chat_completion = original_send
+    default_agent.TaskProofRuntime.execute_tool = original_execute_tool
+    default_agent.TaskProofRuntime.evaluate_current = original_evaluate
+
+if evaluation.get("failure_mode") != "lean_check_failed":
+    raise SystemExit(f"expected normal evaluation after exhausting lean_checks_amount, got {evaluation!r}")
+if attempts[-1].get("missing_required_tool_use"):
+    raise SystemExit("lean_checks_amount exhaustion should stop the extra run_lean_check requirement")
+PY
 python3 harness/default_agent.py describe --profile "$DEFAULT_AGENT_PROFILE"
 python3 harness/default_agent.py describe --profile "$CUSTOM_AGENT_PROFILE"
 python3 harness/default_agent.py describe --profile openai-proxy-fast

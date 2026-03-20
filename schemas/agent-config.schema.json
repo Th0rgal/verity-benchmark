@@ -111,7 +111,7 @@
       "minimum": 1
     },
     "lean_checks_amount": {
-      "description": "Minimum number of run_lean_check calls required before finalize unless one check has already passed.",
+      "description": "Maximum number of run_lean_check calls the harness will require before finalize if none has passed yet.",
       "type": "integer",
       "minimum": 0
     },
