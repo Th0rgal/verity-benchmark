@@ -268,8 +268,7 @@ def validate_agent_contract(config: dict[str, Any], label: str) -> list[str]:
             for index, item in enumerate(raw_command):
                 if not normalize_string(item):
                     errors.append(f"{label}: command[{index}] must be a non-empty string")
-            command_text = " ".join(str(item) for item in raw_command)
-            if "openai_compatible_adapter.py" in command_text:
+            if command_requires_openai_connection(raw_command):
                 for field in ("base_url", "model", "api_key"):
                     direct_value = normalize_string(config.get(field))
                     env_name = normalize_string(config.get(f"{field}_env"))
@@ -392,11 +391,18 @@ def resolve_command(config: dict[str, Any]) -> list[str]:
     return [str(item) for item in raw_command]
 
 
+def command_requires_openai_connection(command: list[object]) -> bool:
+    command_text = " ".join(str(item) for item in command)
+    return "openai_compatible_adapter.py" in command_text
+
+
 def resolve_config(path: Path, *, require_secrets: bool, profile: str | None = None) -> ResolvedAgentConfig:
     config = load_config(path)
     agent_id = str(config["agent_id"])
     adapter = str(config["adapter"])
     mode = resolve_mode(config, profile=profile)
+    command = resolve_command(config)
+    requires_openai_connection = adapter == "openai_compatible" or command_requires_openai_connection(command)
     prompt_files = [str(item) for item in config["system_prompt_files"]]
     missing_files = [item for item in prompt_files if not (ROOT / item).is_file()]
     if missing_files:
@@ -409,13 +415,11 @@ def resolve_config(path: Path, *, require_secrets: bool, profile: str | None = N
         run_slug=resolve_run_slug(config, agent_id=agent_id, profile=profile),
         adapter=adapter,
         config_path=config_label(path),
-        base_url=(
-            resolve_field(config, "base_url", required=require_secrets and adapter == "openai_compatible") or ""
-        ).rstrip("/"),
+        base_url=(resolve_field(config, "base_url", required=require_secrets and requires_openai_connection) or "").rstrip("/"),
         base_url_env=normalize_string(config.get("base_url_env")),
-        model=resolve_field(config, "model", required=require_secrets and adapter == "openai_compatible") or "",
+        model=resolve_field(config, "model", required=require_secrets and requires_openai_connection) or "",
         model_env=normalize_string(config.get("model_env")),
-        api_key=resolve_field(config, "api_key", required=require_secrets and adapter == "openai_compatible") or "",
+        api_key=resolve_field(config, "api_key", required=require_secrets and requires_openai_connection) or "",
         api_key_env=normalize_string(config.get("api_key_env")),
         chat_completions_path=str(config.get("chat_completions_path") or ""),
         models_path=str(config.get("models_path") or ""),
@@ -430,7 +434,7 @@ def resolve_config(path: Path, *, require_secrets: bool, profile: str | None = N
         env_contract=env_contract(config),
         extra_body=dict(config.get("extra_body", {})),
         request_timeout_seconds=int(config.get("request_timeout_seconds", 120)),
-        command=resolve_command(config),
+        command=command,
     )
 
 

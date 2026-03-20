@@ -14,6 +14,7 @@ PLACEHOLDER_PATTERN = re.compile(r"\b(sorry|admit|axiom)\b")
 HOLE_PATTERN = re.compile(r"\?(?:_|\w+)")
 DEF_PATTERN = re.compile(r"^\s*(?:def|theorem|lemma|abbrev|opaque)\s+([A-Za-z0-9_'.]+)")
 HIDDEN_PROOF_IMPORT_PATTERN = re.compile(r"^\s*import\s+Benchmark\.Cases\..*\.Proofs\b", re.MULTILINE)
+IMPORT_PATTERN = re.compile(r"^\s*import\s+([A-Za-z0-9_.']+)\s*$", re.MULTILINE)
 
 
 @dataclass(frozen=True)
@@ -47,6 +48,7 @@ class TaskProofRuntime:
         )
         self.current_proof_text = self._read_repo_file(editable_rel_path)
         self.expected_theorem_signature = self._extract_theorem_signature(self.current_proof_text)
+        self.allowed_task_modules = frozenset(self._module_name(path) for path in self.paths.public_files)
 
     def _read_repo_file(self, rel_path: str) -> str:
         path = ROOT / rel_path
@@ -145,6 +147,17 @@ class TaskProofRuntime:
                 "status": "failed",
                 "failure_mode": "hidden_proof_import_detected",
                 "details": "candidate proof imports hidden Benchmark.Cases.*.Proofs modules",
+            }
+
+        blocked_imports = self._find_blocked_case_imports(candidate_text)
+        if blocked_imports:
+            return {
+                "status": "failed",
+                "failure_mode": "hidden_case_import_detected",
+                "details": (
+                    "candidate proof imports non-public Benchmark.Cases modules: "
+                    + ", ".join(blocked_imports)
+                ),
             }
 
         candidate_signature = self._extract_theorem_signature(candidate_text)
@@ -316,6 +329,25 @@ class TaskProofRuntime:
         signature = re.sub(r"/-.*?-/", " ", match.group("signature"), flags=re.DOTALL)
         signature = re.sub(r"--.*$", " ", signature, flags=re.MULTILINE)
         return " ".join(signature.split())
+
+    def _find_blocked_case_imports(self, text: str) -> list[str]:
+        blocked: list[str] = []
+        for module_name in IMPORT_PATTERN.findall(text):
+            if not module_name.startswith("Benchmark.Cases."):
+                continue
+            if module_name in self.allowed_task_modules:
+                continue
+            blocked.append(module_name)
+        return sorted(set(blocked))
+
+    @staticmethod
+    def _module_name(rel_path: str) -> str:
+        path = Path(rel_path)
+        suffix = "".join(path.suffixes)
+        module_path = str(path)
+        if suffix:
+            module_path = module_path[: -len(suffix)]
+        return module_path.replace("/", ".")
 
 
 def tool_result_json(result: dict[str, Any]) -> str:
