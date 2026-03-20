@@ -136,8 +136,12 @@ def main() -> int:
 
     for path in family_manifests:
         data = load_manifest(path)
-        errors.extend(validate(data, schema_files["family"], str(path.relative_to(ROOT))))
+        rel = str(path.relative_to(ROOT))
+        errors.extend(validate(data, schema_files["family"], rel))
         family_id = data.get("family_id")
+        expected_family_id = path.parent.name
+        if family_id != expected_family_id:
+            errors.append(f"{rel}: family_id must match containing directory ({expected_family_id!r})")
         if isinstance(family_id, str):
             families[family_id] = data
 
@@ -147,6 +151,14 @@ def main() -> int:
         errors.extend(validate(data, schema_files["implementation"], rel))
         family_id = data.get("family_id")
         implementation_id = data.get("implementation_id")
+        expected_family_id = path.parent.parent.parent.name
+        expected_implementation_id = path.parent.name
+        if family_id != expected_family_id:
+            errors.append(f"{rel}: family_id must match containing directory ({expected_family_id!r})")
+        if implementation_id != expected_implementation_id:
+            errors.append(
+                f"{rel}: implementation_id must match containing directory ({expected_implementation_id!r})"
+            )
         if isinstance(family_id, str) and isinstance(implementation_id, str):
             implementations[(family_id, implementation_id)] = data
             case_ids = data.get("case_ids")
@@ -222,6 +234,14 @@ def main() -> int:
                 case_split = cases[case_id].get("split")
                 if data.get("split") != case_split:
                     errors.append(f"{rel}: split must match parent case split ({case_split!r})")
+                case_family_id = case_record.get("family_id")
+                if family_id != case_family_id:
+                    errors.append(f"{rel}: family_id must match parent case family_id ({case_family_id!r})")
+                case_implementation_id = case_record.get("implementation_id")
+                if implementation_id != case_implementation_id:
+                    errors.append(
+                        f"{rel}: implementation_id must match parent case implementation_id ({case_implementation_id!r})"
+                    )
         if not isinstance(family_id, str) or family_id not in families:
             errors.append(f"{rel}: unknown family_id {family_id!r}")
         if not isinstance(family_id, str) or not isinstance(implementation_id, str):
@@ -283,14 +303,36 @@ def main() -> int:
             discovered_task_refs.setdefault(task_ref, []).append(rel)
 
     for family_id, data in families.items():
-        for case_id in data.get("case_ids", []):
+        manifest_case_ids = {
+            case_id for case_id in data.get("case_ids", []) if isinstance(case_id, str)
+        }
+        manifest_implementation_ids = {
+            implementation_id
+            for implementation_id in data.get("implementation_ids", [])
+            if isinstance(implementation_id, str)
+        }
+        for case_id in manifest_case_ids:
             if case_id not in cases:
                 errors.append(f"families/{family_id}/family.yaml: missing case reference {case_id}")
-        for implementation_id in data.get("implementation_ids", []):
+        for implementation_id in manifest_implementation_ids:
             if (family_id, implementation_id) not in implementations:
                 errors.append(
                     f"families/{family_id}/family.yaml: missing implementation reference {implementation_id}"
                 )
+        actual_case_ids = {
+            case_id for case_id, case_data in cases.items() if case_data.get("family_id") == family_id
+        }
+        actual_implementation_ids = {
+            implementation_id
+            for candidate_family_id, implementation_id in implementations
+            if candidate_family_id == family_id
+        }
+        for case_id in sorted(actual_case_ids - manifest_case_ids):
+            errors.append(f"families/{family_id}/family.yaml: case_ids is missing case {case_id}")
+        for implementation_id in sorted(actual_implementation_ids - manifest_implementation_ids):
+            errors.append(
+                f"families/{family_id}/family.yaml: implementation_ids is missing implementation {implementation_id}"
+            )
 
     for (family_id, implementation_id), data in implementations.items():
         rel = f"families/{family_id}/implementations/{implementation_id}/implementation.yaml"

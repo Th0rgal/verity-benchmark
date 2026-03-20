@@ -384,6 +384,10 @@ def resolve_headers(config: dict[str, Any]) -> dict[str, str]:
     return headers
 
 
+def redact_headers(headers: dict[str, str]) -> dict[str, str]:
+    return {str(header_name): "<redacted>" for header_name in headers}
+
+
 def resolve_command(config: dict[str, Any]) -> list[str]:
     raw_command = config.get("command", [])
     if not isinstance(raw_command, list):
@@ -657,7 +661,10 @@ def send_chat_completion(
         raise SystemExit(f"chat completion request failed with HTTP {exc.code}: {detail}") from exc
     except error.URLError as exc:
         raise SystemExit(f"chat completion request failed: {exc}") from exc
-    return json.loads(body)
+    try:
+        return json.loads(body)
+    except json.JSONDecodeError as exc:
+        raise SystemExit(f"chat completion request returned non-JSON response: {body[:400]!r}") from exc
 
 
 def list_models(config: ResolvedAgentConfig) -> dict[str, Any]:
@@ -677,7 +684,10 @@ def list_models(config: ResolvedAgentConfig) -> dict[str, Any]:
         raise SystemExit(f"model probe failed with HTTP {exc.code}: {detail}") from exc
     except error.URLError as exc:
         raise SystemExit(f"model probe failed: {exc}") from exc
-    return json.loads(body)
+    try:
+        return json.loads(body)
+    except json.JSONDecodeError as exc:
+        raise SystemExit(f"model probe returned non-JSON response: {body[:400]!r}") from exc
 
 
 def extract_model_ids(models_payload: dict[str, Any]) -> list[str]:
@@ -925,6 +935,13 @@ def canonical_summary_path(config: ResolvedAgentConfig) -> Path:
     return ROOT / "results" / "agent_summaries" / config.track / f"{config.run_slug}.json"
 
 
+def scoped_summary_path(config: ResolvedAgentConfig, scope: str) -> Path:
+    if scope.startswith("suite:"):
+        return canonical_summary_path(config)
+    slug = slugify(scope.replace(":", "-").replace("/", "-"))
+    return ROOT / "results" / "agent_summaries" / config.track / config.run_slug / f"{slug}.json"
+
+
 def uses_legacy_aliases(config: ResolvedAgentConfig) -> bool:
     return config.track == "reference" and config.config_path == config_label(DEFAULT_AGENT_CONFIG_PATH)
 
@@ -943,13 +960,13 @@ def write_result(task_ref: str, config: ResolvedAgentConfig, payload: dict[str, 
 def build_result(
     task_ref: str,
     config: ResolvedAgentConfig,
+    task: dict[str, Any],
     messages: list[dict[str, Any]],
     *,
     dry_run: bool,
     evaluation: dict[str, Any] | None = None,
     elapsed_seconds: float | None = None,
 ) -> dict[str, Any]:
-    task = resolve_task(task_ref)
     payload = {
         "schema_version": 1,
         "task_ref": task_ref,
@@ -984,7 +1001,7 @@ def build_result(
             "max_attempts": config.max_attempts,
             "max_tool_calls": config.max_tool_calls,
             "request_timeout_seconds": config.request_timeout_seconds,
-            "headers": config.headers,
+            "headers": redact_headers(config.headers),
             "header_envs": config.header_envs,
             "env_contract": config.env_contract,
             "extra_body": config.extra_body,
@@ -1078,7 +1095,7 @@ def describe_command(config_path: Path) -> int:
                 "max_completion_tokens": config.max_completion_tokens,
                 "max_attempts": config.max_attempts,
                 "max_tool_calls": config.max_tool_calls,
-                "headers": config.headers,
+                "headers": redact_headers(config.headers),
                 "header_envs": config.header_envs,
                 "env_contract": config.env_contract,
                 "extra_body": config.extra_body,
@@ -1325,7 +1342,7 @@ def execute_agent_task(
     task = resolve_task(task_ref)
     messages = build_messages(config, task)
     if dry_run:
-        result = build_result(task_ref, config, messages, dry_run=dry_run, elapsed_seconds=0.0)
+        result = build_result(task_ref, config, task, messages, dry_run=dry_run, elapsed_seconds=0.0)
         validate_result_payload(result, task_ref)
         result_path = write_result(task_ref, config, result)
         return 0, result_path
@@ -1354,6 +1371,7 @@ def execute_agent_task(
     result = build_result(
         task_ref,
         config,
+        task,
         messages,
         dry_run=dry_run,
         evaluation=evaluation,

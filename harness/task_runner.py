@@ -300,6 +300,7 @@ def execute_reference_solution_task(task_ref: str) -> tuple[int, Path]:
             "evaluation_engine": task["evaluation"]["engine"],
             "target_kind": task["evaluation"]["target_kind"],
         },
+        "evaluation": task["evaluation"],
         "implementation_files": task["implementation_files"],
         "specification_files": task["specification_files"],
         "editable_files": task["editable_files"],
@@ -335,14 +336,19 @@ def aggregate_results(task_refs: list[str], suite: str) -> dict[str, Any]:
 
     results = []
     selected_case_ids: set[str] = set()
+    missing_task_refs: list[str] = []
     for task_ref in task_refs:
         task_manifest = resolve_task_manifest(task_ref)
         selected_case_ids.add(load_task_record(task_manifest)["case_id"])
         path = TASK_RESULTS_DIR / f"{task_ref.replace('/', '__')}.json"
         if path.exists():
             results.append(json.loads(path.read_text(encoding="utf-8")))
+        else:
+            missing_task_refs.append(task_ref)
 
     task_status_counts = Counter(item["status"] for item in results)
+    if missing_task_refs:
+        task_status_counts["missing"] = len(missing_task_refs)
     failure_mode_counts = Counter(item["failure_mode"] for item in results if item["failure_mode"])
     by_track: dict[str, Counter[str]] = defaultdict(Counter)
     by_property_class: dict[str, Counter[str]] = defaultdict(Counter)
@@ -397,7 +403,7 @@ def aggregate_results(task_refs: list[str], suite: str) -> dict[str, Any]:
         "benchmark": "verity-benchmark",
         "schema_version": 1,
         "unit": "task",
-        "total_tasks": len(results),
+        "total_tasks": len(task_refs),
         "status_counts": dict(sorted(task_status_counts.items())),
         "failure_mode_counts": dict(sorted(failure_mode_counts.items())),
         "track_status_counts": {
@@ -411,6 +417,7 @@ def aggregate_results(task_refs: list[str], suite: str) -> dict[str, Any]:
         "proof_family_counts": dict(sorted(proof_family_counts.items())),
         "readiness_counts": readiness_counts,
         "tasks": [item["task_ref"] for item in results],
+        "missing_task_refs": missing_task_refs,
     }
     case_summary = {
         "benchmark": "verity-benchmark",

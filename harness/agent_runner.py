@@ -13,6 +13,7 @@ from default_agent import (
     execute_agent_task,
     resolve_config,
     resolve_config_path,
+    scoped_summary_path,
     uses_legacy_aliases,
 )
 from task_runner import ROOT, discover_task_refs
@@ -35,7 +36,7 @@ def resolve_case_task_refs(case_ref: str, suite: str) -> list[str]:
 def run_many(task_refs: list[str], config_path: Path, dry_run: bool, *, profile: str | None, scope: str) -> int:
     RESULTS_DIR.mkdir(parents=True, exist_ok=True)
     resolved_config = resolve_config(config_path, require_secrets=not dry_run, profile=profile)
-    summary_path = canonical_summary_path(resolved_config)
+    summary_path = scoped_summary_path(resolved_config, scope)
     entries: list[dict[str, object]] = []
     exit_code = 0
 
@@ -85,7 +86,7 @@ def run_many(task_refs: list[str], config_path: Path, dry_run: bool, *, profile:
     }
     summary_path.parent.mkdir(parents=True, exist_ok=True)
     summary_path.write_text(json.dumps(payload, indent=2) + "\n", encoding="utf-8")
-    if uses_legacy_aliases(resolved_config):
+    if uses_legacy_aliases(resolved_config) and summary_path == canonical_summary_path(resolved_config):
         LEGACY_AGENT_SUMMARY_PATH.write_text(json.dumps(payload, indent=2) + "\n", encoding="utf-8")
     return exit_code
 

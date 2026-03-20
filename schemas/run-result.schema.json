@@ -19,6 +19,8 @@
     "difficulty",
     "theorem_name",
     "proof_family",
+    "source_ref",
+    "task_interface_version",
     "command",
     "started_at",
     "completed_at",
@@ -32,6 +34,7 @@
     "metrics",
     "environment",
     "readiness",
+    "evaluation",
     "targets",
     "reference_solution",
     "output"
@@ -78,6 +81,12 @@
     },
     "proof_family": {
       "type": "string"
+    },
+    "source_ref": {
+      "type": ["string", "null"]
+    },
+    "task_interface_version": {
+      "type": "integer"
     },
     "command": {
       "type": "array",
@@ -134,6 +143,12 @@
       "type": "object",
       "additionalProperties": {
         "type": "string"
+      }
+    },
+    "evaluation": {
+      "type": "object",
+      "additionalProperties": {
+        "type": ["string", "number", "integer", "boolean", "null"]
       }
     },
     "implementation_files": {
