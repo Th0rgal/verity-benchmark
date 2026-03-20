@@ -242,18 +242,6 @@ class TaskProofRuntime:
             {
                 "type": "function",
                 "function": {
-                    "name": "run_lean_check",
-                    "description": "Run the official harness Lean check for the current editable proof.",
-                    "parameters": {
-                        "type": "object",
-                        "additionalProperties": False,
-                        "properties": {},
-                    },
-                },
-            },
-            {
-                "type": "function",
-                "function": {
                     "name": "inspect_lean_goals",
                     "description": "Inspect current Lean diagnostics for explicit proof holes in the editable file. Returns unsupported if no hole is present.",
                     "parameters": {
@@ -286,8 +274,6 @@ class TaskProofRuntime:
             return self.read_public_file(str(arguments.get("path", "")))
         if name == "write_editable_proof":
             return self.write_editable_proof(str(arguments.get("content", "")))
-        if name == "run_lean_check":
-            return self.evaluate_current()
         if name == "inspect_lean_goals":
             return self.inspect_goals()
         if name == "search_public_defs":

@@ -91,7 +91,7 @@
         "system_prompt_files",
         "temperature",
         "max_completion_tokens",
-        "max_attempts",
+        "attempts",
         "request_timeout_seconds",
         "headers",
         "header_envs",
@@ -154,13 +154,10 @@
         "max_completion_tokens": {
           "type": "integer"
         },
-        "max_attempts": {
+        "attempts": {
           "type": "integer"
         },
         "max_tool_calls": {
-          "type": "integer"
-        },
-        "lean_checks_amount": {
           "type": "integer"
         },
         "request_timeout_seconds": {

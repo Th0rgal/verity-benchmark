@@ -85,14 +85,13 @@ Optional config-only extensions for OpenAI-compatible backends:
 - `header_envs`: map of HTTP header name to env var for proxy-specific auth/routing
 - `extra_body`: extra JSON merged into the chat-completions request body
 - `request_timeout_seconds`: request timeout for both probe and run
-- `max_attempts`: bounded number of propose-check-repair rounds per task
+- `attempts`: bounded number of propose-check-repair rounds per task
 - `max_tool_calls`: interactive-mode tool budget
-- `lean_checks_amount`: if no `run_lean_check` call has passed yet, keep requiring it until one passes or this cap is reached
 
 Mode summary:
 
 - `strict`: no agent-visible tools; the harness owns bounded repair rounds
-- `interactive`: exposes only `read_public_file`, `write_editable_proof`, `run_lean_check`, `inspect_lean_goals`, and `search_public_defs`
+- `interactive`: exposes only `read_public_file`, `write_editable_proof`, `inspect_lean_goals`, and `search_public_defs`
 - `custom`: runs a command adapter and still evaluates the returned proof through the benchmark harness
 
 The command adapter request body includes:

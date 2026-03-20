@@ -100,7 +100,7 @@
     "max_completion_tokens": {
       "type": "integer"
     },
-    "max_attempts": {
+    "attempts": {
       "description": "Maximum number of harness-managed model attempts for one task run.",
       "type": "integer",
       "minimum": 1
@@ -109,11 +109,6 @@
       "description": "Maximum number of tool calls allowed during one interactive task run.",
       "type": "integer",
       "minimum": 1
-    },
-    "lean_checks_amount": {
-      "description": "Maximum number of run_lean_check calls the harness will require before finalize if none has passed yet.",
-      "type": "integer",
-      "minimum": 0
     },
     "headers": {
       "type": "object",
