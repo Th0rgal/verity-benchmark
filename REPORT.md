@@ -18,7 +18,7 @@ This report is generated from the benchmark manifests.
 - Stage: `build_green`
 - Status dimensions: translation=`translated`, spec=`frozen`, proof=`partial`
 - Lean target: `Benchmark.Cases.DamnVulnerableDeFi.SideEntrance.Compile`
-- Source ref: `https://github.com/OpenZeppelin/damn-vulnerable-defi@master:contracts/side-entrance/SideEntranceLenderPool.sol`
+- Source ref: `https://github.com/OpenZeppelin/damn-vulnerable-defi@6797353c7cb5409e3d388e9e8f13954f9bb5f609:contracts/side-entrance/SideEntranceLenderPool.sol`
 - Selected functions: `deposit`, `flashLoan`, `withdraw`
 - Source artifact: `contracts/side-entrance/SideEntranceLenderPool.sol`
 - Notes: Compact Side Entrance benchmark focused on the broken coherence between pool assets and withdrawable credit when flash-loan repayment is routed through the deposit path.
@@ -325,8 +325,8 @@ This report is generated from the benchmark manifests.
 - Family / implementation: `openzeppelin` / `contracts`
 - Stage: `proof_complete`
 - Status dimensions: translation=`translated`, spec=`frozen`, proof=`complete`
-- Lean target: `Benchmark.Cases.OpenZeppelin.ERC4626VirtualOffsetDeposit.Specs`
-- Source ref: `https://github.com/OpenZeppelin/openzeppelin-contracts@master:contracts/token/ERC20/extensions/ERC4626.sol`
+- Lean target: `Benchmark.Cases.OpenZeppelin.ERC4626VirtualOffsetDeposit.Compile`
+- Source ref: `https://github.com/OpenZeppelin/openzeppelin-contracts@45f032d1bcf1a88b7bc90154d7eef76c87bf9d45:contracts/token/ERC20/extensions/ERC4626.sol`
 - Selected functions: `previewDeposit`, `deposit`
 - Source artifact: `contracts/token/ERC20/extensions/ERC4626.sol`
 - Notes: Backlog ERC-4626 benchmark slice derived from OpenZeppelin's virtual-offset design and inflation-attack analysis. The committed proof module validates the four arithmetic and state-transition theorems, so the case is runnable in the reference-solution benchmark path while remaining backlog-scoped.
@@ -335,7 +335,7 @@ This report is generated from the benchmark manifests.
 - Family / implementation: `uniswap_v2` / `v2_core`
 - Stage: `proof_complete`
 - Status dimensions: translation=`translated`, spec=`frozen`, proof=`complete`
-- Lean target: `Benchmark.Cases.UniswapV2.PairFeeAdjustedSwap.Specs`
+- Lean target: `Benchmark.Cases.UniswapV2.PairFeeAdjustedSwap.Compile`
 - Source ref: `https://github.com/Uniswap/v2-core@ee547b17853e71ed4e0101ccfd52e70d5acded58:contracts/UniswapV2Pair.sol`
 - Selected functions: `swap`
 - Source artifact: `contracts/UniswapV2Pair.sol`

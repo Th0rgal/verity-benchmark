@@ -6,7 +6,7 @@ display_name: OpenZeppelin Contracts
 split: backlog
 status: translated
 upstream_repo: https://github.com/OpenZeppelin/openzeppelin-contracts
-upstream_commit: master
+upstream_commit: 45f032d1bcf1a88b7bc90154d7eef76c87bf9d45
 source_language: solidity
 source_artifact_path: contracts/token/ERC20/extensions/ERC4626.sol
 case_ids:

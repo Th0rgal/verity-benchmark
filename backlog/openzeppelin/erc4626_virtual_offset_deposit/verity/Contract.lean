@@ -12,6 +12,10 @@ open Verity.Stdlib.Math
   The benchmark keeps only total-assets / total-shares storage, fixed virtual
   offsets, the `previewDeposit` floor-division rule, and the final `deposit`
   state update. Token transfers and all other vault behavior are elided.
+
+  The Verity contract DSL currently rejects named constants in contract bodies,
+  so the virtual offsets remain duplicated as literals there and symbolic in
+  the helper below.
 -/
 
 def virtualAssets : Uint256 := 1

@@ -337,10 +337,10 @@ def write_inventory(
             "backlog_case_count": len(backlog_cases),
             "active_task_count": len(active_tasks),
             "backlog_task_count": len(backlog_tasks),
-            "buildable_case_count": sum(1 for entry in active_cases if entry["buildable"]),
+            "buildable_case_count": sum(1 for entry in all_cases if entry["buildable"]),
             "runnable_task_count": sum(
                 1
-                for entry in active_tasks
+                for entry in all_tasks
                 if entry["readiness"]["editable_proof"] == "ready"
             ),
             "case_stage_counts": summary_counts(all_cases, "stage"),

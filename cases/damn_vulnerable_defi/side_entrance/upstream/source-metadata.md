@@ -1,7 +1,7 @@
 # Upstream metadata
 
 - Repository: https://github.com/OpenZeppelin/damn-vulnerable-defi
-- Commit: `master`
+- Commit: `6797353c7cb5409e3d388e9e8f13954f9bb5f609`
 - Contract path: `contracts/side-entrance/SideEntranceLenderPool.sol`
 - Functions of interest: `deposit`, `flashLoan`, `withdraw`
 - Source language: Solidity

@@ -5,7 +5,7 @@ case_id: damn_vulnerable_defi/side_entrance
 split: active
 family_id: damn_vulnerable_defi
 implementation_id: v2
-source_ref: https://github.com/OpenZeppelin/damn-vulnerable-defi@master:contracts/side-entrance/SideEntranceLenderPool.sol
+source_ref: https://github.com/OpenZeppelin/damn-vulnerable-defi@6797353c7cb5409e3d388e9e8f13954f9bb5f609:contracts/side-entrance/SideEntranceLenderPool.sol
 task_interface_version: 2
 theorem_name: Benchmark.Cases.DamnVulnerableDeFi.SideEntrance.flashLoanViaDeposit_sets_sender_credit
 proof_family: protocol_transition_correctness

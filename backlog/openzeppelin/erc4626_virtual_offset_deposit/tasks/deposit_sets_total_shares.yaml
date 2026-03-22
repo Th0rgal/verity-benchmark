@@ -5,7 +5,7 @@ case_id: openzeppelin/erc4626_virtual_offset_deposit
 split: backlog
 family_id: openzeppelin
 implementation_id: contracts
-source_ref: https://github.com/OpenZeppelin/openzeppelin-contracts@master:contracts/token/ERC20/extensions/ERC4626.sol
+source_ref: https://github.com/OpenZeppelin/openzeppelin-contracts@45f032d1bcf1a88b7bc90154d7eef76c87bf9d45:contracts/token/ERC20/extensions/ERC4626.sol
 task_interface_version: 2
 theorem_name: Benchmark.Cases.OpenZeppelin.ERC4626VirtualOffsetDeposit.deposit_sets_totalShares
 proof_family: state_preservation_local_effects

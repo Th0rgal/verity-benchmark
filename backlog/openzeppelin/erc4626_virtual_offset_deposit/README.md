@@ -12,7 +12,7 @@ fees, and hooks.
 Upstream references:
 
 - OpenZeppelin ERC-4626 implementation:
-  <https://github.com/OpenZeppelin/openzeppelin-contracts/blob/master/contracts/token/ERC20/extensions/ERC4626.sol>
+  <https://github.com/OpenZeppelin/openzeppelin-contracts/blob/45f032d1bcf1a88b7bc90154d7eef76c87bf9d45/contracts/token/ERC20/extensions/ERC4626.sol>
 - OpenZeppelin inflation-attack analysis:
   <https://blog.openzeppelin.com/a-novel-defense-against-erc4626-inflation-attacks>
 
@@ -23,6 +23,6 @@ The intended theorem tasks are:
 3. `previewDeposit_rounds_down`
 4. `positive_deposit_mints_positive_shares_under_rate_bound`
 
-As with other backlog candidates, local validation can be done with an untracked
-`Benchmark/Cases/OpenZeppelin/ERC4626VirtualOffsetDeposit/Proofs.lean` file
-that is intentionally excluded from git.
+The reference proof module is committed at
+`Benchmark/Cases/OpenZeppelin/ERC4626VirtualOffsetDeposit/Proofs.lean`, so this
+backlog case is runnable in the reference benchmark path.

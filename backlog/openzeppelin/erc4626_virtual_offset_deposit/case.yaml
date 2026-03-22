@@ -10,10 +10,10 @@ translation_status: translated
 spec_status: frozen
 proof_status: complete
 upstream_repo: https://github.com/OpenZeppelin/openzeppelin-contracts
-upstream_commit: master
+upstream_commit: 45f032d1bcf1a88b7bc90154d7eef76c87bf9d45
 original_contract_path: contracts/token/ERC20/extensions/ERC4626.sol
-source_ref: https://github.com/OpenZeppelin/openzeppelin-contracts@master:contracts/token/ERC20/extensions/ERC4626.sol
-lean_target: Benchmark.Cases.OpenZeppelin.ERC4626VirtualOffsetDeposit.Specs
+source_ref: https://github.com/OpenZeppelin/openzeppelin-contracts@45f032d1bcf1a88b7bc90154d7eef76c87bf9d45:contracts/token/ERC20/extensions/ERC4626.sol
+lean_target: Benchmark.Cases.OpenZeppelin.ERC4626VirtualOffsetDeposit.Compile
 selected_functions:
   - previewDeposit
   - deposit

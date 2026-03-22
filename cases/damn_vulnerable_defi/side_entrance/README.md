@@ -12,7 +12,7 @@ Focus:
 - pool-balance versus withdrawable-credit coherence
 
 Research notes:
-- Side Entrance: https://github.com/OpenZeppelin/damn-vulnerable-defi/blob/master/contracts/side-entrance/SideEntranceLenderPool.sol
+- Side Entrance: https://github.com/OpenZeppelin/damn-vulnerable-defi/blob/6797353c7cb5409e3d388e9e8f13954f9bb5f609/contracts/side-entrance/SideEntranceLenderPool.sol
   Best fit because the core bug is a crisp cross-function accounting failure: the borrower can satisfy `flashLoan` repayment by calling `deposit`, leaving pool ETH restored but also minting withdrawable credit. That maps cleanly to a two-slot Verity state and a composed exploit theorem.
 - Truster: https://github.com/OpenZeppelin/damn-vulnerable-defi/blob/master/contracts/truster/TrusterLenderPool.sol
   High value, but the bug is arbitrary external call authority during the loan. Modeling calldata-driven token approval would require materially more surface area than this benchmark.

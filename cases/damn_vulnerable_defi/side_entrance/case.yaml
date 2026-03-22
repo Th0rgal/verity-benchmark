@@ -10,9 +10,9 @@ translation_status: translated
 spec_status: frozen
 proof_status: partial
 upstream_repo: https://github.com/OpenZeppelin/damn-vulnerable-defi
-upstream_commit: master
+upstream_commit: 6797353c7cb5409e3d388e9e8f13954f9bb5f609
 original_contract_path: contracts/side-entrance/SideEntranceLenderPool.sol
-source_ref: https://github.com/OpenZeppelin/damn-vulnerable-defi@master:contracts/side-entrance/SideEntranceLenderPool.sol
+source_ref: https://github.com/OpenZeppelin/damn-vulnerable-defi@6797353c7cb5409e3d388e9e8f13954f9bb5f609:contracts/side-entrance/SideEntranceLenderPool.sol
 lean_target: Benchmark.Cases.DamnVulnerableDeFi.SideEntrance.Compile
 selected_functions:
   - deposit
