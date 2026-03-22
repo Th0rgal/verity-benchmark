@@ -29,10 +29,11 @@ abstraction_tags:
   - deposit_coupling
   - single_caller_credit
 abstraction_notes: >
-  The benchmark compresses the Side Entrance exploit into a two-slot state:
-  tracked pool ETH and the current caller's withdrawable credit. The flash-loan
-  callback is summarized as an atomic loan-plus-deposit step that restores pool
-  ETH while still minting fresh credit.
+  The benchmark compresses the Side Entrance exploit into a compact state:
+  tracked pool ETH, aggregate credited liabilities, and the current caller's
+  withdrawable credit. The flash-loan callback is summarized as an atomic
+  loan-plus-deposit step that restores pool ETH while still minting fresh
+  credit.
 unsupported_feature_codes: []
 spec_target: Benchmark.Cases.DamnVulnerableDeFi.SideEntrance.Specs
 proof_target: Benchmark.Cases.DamnVulnerableDeFi.SideEntrance.Proofs
