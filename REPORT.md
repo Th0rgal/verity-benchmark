@@ -250,7 +250,7 @@ This report is generated from the benchmark manifests.
 - Source ref: `https://github.com/Uniswap/v2-core@ee547b17853e71ed4e0101ccfd52e70d5acded58:contracts/UniswapV2Pair.sol`
 - Selected functions: `swap`
 - Source artifact: `contracts/UniswapV2Pair.sol`
-- Notes: Candidate AMM benchmark slice for reasoning about fee-adjusted constant-product guards and post-swap reserve synchronization without exposing the full Uniswap execution path.
+- Notes: Candidate AMM benchmark slice for reasoning about fee-adjusted constant-product guards and post-swap reserve synchronization without exposing the full Uniswap execution path. Reference proofs were validated locally on 2026-03-22 in an intentionally untracked proof module, so the committed tree remains a backlog candidate rather than an active runnable case.
 
 ### `unlink_xyz/placeholder`
 - Family / implementation: `unlink_xyz` / `monorepo`

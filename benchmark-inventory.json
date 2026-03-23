@@ -488,7 +488,7 @@
       ],
       "lean_target": "Benchmark.Cases.UniswapV2.PairFeeAdjustedSwap.Specs",
       "failure_reason": "reference_proofs_withheld",
-      "notes": "Candidate AMM benchmark slice for reasoning about fee-adjusted constant-product guards and post-swap reserve synchronization without exposing the full Uniswap execution path.",
+      "notes": "Candidate AMM benchmark slice for reasoning about fee-adjusted constant-product guards and post-swap reserve synchronization without exposing the full Uniswap execution path. Reference proofs were validated locally on 2026-03-22 in an intentionally untracked proof module, so the committed tree remains a backlog candidate rather than an active runnable case.",
       "buildable": false,
       "verity_commit": "4ebe4931d25e5a1594fcd3f43ff040ecc3c4225a",
       "lean_toolchain": "leanprover/lean4:v4.22.0",
@@ -1576,5 +1576,5 @@
       }
     }
   ],
-  "generated_at": "2026-03-21T21:40:30.815636+00:00"
+  "generated_at": "2026-03-23T16:54:35.474229+00:00"
 }

@@ -378,11 +378,18 @@ def _build_repair_guidance(details: str) -> str:
             "Do not guess lemma names. Instead, use `simp` with the relevant definitions, `omega` for arithmetic, "
             "or `decide`/`native_decide` for decidable propositions. Remove all references to unknown names."
         )
+    if "unsolved goals" in details and "match" in details:
+        hints.append(
+            "- The remaining goal contains a `match` expression. Use `split` to case-split on the match, "
+            "then solve each branch separately. If the match is on a ContractResult, try "
+            "`simp only [...]` to reduce it first, or use `cases` on the matched expression."
+        )
     if "unsolved goals" in details and "if " in details:
         hints.append(
-            "- If `simp` leaves finite residual equalities or `if` expressions, finish those with `native_decide` or `decide`."
+            "- The remaining goal contains an `if` expression. Use `by_cases h : <condition>` to split on the condition, "
+            "then `simp [h, ...]` in each branch. Alternatively, add the condition's hypothesis to the `simp` call."
         )
-    if "unsolved goals" in details and "if " not in details:
+    if "unsolved goals" in details and "match" not in details and "if " not in details:
         hints.append(
             "- Unsolved goals remain. Check that `simp` is given all necessary definitions and hypotheses."
         )
