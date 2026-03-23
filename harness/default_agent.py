@@ -553,13 +553,21 @@ def build_repair_guidance(details: str) -> str:
         hints.append(
             "- Do not use `native_decide` or `decide` on goals that still contain parameters. First reduce to concrete equalities."
         )
-    if "Unknown identifier" in details:
+    if "Unknown identifier" in details or "unknown identifier" in details:
         hints.append(
             "- Fix typos or missing imports directly. Standard names such as `Nat.lt_of_not_ge` and `Nat.not_le_of_lt` are often useful."
         )
     if "unsolved goals" in details and "if " in details:
         hints.append(
             "- If `simp` leaves finite residual equalities or `if` expressions, finish those with `native_decide` or `decide`."
+        )
+    if "unsolved goals" in details and "if " not in details:
+        hints.append(
+            "- Unsolved goals remain. Check that `simp` is given all necessary definitions and hypotheses."
+        )
+    if "type mismatch" in details:
+        hints.append(
+            "- A type mismatch often means the proof term or tactic result does not match the goal. Re-read the spec and ensure your proof targets the correct type."
         )
     return "\n".join(hints)
 
@@ -1263,7 +1271,34 @@ def execute_interactive_agent_task(
             evaluation = runtime.evaluate_current()
             attempts[-1]["candidate_file_contents"] = runtime.current_proof_text
             attempts[-1]["evaluation"] = evaluation
-            return response, response_text, runtime.current_proof_text, evaluation, attempts, tool_calls_used
+            if evaluation["status"] == "passed":
+                return response, response_text, runtime.current_proof_text, evaluation, attempts, tool_calls_used
+            # Failed candidate without tool calls: prompt model to use tools and retry
+            failure_mode = evaluation.get("failure_mode", "")
+            if failure_mode == "lean_check_failed":
+                details = str(evaluation.get("details", ""))[:MAX_ERROR_FEEDBACK_CHARS]
+                guidance = build_repair_guidance(details)
+                retry_msg = (
+                    f"The proof did not pass the Lean checker (attempt {attempt_index} of {config.max_attempts}).\n"
+                    "Use the write_editable_proof tool to submit a corrected complete Lean proof file, "
+                    "then use run_lean_check to verify it.\n\n"
+                    f"Lean checker output:\n{details}\n"
+                )
+                if guidance:
+                    retry_msg += f"\nRepair guidance:\n{guidance}\n"
+            elif failure_mode in ("empty_response", "placeholder_detected", "theorem_statement_mismatch"):
+                retry_msg = (
+                    f"Your response did not produce a valid proof candidate (attempt {attempt_index} of {config.max_attempts}, "
+                    f"failure: {failure_mode}).\n"
+                    "Use the write_editable_proof tool to submit the complete editable Lean proof file, "
+                    "then use run_lean_check to verify it.\n"
+                    "Do not explain or analyze. Use the tools directly.\n"
+                )
+            else:
+                return response, response_text, runtime.current_proof_text, evaluation, attempts, tool_calls_used
+            transcript.append({"role": "assistant", "content": response_text})
+            transcript.append({"role": "user", "content": retry_msg})
+            continue
 
         message = response.get("choices", [{}])[0].get("message", {})
         transcript.append(

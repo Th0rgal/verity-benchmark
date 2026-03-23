@@ -287,7 +287,12 @@ class TaskProofRuntime:
         if name == "write_editable_proof":
             return self.write_editable_proof(str(arguments.get("content", "")))
         if name == "run_lean_check":
-            return self.evaluate_current()
+            result = self.evaluate_current()
+            if result.get("failure_mode") == "lean_check_failed":
+                guidance = _build_repair_guidance(str(result.get("details", "")))
+                if guidance:
+                    result["repair_hints"] = guidance
+            return result
         if name == "inspect_lean_goals":
             return self.inspect_goals()
         if name == "search_public_defs":
@@ -351,6 +356,39 @@ class TaskProofRuntime:
         if suffix:
             module_path = module_path[: -len(suffix)]
         return module_path.replace("/", ".")
+
+
+def _build_repair_guidance(details: str) -> str:
+    hints: list[str] = []
+    if "tactic 'split' failed" in details:
+        hints.append(
+            "- Do not `split` the final post-state blindly. Prove branch-specific helper theorems first, then use `by_cases` plus `simpa`."
+        )
+    if "no goals to be solved" in details:
+        hints.append(
+            "- A previous `simp` likely closed the goal already. Remove trailing tactics after the goal is solved."
+        )
+    if "expected type must not contain free variables" in details:
+        hints.append(
+            "- Do not use `native_decide` or `decide` on goals that still contain parameters. First reduce to concrete equalities."
+        )
+    if "Unknown identifier" in details or "unknown identifier" in details:
+        hints.append(
+            "- Fix typos or missing imports directly. Standard names such as `Nat.lt_of_not_ge` and `Nat.not_le_of_lt` are often useful."
+        )
+    if "unsolved goals" in details and "if " in details:
+        hints.append(
+            "- If `simp` leaves finite residual equalities or `if` expressions, finish those with `native_decide` or `decide`."
+        )
+    if "unsolved goals" in details and "if " not in details:
+        hints.append(
+            "- Unsolved goals remain. Check that `simp` is given all necessary definitions and hypotheses."
+        )
+    if "type mismatch" in details:
+        hints.append(
+            "- A type mismatch often means the proof term or tactic result does not match the goal. Re-read the spec and ensure your proof targets the correct type."
+        )
+    return "\n".join(hints)
 
 
 def tool_result_json(result: dict[str, Any]) -> str:
