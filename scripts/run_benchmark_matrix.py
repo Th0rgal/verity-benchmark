@@ -233,6 +233,21 @@ def process_state(pid: int) -> str:
     return "running"
 
 
+def normalize_worker_status(worker: dict[str, Any]) -> str:
+    status = str(worker.get("status", "unknown"))
+    pid = int(worker.get("pid", 0))
+    if status != "running":
+        return status
+    if pid <= 0:
+        return "failed"
+    runtime_state = process_state(pid)
+    if runtime_state == "exited":
+        return "failed"
+    if runtime_state == "paused":
+        return "paused"
+    return "running"
+
+
 def discover_modules() -> list[str]:
     return sorted({task_to_module(task_ref) for task_ref in discover_task_refs("all")})
 
@@ -329,7 +344,7 @@ def aggregate_state(state_dir: Path) -> dict[str, Any]:
                 "model": target["model"],
                 "repeats": target["repeats"],
                 "completed_runs": len(completed_runs),
-                "status": worker.get("status"),
+                "status": normalize_worker_status(worker),
                 "modules": module_averages,
                 "average_total_elapsed_seconds": average_elapsed_seconds,
                 "average_total_tokens": average_tokens,
@@ -364,8 +379,11 @@ def build_markdown(report: dict[str, Any]) -> str:
     for module in modules:
         row = [module]
         for target in targets:
+            if target["status"] == "failed":
+                row.append("failed")
+                continue
             if target["completed_runs"] == 0:
-                row.append("failed" if target["status"] == "failed" else "pending")
+                row.append("pending")
                 continue
             counts = target["modules"][module]
             row.append(f"{format_average(counts['passed'])}/{format_average(counts['failed'])}")
@@ -373,8 +391,11 @@ def build_markdown(report: dict[str, Any]) -> str:
 
     total_row = ["Total time / tokens"]
     for target in targets:
+        if target["status"] == "failed":
+            total_row.append("failed")
+            continue
         if target["completed_runs"] == 0:
-            total_row.append("failed" if target["status"] == "failed" else "pending")
+            total_row.append("pending")
             continue
         total_row.append(
             f"{format_seconds(target['average_total_elapsed_seconds'])} / "
@@ -603,6 +624,7 @@ def command_worker(args: argparse.Namespace) -> int:
                     }
                 )
                 worker.update({"status": "failed", "runs": runs, "failed_at": utc_now(), "error": str(exc)})
+                worker["pid"] = 0
                 write_worker_state(state_dir, target.key, worker)
                 log_handle.write(f"[{utc_now()}] worker failed: {exc}\n")
                 log_handle.flush()
@@ -613,6 +635,7 @@ def command_worker(args: argparse.Namespace) -> int:
         worker.update(
             {
                 "status": "completed",
+                "pid": 0,
                 "current_run_index": 0,
                 "finished_at": utc_now(),
                 "runs": runs,
@@ -633,9 +656,7 @@ def command_status(args: argparse.Namespace) -> int:
     for target in state["targets"]:
         worker = load_worker_state(state_dir, target["key"])
         pid = int(worker.get("pid", 0))
-        derived_status = worker.get("status", "unknown")
-        if derived_status == "running":
-            derived_status = process_state(pid) if pid > 0 else "exited"
+        derived_status = normalize_worker_status(worker)
         completed_runs = int(worker.get("completed_runs", 0))
         repeats = int(worker.get("repeats", 0))
         print(
@@ -732,7 +753,16 @@ def command_wait(args: argparse.Namespace) -> int:
     while True:
         state = load_json(state_dir / "state.json")
         workers = [load_worker_state(state_dir, target["key"]) for target in state["targets"]]
-        statuses = [str(worker.get("status")) for worker in workers]
+        statuses: list[str] = []
+        for worker in workers:
+            derived_status = normalize_worker_status(worker)
+            if str(worker.get("status")) == "running" and derived_status == "failed":
+                worker["status"] = "failed"
+                worker["pid"] = 0
+                worker["failed_at"] = utc_now()
+                worker.setdefault("error", "worker exited unexpectedly before writing final state")
+                write_worker_state(state_dir, str(worker["target_key"]), worker)
+            statuses.append(derived_status)
         if all(status in {"completed", "failed"} for status in statuses):
             break
         if timeout_at is not None and time.time() >= timeout_at:
