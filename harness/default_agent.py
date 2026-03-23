@@ -503,9 +503,12 @@ def build_user_prompt(task: dict[str, Any], *, interactive: bool) -> str:
     editable_file = task["editable_files"][0]
     mode_instructions = (
         "You are in interactive mode.\n"
-        "Use the provided tools to read task-scoped public files, write the editable proof, run the official Lean check, inspect goals if available, and search public definitions.\n"
+        "All implementation, specification, and editable proof files are already provided below. "
+        "Do NOT re-read them with read_public_file — start working immediately.\n"
+        "Workflow: call write_editable_proof with your complete proof file, then call run_lean_check to verify.\n"
+        "If the check fails, read the error, fix the proof, and repeat write_editable_proof + run_lean_check.\n"
+        "Only use read_public_file or search_public_defs if you need a definition not shown below.\n"
         "Do not ask for or attempt arbitrary shell access, arbitrary filesystem access, or files outside this task.\n"
-        "When you are satisfied, return the final complete Lean proof file or leave the final proof in the editable file via the tool.\n"
     ) if interactive else (
         "The harness may give you several bounded repair rounds for the same task.\n"
         "On every round, return the complete editable Lean proof file, not a patch or explanation.\n"
@@ -1238,17 +1241,63 @@ def execute_strict_agent_task(
     return response, response_text, evaluation, attempts
 
 
+def _compact_interactive_transcript(
+    transcript: list[dict[str, Any]],
+    base_message_count: int,
+    proof_text: str,
+    error_details: str,
+    attempt_index: int,
+    max_attempts: int,
+) -> list[dict[str, Any]]:
+    """Compact transcript by keeping base messages + first exploration + compact repair.
+
+    We preserve the initial exploration (file reads, searches) but drop intermediate
+    failed write-check cycles to prevent context pollution and save tokens.
+    The latest failed proof and error are injected as a single user message.
+    """
+    # Find the first write_editable_proof call to split exploration from repair
+    cutoff = len(transcript)
+    for i, msg in enumerate(transcript):
+        if i < base_message_count:
+            continue
+        if msg.get("role") == "assistant":
+            tool_calls = msg.get("tool_calls", [])
+            for tc in tool_calls:
+                fn = tc.get("function", {})
+                if fn.get("name") == "write_editable_proof":
+                    cutoff = i
+                    break
+            if cutoff < len(transcript):
+                break
+
+    # Keep base messages + exploration phase (up to first write), then add repair
+    kept = transcript[:cutoff]
+    guidance = build_repair_guidance(error_details)
+    repair_msg = (
+        f"Your proof attempt (attempt {attempt_index} of {max_attempts}) failed the Lean checker.\n"
+        "Fix the proof and resubmit using write_editable_proof, then call run_lean_check.\n\n"
+        f"Failed proof:\n```lean\n{proof_text.rstrip()}\n```\n\n"
+        f"Lean checker output:\n{error_details}\n"
+    )
+    if guidance:
+        repair_msg += f"\nRepair guidance:\n{guidance}\n"
+    kept.append({"role": "user", "content": repair_msg})
+    return kept
+
+
 def execute_interactive_agent_task(
     config: ResolvedAgentConfig,
     task: dict[str, Any],
     messages: list[dict[str, Any]],
 ) -> tuple[dict[str, Any], str, str, dict[str, Any], list[dict[str, Any]], int]:
     runtime = TaskProofRuntime(task)
+    base_messages: list[dict[str, Any]] = list(messages)
     transcript: list[dict[str, Any]] = list(messages)
     attempts: list[dict[str, Any]] = []
     response: dict[str, Any] = {}
     response_text = ""
     tool_calls_used = 0
+    last_lean_error: str | None = None
 
     for attempt_index in range(1, config.max_attempts + 1):
         response = send_chat_completion(config, transcript, tools=runtime.tool_specs())
@@ -1273,19 +1322,14 @@ def execute_interactive_agent_task(
             attempts[-1]["evaluation"] = evaluation
             if evaluation["status"] == "passed":
                 return response, response_text, runtime.current_proof_text, evaluation, attempts, tool_calls_used
-            # Failed candidate without tool calls: prompt model to use tools and retry
+            # Failed candidate without tool calls: compact and retry
             failure_mode = evaluation.get("failure_mode", "")
             if failure_mode == "lean_check_failed":
                 details = str(evaluation.get("details", ""))[:MAX_ERROR_FEEDBACK_CHARS]
-                guidance = build_repair_guidance(details)
-                retry_msg = (
-                    f"The proof did not pass the Lean checker (attempt {attempt_index} of {config.max_attempts}).\n"
-                    "Use the write_editable_proof tool to submit a corrected complete Lean proof file, "
-                    "then use run_lean_check to verify it.\n\n"
-                    f"Lean checker output:\n{details}\n"
+                transcript = _compact_interactive_transcript(
+                    transcript, len(base_messages), runtime.current_proof_text, details,
+                    attempt_index, config.max_attempts,
                 )
-                if guidance:
-                    retry_msg += f"\nRepair guidance:\n{guidance}\n"
             elif failure_mode in ("empty_response", "placeholder_detected", "theorem_statement_mismatch"):
                 retry_msg = (
                     f"Your response did not produce a valid proof candidate (attempt {attempt_index} of {config.max_attempts}, "
@@ -1294,10 +1338,10 @@ def execute_interactive_agent_task(
                     "then use run_lean_check to verify it.\n"
                     "Do not explain or analyze. Use the tools directly.\n"
                 )
+                transcript.append({"role": "assistant", "content": response_text})
+                transcript.append({"role": "user", "content": retry_msg})
             else:
                 return response, response_text, runtime.current_proof_text, evaluation, attempts, tool_calls_used
-            transcript.append({"role": "assistant", "content": response_text})
-            transcript.append({"role": "user", "content": retry_msg})
             continue
 
         message = response.get("choices", [{}])[0].get("message", {})
@@ -1308,6 +1352,7 @@ def execute_interactive_agent_task(
                 "tool_calls": tool_calls,
             }
         )
+        saw_lean_failure = False
         for tool_call in tool_calls:
             if tool_calls_used >= config.max_tool_calls:
                 evaluation = runtime.evaluate_current()
@@ -1340,6 +1385,21 @@ def execute_interactive_agent_task(
                     "arguments": arguments,
                     "result": result,
                 }
+            )
+            if tool_name == "run_lean_check" and result.get("failure_mode") == "lean_check_failed":
+                last_lean_error = str(result.get("details", ""))[:MAX_ERROR_FEEDBACK_CHARS]
+                saw_lean_failure = True
+            elif tool_name == "run_lean_check" and result.get("status") == "passed":
+                evaluation = result
+                attempts[-1]["candidate_file_contents"] = runtime.current_proof_text
+                attempts[-1]["evaluation"] = evaluation
+                return response, response_text, runtime.current_proof_text, evaluation, attempts, tool_calls_used
+
+        # After processing all tool calls, compact transcript if we saw a lean failure
+        if saw_lean_failure and last_lean_error:
+            transcript = _compact_interactive_transcript(
+                transcript, len(base_messages), runtime.current_proof_text, last_lean_error,
+                attempt_index, config.max_attempts,
             )
 
     evaluation = runtime.evaluate_current()
