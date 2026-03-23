@@ -662,13 +662,14 @@ def send_chat_completion(
     messages: list[dict[str, Any]],
     *,
     tools: list[dict[str, Any]] | None = None,
+    max_tokens_override: int | None = None,
 ) -> dict[str, Any]:
     url = f"{config.base_url}{config.chat_completions_path}"
     payload = {
         "model": config.model,
         "messages": messages,
         "temperature": config.temperature,
-        "max_tokens": config.max_completion_tokens,
+        "max_tokens": max_tokens_override or config.max_completion_tokens,
     }
     if tools:
         payload["tools"] = tools
@@ -1346,14 +1347,50 @@ def execute_interactive_agent_task(
     consecutive_lean_failures = 0
     proof_attempts = 0
     consecutive_search_turns = 0
+    consecutive_length_stops = 0
     max_total_turns = config.max_attempts * 2  # hard cap to prevent infinite loops
+    token_budget = config.max_completion_tokens
 
     turn = 0
     while proof_attempts < config.max_attempts and turn < max_total_turns:
         turn += 1
-        response = send_chat_completion(config, transcript, tools=runtime.tool_specs())
+        response = send_chat_completion(
+            config, transcript, tools=runtime.tool_specs(),
+            max_tokens_override=token_budget if token_budget != config.max_completion_tokens else None,
+        )
         response_text = extract_text(response)
         tool_calls = extract_tool_calls(response)
+
+        # Detect finish_reason=length with no usable output (model hit token limit
+        # during internal reasoning). Bump token budget and retry without counting
+        # this as a proof attempt.
+        finish_reason = ""
+        choices = response.get("choices", [])
+        if choices:
+            finish_reason = choices[0].get("finish_reason", "")
+        if finish_reason == "length" and not tool_calls and not response_text.strip():
+            consecutive_length_stops += 1
+            if consecutive_length_stops == 1:
+                # First length stop: bump token budget once and retry silently
+                token_budget = min(int(token_budget * 1.5), 4500)
+                continue
+            # Subsequent length stops: inject a nudge to simplify and use tools
+            transcript.append({"role": "assistant", "content": ""})
+            transcript.append({
+                "role": "user",
+                "content": (
+                    "Your response was cut off. Do not over-think. "
+                    "Immediately call write_editable_proof with a simple proof attempt, "
+                    "then call run_lean_check. Keep the proof short."
+                ),
+            })
+            if consecutive_length_stops >= 3:
+                # Reset budget back to configured value after persistent overruns
+                token_budget = config.max_completion_tokens
+            continue
+        else:
+            consecutive_length_stops = 0
+
         attempts.append(
             {
                 "attempt": turn,
@@ -1370,33 +1407,41 @@ def execute_interactive_agent_task(
             if final_candidate.strip():
                 runtime.write_editable_proof(final_candidate)
                 proof_attempts += 1
-            evaluation = runtime.evaluate_current()
-            attempts[-1]["candidate_file_contents"] = runtime.current_proof_text
-            attempts[-1]["evaluation"] = evaluation
-            if evaluation["status"] == "passed":
-                return response, response_text, runtime.current_proof_text, evaluation, attempts, tool_calls_used
-            # Failed candidate without tool calls: compact and retry
-            failure_mode = evaluation.get("failure_mode", "")
-            if failure_mode == "lean_check_failed":
-                consecutive_lean_failures += 1
-                details = str(evaluation.get("details", ""))[:MAX_ERROR_FEEDBACK_CHARS]
-                transcript = _compact_interactive_transcript(
-                    transcript, len(base_messages), runtime.current_proof_text, details,
-                    proof_attempts, config.max_attempts,
-                    consecutive_failures=consecutive_lean_failures,
-                )
-            elif failure_mode in ("empty_response", "placeholder_detected", "theorem_statement_mismatch"):
-                retry_msg = (
-                    f"Your response did not produce a valid proof candidate (proof attempt {proof_attempts} of {config.max_attempts}, "
-                    f"failure: {failure_mode}).\n"
-                    "Use the write_editable_proof tool to submit the complete editable Lean proof file, "
-                    "then use run_lean_check to verify it.\n"
-                    "Do not explain or analyze. Use the tools directly.\n"
-                )
-                transcript.append({"role": "assistant", "content": response_text})
-                transcript.append({"role": "user", "content": retry_msg})
+                evaluation = runtime.evaluate_current()
+                attempts[-1]["candidate_file_contents"] = runtime.current_proof_text
+                attempts[-1]["evaluation"] = evaluation
+                if evaluation["status"] == "passed":
+                    return response, response_text, runtime.current_proof_text, evaluation, attempts, tool_calls_used
+                # Failed candidate without tool calls: compact and retry
+                failure_mode = evaluation.get("failure_mode", "")
+                if failure_mode == "lean_check_failed":
+                    consecutive_lean_failures += 1
+                    details = str(evaluation.get("details", ""))[:MAX_ERROR_FEEDBACK_CHARS]
+                    transcript = _compact_interactive_transcript(
+                        transcript, len(base_messages), runtime.current_proof_text, details,
+                        proof_attempts, config.max_attempts,
+                        consecutive_failures=consecutive_lean_failures,
+                    )
+                elif failure_mode in ("placeholder_detected", "theorem_statement_mismatch"):
+                    retry_msg = (
+                        f"Your response did not produce a valid proof candidate (proof attempt {proof_attempts} of {config.max_attempts}, "
+                        f"failure: {failure_mode}).\n"
+                        "Use the write_editable_proof tool to submit the complete editable Lean proof file, "
+                        "then use run_lean_check to verify it.\n"
+                        "Do not explain or analyze. Use the tools directly.\n"
+                    )
+                    transcript.append({"role": "assistant", "content": response_text})
+                    transcript.append({"role": "user", "content": retry_msg})
+                else:
+                    return response, response_text, runtime.current_proof_text, evaluation, attempts, tool_calls_used
             else:
-                return response, response_text, runtime.current_proof_text, evaluation, attempts, tool_calls_used
+                # Empty response or no valid candidate: nudge model to use tools
+                nudge_msg = (
+                    "You must use the write_editable_proof tool to submit your proof, "
+                    "then call run_lean_check to verify it. Do not respond with text only.\n"
+                )
+                transcript.append({"role": "assistant", "content": response_text or ""})
+                transcript.append({"role": "user", "content": nudge_msg})
             continue
 
         transcript.append(
