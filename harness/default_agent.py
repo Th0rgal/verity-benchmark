@@ -537,6 +537,11 @@ def extract_contract_branches(task: dict[str, Any]) -> list[str]:
             cond = m.group(1).strip()
             if cond not in branches:
                 branches.append(cond)
+        # Match 'ite (<condition>)' patterns (e.g., ite (nodeIndex == 3) ...)
+        for m in re.finditer(r"\bite\s+\((.+?)\)", content):
+            cond = m.group(1).strip()
+            if cond not in branches:
+                branches.append(cond)
     return branches
 
 

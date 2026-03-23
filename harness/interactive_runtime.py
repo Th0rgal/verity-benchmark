@@ -41,6 +41,8 @@ class TaskProofRuntime:
         editable_rel_path = editable_files[0]
         self._check_history: list[str] = []  # failure_class history for stagnation detection
         self._task = task  # store for hint escalation
+        self._best_error_count: int | None = None
+        self._best_first_error_line: int | None = None
         self.paths = RuntimePaths(
             editable_rel_path=editable_rel_path,
             theorem_name=str(task["theorem_name"]),
@@ -398,13 +400,37 @@ class TaskProofRuntime:
         if hints:
             annotated["repair_hints"] = hints
 
-        # Add structured error summary
+        # Add structured error summary with progress tracking
         error_lines: list[int] = []
         for match in re.finditer(r":(\d+):\d+: error:", details):
             error_lines.append(int(match.group(1)))
         if error_lines:
-            annotated["error_count"] = len(error_lines)
-            annotated["first_error_line"] = min(error_lines)
+            error_count = len(error_lines)
+            first_error = min(error_lines)
+            annotated["error_count"] = error_count
+            annotated["first_error_line"] = first_error
+
+            # Track progress relative to best seen
+            progress_parts: list[str] = []
+            if self._best_error_count is not None:
+                if error_count < self._best_error_count:
+                    progress_parts.append(f"errors reduced ({self._best_error_count} -> {error_count})")
+                elif error_count > self._best_error_count:
+                    progress_parts.append(f"errors increased ({self._best_error_count} -> {error_count}), reverting direction")
+            if self._best_first_error_line is not None:
+                if first_error > self._best_first_error_line:
+                    progress_parts.append(f"first error moved deeper (line {self._best_first_error_line} -> {first_error})")
+                elif first_error < self._best_first_error_line:
+                    progress_parts.append(f"first error moved earlier (line {self._best_first_error_line} -> {first_error})")
+
+            if progress_parts:
+                annotated["progress"] = "; ".join(progress_parts)
+
+            # Update best-seen metrics
+            if self._best_error_count is None or error_count < self._best_error_count:
+                self._best_error_count = error_count
+            if self._best_first_error_line is None or first_error > self._best_first_error_line:
+                self._best_first_error_line = first_error
 
         return annotated
 
