@@ -1,0 +1,728 @@
+{
+  "schema_version": 1,
+  "task_ref": "nexus_mutual/ramm_price_band/sync_sets_book_value",
+  "task_id": "sync_sets_book_value",
+  "case_id": "nexus_mutual/ramm_price_band",
+  "timestamp": "2026-03-23T17:42:34Z",
+  "dry_run": false,
+  "status": "passed",
+  "theorem_name": "Benchmark.Cases.NexusMutual.RammPriceBand.syncPriceBand_sets_book_value",
+  "proof_family": "functional_correctness",
+  "implementation_files": [
+    "cases/nexus_mutual/ramm_price_band/verity/Contract.lean",
+    "Benchmark/Cases/NexusMutual/RammPriceBand/Contract.lean"
+  ],
+  "specification_files": [
+    "cases/nexus_mutual/ramm_price_band/verity/Specs.lean",
+    "Benchmark/Cases/NexusMutual/RammPriceBand/Specs.lean"
+  ],
+  "editable_files": [
+    "Benchmark/Generated/NexusMutual/RammPriceBand/Tasks/SyncSetsBookValue.lean"
+  ],
+  "agent": {
+    "profile": null,
+    "agent_id": "openai-interactive",
+    "mode": "interactive",
+    "track": "custom",
+    "run_slug": "interactive-candidate",
+    "adapter": "openai_compatible",
+    "config_path": "harness/agents/interactive-candidate.json",
+    "base_url": "https://agent-backend.thomas.md/v1",
+    "base_url_env": "VERITY_BENCHMARK_AGENT_BASE_URL",
+    "model": "builtin/fast",
+    "model_env": "VERITY_BENCHMARK_AGENT_MODEL",
+    "api_key_env": "VERITY_BENCHMARK_AGENT_API_KEY",
+    "chat_completions_path": "/chat/completions",
+    "models_path": "/models",
+    "system_prompt_files": [
+      "harness/PROMPT.md",
+      "harness/POLICY.md",
+      "harness/TOOLS.md",
+      "harness/PROOF_PATTERNS.md"
+    ],
+    "temperature": 0.0,
+    "max_completion_tokens": 2000,
+    "max_attempts": 16,
+    "max_tool_calls": 24,
+    "request_timeout_seconds": 120,
+    "headers": {},
+    "header_envs": {},
+    "env_contract": {
+      "required": [
+        "VERITY_BENCHMARK_AGENT_API_KEY",
+        "VERITY_BENCHMARK_AGENT_BASE_URL",
+        "VERITY_BENCHMARK_AGENT_MODEL"
+      ],
+      "optional": []
+    },
+    "extra_body": {
+      "thinking": {
+        "type": "disabled"
+      }
+    },
+    "command": []
+  },
+  "messages": [
+    {
+      "role": "system",
+      "content": "[harness/PROMPT.md]\n# Harness Prompt\n\nEach task gives the agent:\n- fixed implementation files\n- fixed specification files\n- one editable proof file\n- one theorem target\n\nThe agent must return the full proof file. It must not change specs, change implementations, or rely on hidden solved proofs.\n\nThe harness rejects placeholders, runs Lean in a temp workspace, and checks the target theorem.\n\n[harness/POLICY.md]\n# Harness Policy\n\n- `tasks/*.yaml` is the execution unit.\n- The task manifest defines the proof contract.\n- Only run tasks with `proof_status` `partial` or `complete`.\n- Write deterministic outputs under `results/tasks/`.\n\n[harness/TOOLS.md]\n# Harness Tools\n\nThe fixed harness uses only repo-local tools:\n- `lake build <target>`\n- `scripts/run_task.sh`\n- `scripts/run_all.sh`\n\nThe tool surface stays narrow so runs remain comparable.\n\n[harness/PROOF_PATTERNS.md]\n# Proof Patterns\n\nUse public operational proof patterns, not hidden case solutions.\n\nVerity execution proofs often reduce with `simp` once the execution path is fixed.\nTypical symbols to unfold or simplify are:\n\n- `getStorage`, `setStorage`, `setMapping`, `setMappingUint`\n- `Verity.require`, `Verity.bind`, `Bind.bind`\n- `Verity.pure`, `Pure.pure`\n- `Contract.run`, `ContractResult.snd`\n- the contract's storage labels, such as `ContractName.counter`\n\nCommon pattern for a successful-path slot-write theorem:\n\n```lean\nprivate theorem slot_write_helper\n    (x : Uint256) (s : ContractState)\n    (hGuard : ...) :\n    let s' := ((ContractName.fn x).run s).snd\n    s'.storage slot = expected := by\n  simp [ContractName.fn, hGuard, ContractName.slotField,\n    getStorage, setStorage, Verity.require, Verity.bind, Bind.bind,\n    Verity.pure, Pure.pure, Contract.run, ContractResult.snd]\n```\n\nCommon pattern for a branch theorem:\n\n```lean\nby_cases hBranch : condition\n\u00b7 simp [ContractName.fn, hBranch, ...]\n\u00b7 have hNotBranch : \u00ac condition := hBranch\n  simp [ContractName.fn, hNotBranch, ...]\n```\n\nDo not use `split` on the final post-state goal unless the goal itself is explicitly a conjunction or a sum-type elimination. Generated Verity execution terms often simplify better if you first prove the exact branch facts used by the contract and then call `simp`.\n\nFor arithmetic threshold branches, the negated fact often needs to be restated in the comparator form used by the generated code. Example:\n\n```lean\nhave hNotFull : \u00ac 32000000000 \u2264 depositAmount := Nat.not_le_of_lt hSmall\nsimp [ContractName.fn, hCount, hMin, hNotFull, ...]\n```\n\nIf one theorem has to work for both sides of a branch, prove two private helpers first, one per branch, then use `by_cases` in the public theorem and `simpa using` the matching helper.\n\nIf `simp` reduces the goal to concrete slot equalities or a finite `if` over concrete slot numbers, `native_decide` or `decide` often closes the remaining goal.\n\nTypical shape:\n\n```lean\nhave hSlot : s'.storage slot = expected := by\n  simp [ContractName.fn, hGuard, ...]\n  native_decide\n```\n\nIf `simp` already solves the goal, do not leave a trailing `decide`, `exact`, or extra tactic line after it; Lean will report `no goals to be solved`.\n\nIf the public theorem is just a named spec, it is often cleaner to:\n\n1. prove a private helper theorem about the concrete post-state slots,\n2. unfold the spec,\n3. finish with `simpa using ...`."
+    },
+    {
+      "role": "user",
+      "content": "You are running the default benchmark agent for verity-benchmark.\nTreat this as a strict proof-generation benchmark.\nDo not invent specs, modify implementations, or rely on hidden reference proofs.\n\nYou are in interactive mode.\nAll implementation, specification, and editable proof files are already provided below. Do NOT re-read them with read_public_file \u2014 start working immediately.\nWorkflow: call write_editable_proof with your complete proof file, then call run_lean_check to verify.\nIf the check fails, read the error, fix the proof, and repeat write_editable_proof + run_lean_check.\nOnly use read_public_file or search_public_defs if you need a definition not shown below.\nDo not ask for or attempt arbitrary shell access, arbitrary filesystem access, or files outside this task.\n\nDo not claim that you will inspect more files or run commands.\nReason only from the task payload and the file contents included below.\nReturn Lean code only if you answer with a final proof file.\nTask ref: nexus_mutual/ramm_price_band/sync_sets_book_value\nTheorem name: Benchmark.Cases.NexusMutual.RammPriceBand.syncPriceBand_sets_book_value\nProof family: functional_correctness\nEditable file: Benchmark/Generated/NexusMutual/RammPriceBand/Tasks/SyncSetsBookValue.lean\n\nImplementation file contents:\n[Benchmark/Cases/NexusMutual/RammPriceBand/Contract.lean]\nimport Contracts.Common\n\nnamespace Benchmark.Cases.NexusMutual.RammPriceBand\n\nopen Verity hiding pure bind\nopen Verity.EVM.Uint256\nopen Verity.Stdlib.Math\n\n/-\n  Focused Verity slice of Nexus Mutual's RAMM pricing surface.\n  The real contract derives buy and sell prices from reserves, ratchets, and a\n  1% buffer around book value. This benchmark freezes that invariant-relevant\n  boundary computation and omits reserve adjustment, TWAP, and swap execution.\n-/\nverity_contract RammPriceBand where\n  storage\n    capital : Uint256 := slot 0\n    supply : Uint256 := slot 1\n    bookValue : Uint256 := slot 2\n    buySpotPrice : Uint256 := slot 3\n    sellSpotPrice : Uint256 := slot 4\n\n  function syncPriceBand (capital_ : Uint256, supply_ : Uint256) : Unit := do\n    require (supply_ != 0) \"SupplyMustBePositive\"\n\n    let bv := div (mul 1000000000000000000 capital_) supply_\n    let buy := div (mul bv 10100) 10000\n    let sell := div (mul bv 9900) 10000\n\n    setStorage capital capital_\n    setStorage supply supply_\n    setStorage bookValue bv\n    setStorage buySpotPrice buy\n    setStorage sellSpotPrice sell\n\nend Benchmark.Cases.NexusMutual.RammPriceBand\n\nSpecification file contents:\n[Benchmark/Cases/NexusMutual/RammPriceBand/Specs.lean]\nimport Verity.Specs.Common\nimport Benchmark.Cases.NexusMutual.RammPriceBand.Contract\n\nnamespace Benchmark.Cases.NexusMutual.RammPriceBand\n\nopen Verity\nopen Verity.EVM.Uint256\n\ndef syncPriceBand_sets_capital_spec\n    (capital_ : Uint256) (_s s' : ContractState) : Prop :=\n  s'.storage 0 = capital_\n\ndef syncPriceBand_sets_book_value_spec\n    (capital_ supply_ : Uint256) (_s s' : ContractState) : Prop :=\n  s'.storage 2 = div (mul 1000000000000000000 capital_) supply_\n\ndef syncPriceBand_sets_buy_price_spec\n    (capital_ supply_ : Uint256) (_s s' : ContractState) : Prop :=\n  let bv := div (mul 1000000000000000000 capital_) supply_\n  s'.storage 3 = div (mul bv 10100) 10000\n\ndef syncPriceBand_sets_sell_price_spec\n    (capital_ supply_ : Uint256) (_s s' : ContractState) : Prop :=\n  let bv := div (mul 1000000000000000000 capital_) supply_\n  s'.storage 4 = div (mul bv 9900) 10000\n\nend Benchmark.Cases.NexusMutual.RammPriceBand\n\nEditable proof template contents:\n[Benchmark/Generated/NexusMutual/RammPriceBand/Tasks/SyncSetsBookValue.lean]\nimport Benchmark.Cases.NexusMutual.RammPriceBand.Specs\n\nnamespace Benchmark.Cases.NexusMutual.RammPriceBand\n\nopen Verity\nopen Verity.EVM.Uint256\n\n/--\nExecuting `syncPriceBand` stores the synchronized book value.\n-/\ntheorem syncPriceBand_sets_book_value\n    (capital_ supply_ : Uint256) (s : ContractState)\n    (hSupply : supply_ != 0) :\n    let s' := ((RammPriceBand.syncPriceBand capital_ supply_).run s).snd\n    syncPriceBand_sets_book_value_spec capital_ supply_ s s' := by\n  -- Replace this placeholder with a complete Lean proof.\n  exact ?_\n\nend Benchmark.Cases.NexusMutual.RammPriceBand\n\nPublic proof hints:\n- Verity execution proofs often need `simp` with the operational definitions, not just the theorem spec.\n- Useful simplification symbols are often: `getStorage`, `setStorage`, `Verity.require`, `Verity.bind`, `Bind.bind`, `Verity.pure`, `Pure.pure`, `Contract.run`, and `ContractResult.snd`.\n- If `simp` gets stuck on a conditional execution path, prove branch-specific private helper theorems with explicit hypotheses instead of splitting the final post-state directly.\n- If helpful, add imports required for proof automation, for example `import Verity.Proofs.Stdlib.Automation`.\n- For functional-correctness theorems, unfold the spec to the mathematical target form before simplifying the execution result.\n"
+    }
+  ],
+  "evaluation": {
+    "status": "passed",
+    "failure_mode": null,
+    "details": "Benchmark.Cases.NexusMutual.RammPriceBand.syncPriceBand_sets_book_value (capital_ supply_ : Verity.Uint256)\n  (s : Verity.ContractState) (hSupply : (supply_ != 0) = true) :\n  have s' := ((Benchmark.Cases.NexusMutual.RammPriceBand.RammPriceBand.syncPriceBand capital_ supply_).run s).snd;\n  Benchmark.Cases.NexusMutual.RammPriceBand.syncPriceBand_sets_book_value_spec capital_ supply_ s s'",
+    "command": [
+      "lake",
+      "env",
+      "lean",
+      "--root=.",
+      "CandidateCheck.lean"
+    ],
+    "candidate_workspace": "Benchmark/Generated/NexusMutual/RammPriceBand/Tasks/SyncSetsBookValue.lean"
+  },
+  "elapsed_seconds": 20.693,
+  "response": {
+    "choices": [
+      {
+        "finish_reason": "tool_calls",
+        "index": 0,
+        "message": {
+          "content": "",
+          "role": "assistant",
+          "tool_calls": [
+            {
+              "function": {
+                "arguments": "{}",
+                "name": "run_lean_check"
+              },
+              "id": "call_-7780044085145889507",
+              "index": 0,
+              "type": "function"
+            }
+          ]
+        }
+      }
+    ],
+    "created": 1774287752,
+    "id": "20260324014231a624f98c672848ea",
+    "model": "glm-5-turbo",
+    "object": "chat.completion",
+    "request_id": "20260324014231a624f98c672848ea",
+    "usage": {
+      "completion_tokens": 7,
+      "completion_tokens_details": {
+        "reasoning_tokens": 0
+      },
+      "prompt_tokens": 4631,
+      "prompt_tokens_details": {
+        "cached_tokens": 4245
+      },
+      "total_tokens": 4638
+    }
+  },
+  "response_text": "",
+  "candidate_file_contents": "import Benchmark.Cases.NexusMutual.RammPriceBand.Specs\n\nnamespace Benchmark.Cases.NexusMutual.RammPriceBand\n\nopen Verity\nopen Verity.EVM.Uint256\n\nprivate theorem sync_sets_book_value_helper\n    (capital_ supply_ : Uint256) (s : ContractState)\n    (hSupply : supply_ != 0) :\n    let s' := ((RammPriceBand.syncPriceBand capital_ supply_).run s).snd\n    s'.storage 2 = div (mul 1000000000000000000 capital_) supply_ := by\n  simp [RammPriceBand.syncPriceBand, hSupply, RammPriceBand.bookValue,\n    RammPriceBand.sellSpotPrice, RammPriceBand.buySpotPrice,\n    setStorage, Verity.require, Verity.bind, Bind.bind,\n    Contract.run, ContractResult.snd]\n\n/--\nExecuting `syncPriceBand` stores the synchronized book value.\n-/\ntheorem syncPriceBand_sets_book_value\n    (capital_ supply_ : Uint256) (s : ContractState)\n    (hSupply : supply_ != 0) :\n    let s' := ((RammPriceBand.syncPriceBand capital_ supply_).run s).snd\n    syncPriceBand_sets_book_value_spec capital_ supply_ s s' := by\n  unfold syncPriceBand_sets_book_value_spec\n  simpa using sync_sets_book_value_helper capital_ supply_ s hSupply\n\nend Benchmark.Cases.NexusMutual.RammPriceBand\n",
+  "attempts": [
+    {
+      "attempt": 1,
+      "mode": "interactive",
+      "messages": [
+        {
+          "role": "system",
+          "content": "[harness/PROMPT.md]\n# Harness Prompt\n\nEach task gives the agent:\n- fixed implementation files\n- fixed specification files\n- one editable proof file\n- one theorem target\n\nThe agent must return the full proof file. It must not change specs, change implementations, or rely on hidden solved proofs.\n\nThe harness rejects placeholders, runs Lean in a temp workspace, and checks the target theorem.\n\n[harness/POLICY.md]\n# Harness Policy\n\n- `tasks/*.yaml` is the execution unit.\n- The task manifest defines the proof contract.\n- Only run tasks with `proof_status` `partial` or `complete`.\n- Write deterministic outputs under `results/tasks/`.\n\n[harness/TOOLS.md]\n# Harness Tools\n\nThe fixed harness uses only repo-local tools:\n- `lake build <target>`\n- `scripts/run_task.sh`\n- `scripts/run_all.sh`\n\nThe tool surface stays narrow so runs remain comparable.\n\n[harness/PROOF_PATTERNS.md]\n# Proof Patterns\n\nUse public operational proof patterns, not hidden case solutions.\n\nVerity execution proofs often reduce with `simp` once the execution path is fixed.\nTypical symbols to unfold or simplify are:\n\n- `getStorage`, `setStorage`, `setMapping`, `setMappingUint`\n- `Verity.require`, `Verity.bind`, `Bind.bind`\n- `Verity.pure`, `Pure.pure`\n- `Contract.run`, `ContractResult.snd`\n- the contract's storage labels, such as `ContractName.counter`\n\nCommon pattern for a successful-path slot-write theorem:\n\n```lean\nprivate theorem slot_write_helper\n    (x : Uint256) (s : ContractState)\n    (hGuard : ...) :\n    let s' := ((ContractName.fn x).run s).snd\n    s'.storage slot = expected := by\n  simp [ContractName.fn, hGuard, ContractName.slotField,\n    getStorage, setStorage, Verity.require, Verity.bind, Bind.bind,\n    Verity.pure, Pure.pure, Contract.run, ContractResult.snd]\n```\n\nCommon pattern for a branch theorem:\n\n```lean\nby_cases hBranch : condition\n\u00b7 simp [ContractName.fn, hBranch, ...]\n\u00b7 have hNotBranch : \u00ac condition := hBranch\n  simp [ContractName.fn, hNotBranch, ...]\n```\n\nDo not use `split` on the final post-state goal unless the goal itself is explicitly a conjunction or a sum-type elimination. Generated Verity execution terms often simplify better if you first prove the exact branch facts used by the contract and then call `simp`.\n\nFor arithmetic threshold branches, the negated fact often needs to be restated in the comparator form used by the generated code. Example:\n\n```lean\nhave hNotFull : \u00ac 32000000000 \u2264 depositAmount := Nat.not_le_of_lt hSmall\nsimp [ContractName.fn, hCount, hMin, hNotFull, ...]\n```\n\nIf one theorem has to work for both sides of a branch, prove two private helpers first, one per branch, then use `by_cases` in the public theorem and `simpa using` the matching helper.\n\nIf `simp` reduces the goal to concrete slot equalities or a finite `if` over concrete slot numbers, `native_decide` or `decide` often closes the remaining goal.\n\nTypical shape:\n\n```lean\nhave hSlot : s'.storage slot = expected := by\n  simp [ContractName.fn, hGuard, ...]\n  native_decide\n```\n\nIf `simp` already solves the goal, do not leave a trailing `decide`, `exact`, or extra tactic line after it; Lean will report `no goals to be solved`.\n\nIf the public theorem is just a named spec, it is often cleaner to:\n\n1. prove a private helper theorem about the concrete post-state slots,\n2. unfold the spec,\n3. finish with `simpa using ...`."
+        },
+        {
+          "role": "user",
+          "content": "You are running the default benchmark agent for verity-benchmark.\nTreat this as a strict proof-generation benchmark.\nDo not invent specs, modify implementations, or rely on hidden reference proofs.\n\nYou are in interactive mode.\nAll implementation, specification, and editable proof files are already provided below. Do NOT re-read them with read_public_file \u2014 start working immediately.\nWorkflow: call write_editable_proof with your complete proof file, then call run_lean_check to verify.\nIf the check fails, read the error, fix the proof, and repeat write_editable_proof + run_lean_check.\nOnly use read_public_file or search_public_defs if you need a definition not shown below.\nDo not ask for or attempt arbitrary shell access, arbitrary filesystem access, or files outside this task.\n\nDo not claim that you will inspect more files or run commands.\nReason only from the task payload and the file contents included below.\nReturn Lean code only if you answer with a final proof file.\nTask ref: nexus_mutual/ramm_price_band/sync_sets_book_value\nTheorem name: Benchmark.Cases.NexusMutual.RammPriceBand.syncPriceBand_sets_book_value\nProof family: functional_correctness\nEditable file: Benchmark/Generated/NexusMutual/RammPriceBand/Tasks/SyncSetsBookValue.lean\n\nImplementation file contents:\n[Benchmark/Cases/NexusMutual/RammPriceBand/Contract.lean]\nimport Contracts.Common\n\nnamespace Benchmark.Cases.NexusMutual.RammPriceBand\n\nopen Verity hiding pure bind\nopen Verity.EVM.Uint256\nopen Verity.Stdlib.Math\n\n/-\n  Focused Verity slice of Nexus Mutual's RAMM pricing surface.\n  The real contract derives buy and sell prices from reserves, ratchets, and a\n  1% buffer around book value. This benchmark freezes that invariant-relevant\n  boundary computation and omits reserve adjustment, TWAP, and swap execution.\n-/\nverity_contract RammPriceBand where\n  storage\n    capital : Uint256 := slot 0\n    supply : Uint256 := slot 1\n    bookValue : Uint256 := slot 2\n    buySpotPrice : Uint256 := slot 3\n    sellSpotPrice : Uint256 := slot 4\n\n  function syncPriceBand (capital_ : Uint256, supply_ : Uint256) : Unit := do\n    require (supply_ != 0) \"SupplyMustBePositive\"\n\n    let bv := div (mul 1000000000000000000 capital_) supply_\n    let buy := div (mul bv 10100) 10000\n    let sell := div (mul bv 9900) 10000\n\n    setStorage capital capital_\n    setStorage supply supply_\n    setStorage bookValue bv\n    setStorage buySpotPrice buy\n    setStorage sellSpotPrice sell\n\nend Benchmark.Cases.NexusMutual.RammPriceBand\n\nSpecification file contents:\n[Benchmark/Cases/NexusMutual/RammPriceBand/Specs.lean]\nimport Verity.Specs.Common\nimport Benchmark.Cases.NexusMutual.RammPriceBand.Contract\n\nnamespace Benchmark.Cases.NexusMutual.RammPriceBand\n\nopen Verity\nopen Verity.EVM.Uint256\n\ndef syncPriceBand_sets_capital_spec\n    (capital_ : Uint256) (_s s' : ContractState) : Prop :=\n  s'.storage 0 = capital_\n\ndef syncPriceBand_sets_book_value_spec\n    (capital_ supply_ : Uint256) (_s s' : ContractState) : Prop :=\n  s'.storage 2 = div (mul 1000000000000000000 capital_) supply_\n\ndef syncPriceBand_sets_buy_price_spec\n    (capital_ supply_ : Uint256) (_s s' : ContractState) : Prop :=\n  let bv := div (mul 1000000000000000000 capital_) supply_\n  s'.storage 3 = div (mul bv 10100) 10000\n\ndef syncPriceBand_sets_sell_price_spec\n    (capital_ supply_ : Uint256) (_s s' : ContractState) : Prop :=\n  let bv := div (mul 1000000000000000000 capital_) supply_\n  s'.storage 4 = div (mul bv 9900) 10000\n\nend Benchmark.Cases.NexusMutual.RammPriceBand\n\nEditable proof template contents:\n[Benchmark/Generated/NexusMutual/RammPriceBand/Tasks/SyncSetsBookValue.lean]\nimport Benchmark.Cases.NexusMutual.RammPriceBand.Specs\n\nnamespace Benchmark.Cases.NexusMutual.RammPriceBand\n\nopen Verity\nopen Verity.EVM.Uint256\n\n/--\nExecuting `syncPriceBand` stores the synchronized book value.\n-/\ntheorem syncPriceBand_sets_book_value\n    (capital_ supply_ : Uint256) (s : ContractState)\n    (hSupply : supply_ != 0) :\n    let s' := ((RammPriceBand.syncPriceBand capital_ supply_).run s).snd\n    syncPriceBand_sets_book_value_spec capital_ supply_ s s' := by\n  -- Replace this placeholder with a complete Lean proof.\n  exact ?_\n\nend Benchmark.Cases.NexusMutual.RammPriceBand\n\nPublic proof hints:\n- Verity execution proofs often need `simp` with the operational definitions, not just the theorem spec.\n- Useful simplification symbols are often: `getStorage`, `setStorage`, `Verity.require`, `Verity.bind`, `Bind.bind`, `Verity.pure`, `Pure.pure`, `Contract.run`, and `ContractResult.snd`.\n- If `simp` gets stuck on a conditional execution path, prove branch-specific private helper theorems with explicit hypotheses instead of splitting the final post-state directly.\n- If helpful, add imports required for proof automation, for example `import Verity.Proofs.Stdlib.Automation`.\n- For functional-correctness theorems, unfold the spec to the mathematical target form before simplifying the execution result.\n"
+        }
+      ],
+      "response": {
+        "choices": [
+          {
+            "finish_reason": "tool_calls",
+            "index": 0,
+            "message": {
+              "content": "",
+              "role": "assistant",
+              "tool_calls": [
+                {
+                  "function": {
+                    "arguments": "{\"content\":\"import Benchmark.Cases.NexusMutual.RammPriceBand.Specs\\n\\nnamespace Benchmark.Cases.NexusMutual.RammPriceBand\\n\\nopen Verity\\nopen Verity.EVM.Uint256\\n\\nprivate theorem sync_sets_book_value_helper\\n    (capital_ supply_ : Uint256) (s : ContractState)\\n    (hSupply : supply_ != 0) :\\n    let s' := ((RammPriceBand.syncPriceBand capital_ supply_).run s).snd\\n    s'.storage 2 = div (mul 1000000000000000000 capital_) supply_ := by\\n  simp [RammPriceBand.syncPriceBand, hSupply, RammPriceBand.bookValue,\\n    getStorage, setStorage, Verity.require, Verity.bind, Bind.bind,\\n    Verity.pure, Pure.pure, Contract.run, ContractResult.snd]\\n\\n/--\\nExecuting `syncPriceBand` stores the synchronized book value.\\n-/\\ntheorem syncPriceBand_sets_book_value\\n    (capital_ supply_ : Uint256) (s : ContractState)\\n    (hSupply : supply_ != 0) :\\n    let s' := ((RammPriceBand.syncPriceBand capital_ supply_).run s).snd\\n    syncPriceBand_sets_book_value_spec capital_ supply_ s s' := by\\n  unfold syncPriceBand_sets_book_value_spec\\n  simpa using sync_sets_book_value_helper capital_ supply_ s hSupply\\n\\nend Benchmark.Cases.NexusMutual.RammPriceBand\\n\"}",
+                    "name": "write_editable_proof"
+                  },
+                  "id": "call_-7780028932501272224",
+                  "index": 0,
+                  "type": "function"
+                }
+              ]
+            }
+          }
+        ],
+        "created": 1774287737,
+        "id": "20260324014213accd47f5e4a148f0",
+        "model": "glm-5-turbo",
+        "object": "chat.completion",
+        "request_id": "20260324014213accd47f5e4a148f0",
+        "usage": {
+          "completion_tokens": 326,
+          "completion_tokens_details": {
+            "reasoning_tokens": 0
+          },
+          "prompt_tokens": 2594,
+          "prompt_tokens_details": {
+            "cached_tokens": 2592
+          },
+          "total_tokens": 2920
+        }
+      },
+      "response_text": "",
+      "tool_calls": [
+        {
+          "function": {
+            "arguments": "{\"content\":\"import Benchmark.Cases.NexusMutual.RammPriceBand.Specs\\n\\nnamespace Benchmark.Cases.NexusMutual.RammPriceBand\\n\\nopen Verity\\nopen Verity.EVM.Uint256\\n\\nprivate theorem sync_sets_book_value_helper\\n    (capital_ supply_ : Uint256) (s : ContractState)\\n    (hSupply : supply_ != 0) :\\n    let s' := ((RammPriceBand.syncPriceBand capital_ supply_).run s).snd\\n    s'.storage 2 = div (mul 1000000000000000000 capital_) supply_ := by\\n  simp [RammPriceBand.syncPriceBand, hSupply, RammPriceBand.bookValue,\\n    getStorage, setStorage, Verity.require, Verity.bind, Bind.bind,\\n    Verity.pure, Pure.pure, Contract.run, ContractResult.snd]\\n\\n/--\\nExecuting `syncPriceBand` stores the synchronized book value.\\n-/\\ntheorem syncPriceBand_sets_book_value\\n    (capital_ supply_ : Uint256) (s : ContractState)\\n    (hSupply : supply_ != 0) :\\n    let s' := ((RammPriceBand.syncPriceBand capital_ supply_).run s).snd\\n    syncPriceBand_sets_book_value_spec capital_ supply_ s s' := by\\n  unfold syncPriceBand_sets_book_value_spec\\n  simpa using sync_sets_book_value_helper capital_ supply_ s hSupply\\n\\nend Benchmark.Cases.NexusMutual.RammPriceBand\\n\"}",
+            "name": "write_editable_proof"
+          },
+          "id": "call_-7780028932501272224",
+          "index": 0,
+          "type": "function"
+        }
+      ],
+      "tool_results": [
+        {
+          "tool_call_id": "call_-7780028932501272224",
+          "name": "write_editable_proof",
+          "arguments": {
+            "content": "import Benchmark.Cases.NexusMutual.RammPriceBand.Specs\n\nnamespace Benchmark.Cases.NexusMutual.RammPriceBand\n\nopen Verity\nopen Verity.EVM.Uint256\n\nprivate theorem sync_sets_book_value_helper\n    (capital_ supply_ : Uint256) (s : ContractState)\n    (hSupply : supply_ != 0) :\n    let s' := ((RammPriceBand.syncPriceBand capital_ supply_).run s).snd\n    s'.storage 2 = div (mul 1000000000000000000 capital_) supply_ := by\n  simp [RammPriceBand.syncPriceBand, hSupply, RammPriceBand.bookValue,\n    getStorage, setStorage, Verity.require, Verity.bind, Bind.bind,\n    Verity.pure, Pure.pure, Contract.run, ContractResult.snd]\n\n/--\nExecuting `syncPriceBand` stores the synchronized book value.\n-/\ntheorem syncPriceBand_sets_book_value\n    (capital_ supply_ : Uint256) (s : ContractState)\n    (hSupply : supply_ != 0) :\n    let s' := ((RammPriceBand.syncPriceBand capital_ supply_).run s).snd\n    syncPriceBand_sets_book_value_spec capital_ supply_ s s' := by\n  unfold syncPriceBand_sets_book_value_spec\n  simpa using sync_sets_book_value_helper capital_ supply_ s hSupply\n\nend Benchmark.Cases.NexusMutual.RammPriceBand\n"
+          },
+          "result": {
+            "status": "ok",
+            "path": "Benchmark/Generated/NexusMutual/RammPriceBand/Tasks/SyncSetsBookValue.lean",
+            "bytes": 1112,
+            "lines": 28
+          }
+        }
+      ]
+    },
+    {
+      "attempt": 2,
+      "mode": "interactive",
+      "messages": [
+        {
+          "role": "system",
+          "content": "[harness/PROMPT.md]\n# Harness Prompt\n\nEach task gives the agent:\n- fixed implementation files\n- fixed specification files\n- one editable proof file\n- one theorem target\n\nThe agent must return the full proof file. It must not change specs, change implementations, or rely on hidden solved proofs.\n\nThe harness rejects placeholders, runs Lean in a temp workspace, and checks the target theorem.\n\n[harness/POLICY.md]\n# Harness Policy\n\n- `tasks/*.yaml` is the execution unit.\n- The task manifest defines the proof contract.\n- Only run tasks with `proof_status` `partial` or `complete`.\n- Write deterministic outputs under `results/tasks/`.\n\n[harness/TOOLS.md]\n# Harness Tools\n\nThe fixed harness uses only repo-local tools:\n- `lake build <target>`\n- `scripts/run_task.sh`\n- `scripts/run_all.sh`\n\nThe tool surface stays narrow so runs remain comparable.\n\n[harness/PROOF_PATTERNS.md]\n# Proof Patterns\n\nUse public operational proof patterns, not hidden case solutions.\n\nVerity execution proofs often reduce with `simp` once the execution path is fixed.\nTypical symbols to unfold or simplify are:\n\n- `getStorage`, `setStorage`, `setMapping`, `setMappingUint`\n- `Verity.require`, `Verity.bind`, `Bind.bind`\n- `Verity.pure`, `Pure.pure`\n- `Contract.run`, `ContractResult.snd`\n- the contract's storage labels, such as `ContractName.counter`\n\nCommon pattern for a successful-path slot-write theorem:\n\n```lean\nprivate theorem slot_write_helper\n    (x : Uint256) (s : ContractState)\n    (hGuard : ...) :\n    let s' := ((ContractName.fn x).run s).snd\n    s'.storage slot = expected := by\n  simp [ContractName.fn, hGuard, ContractName.slotField,\n    getStorage, setStorage, Verity.require, Verity.bind, Bind.bind,\n    Verity.pure, Pure.pure, Contract.run, ContractResult.snd]\n```\n\nCommon pattern for a branch theorem:\n\n```lean\nby_cases hBranch : condition\n\u00b7 simp [ContractName.fn, hBranch, ...]\n\u00b7 have hNotBranch : \u00ac condition := hBranch\n  simp [ContractName.fn, hNotBranch, ...]\n```\n\nDo not use `split` on the final post-state goal unless the goal itself is explicitly a conjunction or a sum-type elimination. Generated Verity execution terms often simplify better if you first prove the exact branch facts used by the contract and then call `simp`.\n\nFor arithmetic threshold branches, the negated fact often needs to be restated in the comparator form used by the generated code. Example:\n\n```lean\nhave hNotFull : \u00ac 32000000000 \u2264 depositAmount := Nat.not_le_of_lt hSmall\nsimp [ContractName.fn, hCount, hMin, hNotFull, ...]\n```\n\nIf one theorem has to work for both sides of a branch, prove two private helpers first, one per branch, then use `by_cases` in the public theorem and `simpa using` the matching helper.\n\nIf `simp` reduces the goal to concrete slot equalities or a finite `if` over concrete slot numbers, `native_decide` or `decide` often closes the remaining goal.\n\nTypical shape:\n\n```lean\nhave hSlot : s'.storage slot = expected := by\n  simp [ContractName.fn, hGuard, ...]\n  native_decide\n```\n\nIf `simp` already solves the goal, do not leave a trailing `decide`, `exact`, or extra tactic line after it; Lean will report `no goals to be solved`.\n\nIf the public theorem is just a named spec, it is often cleaner to:\n\n1. prove a private helper theorem about the concrete post-state slots,\n2. unfold the spec,\n3. finish with `simpa using ...`."
+        },
+        {
+          "role": "user",
+          "content": "You are running the default benchmark agent for verity-benchmark.\nTreat this as a strict proof-generation benchmark.\nDo not invent specs, modify implementations, or rely on hidden reference proofs.\n\nYou are in interactive mode.\nAll implementation, specification, and editable proof files are already provided below. Do NOT re-read them with read_public_file \u2014 start working immediately.\nWorkflow: call write_editable_proof with your complete proof file, then call run_lean_check to verify.\nIf the check fails, read the error, fix the proof, and repeat write_editable_proof + run_lean_check.\nOnly use read_public_file or search_public_defs if you need a definition not shown below.\nDo not ask for or attempt arbitrary shell access, arbitrary filesystem access, or files outside this task.\n\nDo not claim that you will inspect more files or run commands.\nReason only from the task payload and the file contents included below.\nReturn Lean code only if you answer with a final proof file.\nTask ref: nexus_mutual/ramm_price_band/sync_sets_book_value\nTheorem name: Benchmark.Cases.NexusMutual.RammPriceBand.syncPriceBand_sets_book_value\nProof family: functional_correctness\nEditable file: Benchmark/Generated/NexusMutual/RammPriceBand/Tasks/SyncSetsBookValue.lean\n\nImplementation file contents:\n[Benchmark/Cases/NexusMutual/RammPriceBand/Contract.lean]\nimport Contracts.Common\n\nnamespace Benchmark.Cases.NexusMutual.RammPriceBand\n\nopen Verity hiding pure bind\nopen Verity.EVM.Uint256\nopen Verity.Stdlib.Math\n\n/-\n  Focused Verity slice of Nexus Mutual's RAMM pricing surface.\n  The real contract derives buy and sell prices from reserves, ratchets, and a\n  1% buffer around book value. This benchmark freezes that invariant-relevant\n  boundary computation and omits reserve adjustment, TWAP, and swap execution.\n-/\nverity_contract RammPriceBand where\n  storage\n    capital : Uint256 := slot 0\n    supply : Uint256 := slot 1\n    bookValue : Uint256 := slot 2\n    buySpotPrice : Uint256 := slot 3\n    sellSpotPrice : Uint256 := slot 4\n\n  function syncPriceBand (capital_ : Uint256, supply_ : Uint256) : Unit := do\n    require (supply_ != 0) \"SupplyMustBePositive\"\n\n    let bv := div (mul 1000000000000000000 capital_) supply_\n    let buy := div (mul bv 10100) 10000\n    let sell := div (mul bv 9900) 10000\n\n    setStorage capital capital_\n    setStorage supply supply_\n    setStorage bookValue bv\n    setStorage buySpotPrice buy\n    setStorage sellSpotPrice sell\n\nend Benchmark.Cases.NexusMutual.RammPriceBand\n\nSpecification file contents:\n[Benchmark/Cases/NexusMutual/RammPriceBand/Specs.lean]\nimport Verity.Specs.Common\nimport Benchmark.Cases.NexusMutual.RammPriceBand.Contract\n\nnamespace Benchmark.Cases.NexusMutual.RammPriceBand\n\nopen Verity\nopen Verity.EVM.Uint256\n\ndef syncPriceBand_sets_capital_spec\n    (capital_ : Uint256) (_s s' : ContractState) : Prop :=\n  s'.storage 0 = capital_\n\ndef syncPriceBand_sets_book_value_spec\n    (capital_ supply_ : Uint256) (_s s' : ContractState) : Prop :=\n  s'.storage 2 = div (mul 1000000000000000000 capital_) supply_\n\ndef syncPriceBand_sets_buy_price_spec\n    (capital_ supply_ : Uint256) (_s s' : ContractState) : Prop :=\n  let bv := div (mul 1000000000000000000 capital_) supply_\n  s'.storage 3 = div (mul bv 10100) 10000\n\ndef syncPriceBand_sets_sell_price_spec\n    (capital_ supply_ : Uint256) (_s s' : ContractState) : Prop :=\n  let bv := div (mul 1000000000000000000 capital_) supply_\n  s'.storage 4 = div (mul bv 9900) 10000\n\nend Benchmark.Cases.NexusMutual.RammPriceBand\n\nEditable proof template contents:\n[Benchmark/Generated/NexusMutual/RammPriceBand/Tasks/SyncSetsBookValue.lean]\nimport Benchmark.Cases.NexusMutual.RammPriceBand.Specs\n\nnamespace Benchmark.Cases.NexusMutual.RammPriceBand\n\nopen Verity\nopen Verity.EVM.Uint256\n\n/--\nExecuting `syncPriceBand` stores the synchronized book value.\n-/\ntheorem syncPriceBand_sets_book_value\n    (capital_ supply_ : Uint256) (s : ContractState)\n    (hSupply : supply_ != 0) :\n    let s' := ((RammPriceBand.syncPriceBand capital_ supply_).run s).snd\n    syncPriceBand_sets_book_value_spec capital_ supply_ s s' := by\n  -- Replace this placeholder with a complete Lean proof.\n  exact ?_\n\nend Benchmark.Cases.NexusMutual.RammPriceBand\n\nPublic proof hints:\n- Verity execution proofs often need `simp` with the operational definitions, not just the theorem spec.\n- Useful simplification symbols are often: `getStorage`, `setStorage`, `Verity.require`, `Verity.bind`, `Bind.bind`, `Verity.pure`, `Pure.pure`, `Contract.run`, and `ContractResult.snd`.\n- If `simp` gets stuck on a conditional execution path, prove branch-specific private helper theorems with explicit hypotheses instead of splitting the final post-state directly.\n- If helpful, add imports required for proof automation, for example `import Verity.Proofs.Stdlib.Automation`.\n- For functional-correctness theorems, unfold the spec to the mathematical target form before simplifying the execution result.\n"
+        },
+        {
+          "role": "assistant",
+          "content": "",
+          "tool_calls": [
+            {
+              "function": {
+                "arguments": "{\"content\":\"import Benchmark.Cases.NexusMutual.RammPriceBand.Specs\\n\\nnamespace Benchmark.Cases.NexusMutual.RammPriceBand\\n\\nopen Verity\\nopen Verity.EVM.Uint256\\n\\nprivate theorem sync_sets_book_value_helper\\n    (capital_ supply_ : Uint256) (s : ContractState)\\n    (hSupply : supply_ != 0) :\\n    let s' := ((RammPriceBand.syncPriceBand capital_ supply_).run s).snd\\n    s'.storage 2 = div (mul 1000000000000000000 capital_) supply_ := by\\n  simp [RammPriceBand.syncPriceBand, hSupply, RammPriceBand.bookValue,\\n    getStorage, setStorage, Verity.require, Verity.bind, Bind.bind,\\n    Verity.pure, Pure.pure, Contract.run, ContractResult.snd]\\n\\n/--\\nExecuting `syncPriceBand` stores the synchronized book value.\\n-/\\ntheorem syncPriceBand_sets_book_value\\n    (capital_ supply_ : Uint256) (s : ContractState)\\n    (hSupply : supply_ != 0) :\\n    let s' := ((RammPriceBand.syncPriceBand capital_ supply_).run s).snd\\n    syncPriceBand_sets_book_value_spec capital_ supply_ s s' := by\\n  unfold syncPriceBand_sets_book_value_spec\\n  simpa using sync_sets_book_value_helper capital_ supply_ s hSupply\\n\\nend Benchmark.Cases.NexusMutual.RammPriceBand\\n\"}",
+                "name": "write_editable_proof"
+              },
+              "id": "call_-7780028932501272224",
+              "index": 0,
+              "type": "function"
+            }
+          ]
+        },
+        {
+          "role": "tool",
+          "tool_call_id": "call_-7780028932501272224",
+          "content": "{\n  \"bytes\": 1112,\n  \"lines\": 28,\n  \"path\": \"Benchmark/Generated/NexusMutual/RammPriceBand/Tasks/SyncSetsBookValue.lean\",\n  \"status\": \"ok\"\n}"
+        }
+      ],
+      "response": {
+        "choices": [
+          {
+            "finish_reason": "tool_calls",
+            "index": 0,
+            "message": {
+              "content": "",
+              "role": "assistant",
+              "tool_calls": [
+                {
+                  "function": {
+                    "arguments": "{}",
+                    "name": "run_lean_check"
+                  },
+                  "id": "call_-7780031749999812649",
+                  "index": 0,
+                  "type": "function"
+                }
+              ]
+            }
+          }
+        ],
+        "created": 1774287739,
+        "id": "2026032401421818e5833148454dac",
+        "model": "glm-5-turbo",
+        "object": "chat.completion",
+        "request_id": "2026032401421818e5833148454dac",
+        "usage": {
+          "completion_tokens": 7,
+          "completion_tokens_details": {
+            "reasoning_tokens": 0
+          },
+          "prompt_tokens": 2974,
+          "prompt_tokens_details": {
+            "cached_tokens": 2593
+          },
+          "total_tokens": 2981
+        }
+      },
+      "response_text": "",
+      "tool_calls": [
+        {
+          "function": {
+            "arguments": "{}",
+            "name": "run_lean_check"
+          },
+          "id": "call_-7780031749999812649",
+          "index": 0,
+          "type": "function"
+        }
+      ],
+      "tool_results": [
+        {
+          "tool_call_id": "call_-7780031749999812649",
+          "name": "run_lean_check",
+          "arguments": {},
+          "result": {
+            "status": "failed",
+            "failure_mode": "lean_check_failed",
+            "details": "CandidateCheck.lean:12:69: error: unsolved goals\ncapital_ supply_ : Uint256\ns : ContractState\nhSupply : (supply_ != 0) = true\n\u22a2 (if 2 = RammPriceBand.sellSpotPrice.slot then div (mul (div (mul 1000000000000000000 capital_) supply_) 9900) 10000\n    else\n      if 2 = RammPriceBand.buySpotPrice.slot then div (mul (div (mul 1000000000000000000 capital_) supply_) 10100) 10000\n      else div (mul 1000000000000000000 capital_) supply_) =\n    div (mul 1000000000000000000 capital_) supply_\nCandidateCheck.lean:14:4: warning: This simp argument is unused:\n  getStorage\n\nHint: Omit it from the simp argument list.\n  simp [RammPriceBand.syncPriceBand, hSupply, RammPriceBand.bookValue, g\u0335e\u0335t\u0335S\u0335t\u0335o\u0335r\u0335a\u0335g\u0335e\u0335,\u0335 \u0335setStorage, Verity.require,\n  \u0332  \u0332 \u0332 \u0332Verity.bind, Bind.bind, Verity.pure, Pure.pure, Contract.run, ContractResult.snd]\n\nNote: This linter can be disabled with `set_option linter.unusedSimpArgs false`\nCandidateCheck.lean:15:4: warning: This simp argument is unused:\n  Verity.pure\n\nHint: Omit it from the simp argument list.\n  simp [RammPriceBand.syncPriceBand, hSupply, RammPriceBand.bookValue,\n  \u0335  \u0335 \u0335 \u0335getStorage, setStorage,\n  \u0332  \u0332 \u0332 \u0332Verity.require, Verity.bind, Bind.bind,\n  \u0335  \u0335 \u0335 \u0335V\u0335e\u0335r\u0335i\u0335t\u0335y\u0335.\u0335p\u0335u\u0335r\u0335e\u0335,\u0335 \u0335Pure.pure, Contract.run, ContractResult.snd]\n\nNote: This linter can be disabled with `set_option linter.unusedSimpArgs false`\nCandidateCheck.lean:15:17: warning: This simp argument is unused:\n  Pure.pure\n\nHint: Omit it from the simp argument list.\n  simp [RammPriceBand.syncPriceBand, hSupply, RammPriceBand.bookValue,\n  \u0335  \u0335 \u0335 \u0335getStorage, setStorage,\n  \u0332  \u0332 \u0332 \u0332Verity.require, Verity.bind, Bind.bind,\n  \u0335  \u0335 \u0335 \u0335Verity.pure, P\u0335u\u0335r\u0335e\u0335.\u0335p\u0335u\u0335r\u0335e\u0335,\u0335 \u0335Contract.run, ContractResult.snd]\n\nNote: This linter can be disabled with `set_option linter.unusedSimpArgs false`\nBenchmark.Cases.NexusMutual.RammPriceBand.syncPriceBand_sets_book_value (capital_ supply_ : Verity.Uint256)\n  (s : Verity.ContractState) (hSupply : (supply_ != 0) = true) :\n  have s' := ((Benchmark.Cases.NexusMutual.RammPriceBand.RammPriceBand.syncPriceBand capital_ supply_).run s).snd;\n  Benchmark.Cases.NexusMutual.RammPriceBand.syncPriceBand_sets_book_value_spec capital_ supply_ s s'",
+            "command": [
+              "lake",
+              "env",
+              "lean",
+              "--root=.",
+              "CandidateCheck.lean"
+            ],
+            "candidate_workspace": "Benchmark/Generated/NexusMutual/RammPriceBand/Tasks/SyncSetsBookValue.lean",
+            "repair_hints": "- If `simp` leaves finite residual equalities or `if` expressions, finish those with `native_decide` or `decide`."
+          }
+        }
+      ]
+    },
+    {
+      "attempt": 3,
+      "mode": "interactive",
+      "messages": [
+        {
+          "role": "system",
+          "content": "[harness/PROMPT.md]\n# Harness Prompt\n\nEach task gives the agent:\n- fixed implementation files\n- fixed specification files\n- one editable proof file\n- one theorem target\n\nThe agent must return the full proof file. It must not change specs, change implementations, or rely on hidden solved proofs.\n\nThe harness rejects placeholders, runs Lean in a temp workspace, and checks the target theorem.\n\n[harness/POLICY.md]\n# Harness Policy\n\n- `tasks/*.yaml` is the execution unit.\n- The task manifest defines the proof contract.\n- Only run tasks with `proof_status` `partial` or `complete`.\n- Write deterministic outputs under `results/tasks/`.\n\n[harness/TOOLS.md]\n# Harness Tools\n\nThe fixed harness uses only repo-local tools:\n- `lake build <target>`\n- `scripts/run_task.sh`\n- `scripts/run_all.sh`\n\nThe tool surface stays narrow so runs remain comparable.\n\n[harness/PROOF_PATTERNS.md]\n# Proof Patterns\n\nUse public operational proof patterns, not hidden case solutions.\n\nVerity execution proofs often reduce with `simp` once the execution path is fixed.\nTypical symbols to unfold or simplify are:\n\n- `getStorage`, `setStorage`, `setMapping`, `setMappingUint`\n- `Verity.require`, `Verity.bind`, `Bind.bind`\n- `Verity.pure`, `Pure.pure`\n- `Contract.run`, `ContractResult.snd`\n- the contract's storage labels, such as `ContractName.counter`\n\nCommon pattern for a successful-path slot-write theorem:\n\n```lean\nprivate theorem slot_write_helper\n    (x : Uint256) (s : ContractState)\n    (hGuard : ...) :\n    let s' := ((ContractName.fn x).run s).snd\n    s'.storage slot = expected := by\n  simp [ContractName.fn, hGuard, ContractName.slotField,\n    getStorage, setStorage, Verity.require, Verity.bind, Bind.bind,\n    Verity.pure, Pure.pure, Contract.run, ContractResult.snd]\n```\n\nCommon pattern for a branch theorem:\n\n```lean\nby_cases hBranch : condition\n\u00b7 simp [ContractName.fn, hBranch, ...]\n\u00b7 have hNotBranch : \u00ac condition := hBranch\n  simp [ContractName.fn, hNotBranch, ...]\n```\n\nDo not use `split` on the final post-state goal unless the goal itself is explicitly a conjunction or a sum-type elimination. Generated Verity execution terms often simplify better if you first prove the exact branch facts used by the contract and then call `simp`.\n\nFor arithmetic threshold branches, the negated fact often needs to be restated in the comparator form used by the generated code. Example:\n\n```lean\nhave hNotFull : \u00ac 32000000000 \u2264 depositAmount := Nat.not_le_of_lt hSmall\nsimp [ContractName.fn, hCount, hMin, hNotFull, ...]\n```\n\nIf one theorem has to work for both sides of a branch, prove two private helpers first, one per branch, then use `by_cases` in the public theorem and `simpa using` the matching helper.\n\nIf `simp` reduces the goal to concrete slot equalities or a finite `if` over concrete slot numbers, `native_decide` or `decide` often closes the remaining goal.\n\nTypical shape:\n\n```lean\nhave hSlot : s'.storage slot = expected := by\n  simp [ContractName.fn, hGuard, ...]\n  native_decide\n```\n\nIf `simp` already solves the goal, do not leave a trailing `decide`, `exact`, or extra tactic line after it; Lean will report `no goals to be solved`.\n\nIf the public theorem is just a named spec, it is often cleaner to:\n\n1. prove a private helper theorem about the concrete post-state slots,\n2. unfold the spec,\n3. finish with `simpa using ...`."
+        },
+        {
+          "role": "user",
+          "content": "You are running the default benchmark agent for verity-benchmark.\nTreat this as a strict proof-generation benchmark.\nDo not invent specs, modify implementations, or rely on hidden reference proofs.\n\nYou are in interactive mode.\nAll implementation, specification, and editable proof files are already provided below. Do NOT re-read them with read_public_file \u2014 start working immediately.\nWorkflow: call write_editable_proof with your complete proof file, then call run_lean_check to verify.\nIf the check fails, read the error, fix the proof, and repeat write_editable_proof + run_lean_check.\nOnly use read_public_file or search_public_defs if you need a definition not shown below.\nDo not ask for or attempt arbitrary shell access, arbitrary filesystem access, or files outside this task.\n\nDo not claim that you will inspect more files or run commands.\nReason only from the task payload and the file contents included below.\nReturn Lean code only if you answer with a final proof file.\nTask ref: nexus_mutual/ramm_price_band/sync_sets_book_value\nTheorem name: Benchmark.Cases.NexusMutual.RammPriceBand.syncPriceBand_sets_book_value\nProof family: functional_correctness\nEditable file: Benchmark/Generated/NexusMutual/RammPriceBand/Tasks/SyncSetsBookValue.lean\n\nImplementation file contents:\n[Benchmark/Cases/NexusMutual/RammPriceBand/Contract.lean]\nimport Contracts.Common\n\nnamespace Benchmark.Cases.NexusMutual.RammPriceBand\n\nopen Verity hiding pure bind\nopen Verity.EVM.Uint256\nopen Verity.Stdlib.Math\n\n/-\n  Focused Verity slice of Nexus Mutual's RAMM pricing surface.\n  The real contract derives buy and sell prices from reserves, ratchets, and a\n  1% buffer around book value. This benchmark freezes that invariant-relevant\n  boundary computation and omits reserve adjustment, TWAP, and swap execution.\n-/\nverity_contract RammPriceBand where\n  storage\n    capital : Uint256 := slot 0\n    supply : Uint256 := slot 1\n    bookValue : Uint256 := slot 2\n    buySpotPrice : Uint256 := slot 3\n    sellSpotPrice : Uint256 := slot 4\n\n  function syncPriceBand (capital_ : Uint256, supply_ : Uint256) : Unit := do\n    require (supply_ != 0) \"SupplyMustBePositive\"\n\n    let bv := div (mul 1000000000000000000 capital_) supply_\n    let buy := div (mul bv 10100) 10000\n    let sell := div (mul bv 9900) 10000\n\n    setStorage capital capital_\n    setStorage supply supply_\n    setStorage bookValue bv\n    setStorage buySpotPrice buy\n    setStorage sellSpotPrice sell\n\nend Benchmark.Cases.NexusMutual.RammPriceBand\n\nSpecification file contents:\n[Benchmark/Cases/NexusMutual/RammPriceBand/Specs.lean]\nimport Verity.Specs.Common\nimport Benchmark.Cases.NexusMutual.RammPriceBand.Contract\n\nnamespace Benchmark.Cases.NexusMutual.RammPriceBand\n\nopen Verity\nopen Verity.EVM.Uint256\n\ndef syncPriceBand_sets_capital_spec\n    (capital_ : Uint256) (_s s' : ContractState) : Prop :=\n  s'.storage 0 = capital_\n\ndef syncPriceBand_sets_book_value_spec\n    (capital_ supply_ : Uint256) (_s s' : ContractState) : Prop :=\n  s'.storage 2 = div (mul 1000000000000000000 capital_) supply_\n\ndef syncPriceBand_sets_buy_price_spec\n    (capital_ supply_ : Uint256) (_s s' : ContractState) : Prop :=\n  let bv := div (mul 1000000000000000000 capital_) supply_\n  s'.storage 3 = div (mul bv 10100) 10000\n\ndef syncPriceBand_sets_sell_price_spec\n    (capital_ supply_ : Uint256) (_s s' : ContractState) : Prop :=\n  let bv := div (mul 1000000000000000000 capital_) supply_\n  s'.storage 4 = div (mul bv 9900) 10000\n\nend Benchmark.Cases.NexusMutual.RammPriceBand\n\nEditable proof template contents:\n[Benchmark/Generated/NexusMutual/RammPriceBand/Tasks/SyncSetsBookValue.lean]\nimport Benchmark.Cases.NexusMutual.RammPriceBand.Specs\n\nnamespace Benchmark.Cases.NexusMutual.RammPriceBand\n\nopen Verity\nopen Verity.EVM.Uint256\n\n/--\nExecuting `syncPriceBand` stores the synchronized book value.\n-/\ntheorem syncPriceBand_sets_book_value\n    (capital_ supply_ : Uint256) (s : ContractState)\n    (hSupply : supply_ != 0) :\n    let s' := ((RammPriceBand.syncPriceBand capital_ supply_).run s).snd\n    syncPriceBand_sets_book_value_spec capital_ supply_ s s' := by\n  -- Replace this placeholder with a complete Lean proof.\n  exact ?_\n\nend Benchmark.Cases.NexusMutual.RammPriceBand\n\nPublic proof hints:\n- Verity execution proofs often need `simp` with the operational definitions, not just the theorem spec.\n- Useful simplification symbols are often: `getStorage`, `setStorage`, `Verity.require`, `Verity.bind`, `Bind.bind`, `Verity.pure`, `Pure.pure`, `Contract.run`, and `ContractResult.snd`.\n- If `simp` gets stuck on a conditional execution path, prove branch-specific private helper theorems with explicit hypotheses instead of splitting the final post-state directly.\n- If helpful, add imports required for proof automation, for example `import Verity.Proofs.Stdlib.Automation`.\n- For functional-correctness theorems, unfold the spec to the mathematical target form before simplifying the execution result.\n"
+        },
+        {
+          "role": "user",
+          "content": "Your proof attempt (attempt 2 of 16) failed the Lean checker.\nFix the proof and resubmit using write_editable_proof, then call run_lean_check.\n\nFailed proof:\n```lean\nimport Benchmark.Cases.NexusMutual.RammPriceBand.Specs\n\nnamespace Benchmark.Cases.NexusMutual.RammPriceBand\n\nopen Verity\nopen Verity.EVM.Uint256\n\nprivate theorem sync_sets_book_value_helper\n    (capital_ supply_ : Uint256) (s : ContractState)\n    (hSupply : supply_ != 0) :\n    let s' := ((RammPriceBand.syncPriceBand capital_ supply_).run s).snd\n    s'.storage 2 = div (mul 1000000000000000000 capital_) supply_ := by\n  simp [RammPriceBand.syncPriceBand, hSupply, RammPriceBand.bookValue,\n    getStorage, setStorage, Verity.require, Verity.bind, Bind.bind,\n    Verity.pure, Pure.pure, Contract.run, ContractResult.snd]\n\n/--\nExecuting `syncPriceBand` stores the synchronized book value.\n-/\ntheorem syncPriceBand_sets_book_value\n    (capital_ supply_ : Uint256) (s : ContractState)\n    (hSupply : supply_ != 0) :\n    let s' := ((RammPriceBand.syncPriceBand capital_ supply_).run s).snd\n    syncPriceBand_sets_book_value_spec capital_ supply_ s s' := by\n  unfold syncPriceBand_sets_book_value_spec\n  simpa using sync_sets_book_value_helper capital_ supply_ s hSupply\n\nend Benchmark.Cases.NexusMutual.RammPriceBand\n```\n\nLean checker output:\nCandidateCheck.lean:12:69: error: unsolved goals\ncapital_ supply_ : Uint256\ns : ContractState\nhSupply : (supply_ != 0) = true\n\u22a2 (if 2 = RammPriceBand.sellSpotPrice.slot then div (mul (div (mul 1000000000000000000 capital_) supply_) 9900) 10000\n    else\n      if 2 = RammPriceBand.buySpotPrice.slot then div (mul (div (mul 1000000000000000000 capital_) supply_) 10100) 10000\n      else div (mul 1000000000000000000 capital_) supply_) =\n    div (mul 1000000000000000000 capital_) supply_\nCandidateCheck.lean:14:4: warning: This simp argument is unused:\n  getStorage\n\nHint: Omit it from the simp argument list.\n  simp [RammPriceBand.syncPriceBand, hSupply, RammPriceBand.bookValue, g\u0335e\u0335t\u0335S\u0335t\u0335o\u0335r\u0335a\u0335g\u0335e\u0335,\u0335 \u0335setStorage, Verity.require,\n  \u0332  \u0332 \u0332 \u0332Verity.bind, Bind.bind, Verity.pure, Pure.pure, Contract.run, ContractResult.snd]\n\nNote: This linter can be disabled with `set_option linter.unusedSimpArgs false`\nCandidateCheck.lean:15:4: warning: This simp argument is unused:\n  Verity.pure\n\nHint: Omit it from the simp argument list.\n  simp [RammPriceBand.syncPriceBand, hSupply, RammPriceBand.bookValue,\n  \u0335  \u0335 \u0335 \u0335getStorage, setStorage,\n  \u0332  \u0332 \u0332 \u0332Verity.require, Verity.bind, Bind.bind,\n  \u0335  \u0335 \u0335 \u0335V\u0335e\u0335r\u0335i\u0335t\u0335y\u0335.\u0335p\u0335u\u0335r\u0335e\u0335,\u0335 \u0335Pure.pure, Contract.run, ContractResult.snd]\n\nNote: This linter can be disabled with `set_option linter.unusedSimpArgs false`\nCandidateCheck.lean:15:17: warning: This simp argument is unused:\n  Pure.pure\n\nHint: Omit it from the simp argument list.\n  simp [RammPriceBand.syncPriceBand, hSupply, RammPriceBand.bookValue,\n  \u0335  \u0335 \u0335 \u0335getStorage, setStorage,\n  \u0332  \u0332 \u0332 \u0332Verity.require, Verity.bind, Bind.bind,\n  \u0335  \u0335 \u0335 \u0335Verity.pure, P\u0335u\u0335r\u0335e\u0335.\u0335p\u0335u\u0335r\u0335e\u0335,\u0335 \u0335Contract.run, ContractResult.snd]\n\nNote: This linter can be disabled with `set_option linter.unusedSimpArgs false`\nBenchmark.Cases.NexusMutual.RammPriceBand.syncPriceBand_sets_book_value (capital_ supply_ : Verity.Uint256)\n  (s : Verity.ContractState) (hSupply : (supply_ != 0) = true) :\n  have s' := ((Benchmark.Cases.NexusMutual.RammPriceBand.RammPriceBand.syncPriceBand capital_ supply_).run s).snd;\n  Benchmark.Cases.NexusMutual.RammPriceBand.syncPriceBand_sets_book_value_spec capital_ supply_ s s'\n\nRepair guidance:\n- If `simp` leaves finite residual equalities or `if` expressions, finish those with `native_decide` or `decide`.\n"
+        }
+      ],
+      "response": {
+        "choices": [
+          {
+            "finish_reason": "tool_calls",
+            "index": 0,
+            "message": {
+              "content": "Looking at the error, the `simp` leaves behind an `if` expression because the concrete slot numbers aren't being resolved. I need to add the storage field definitions so the slot constants are known, then use `native_decide` to close the remaining concrete equality.",
+              "role": "assistant",
+              "tool_calls": [
+                {
+                  "function": {
+                    "arguments": "{\"content\":\"import Benchmark.Cases.NexusMutual.RammPriceBand.Specs\\n\\nnamespace Benchmark.Cases.NexusMutual.RammPriceBand\\n\\nopen Verity\\nopen Verity.EVM.Uint256\\n\\nprivate theorem sync_sets_book_value_helper\\n    (capital_ supply_ : Uint256) (s : ContractState)\\n    (hSupply : supply_ != 0) :\\n    let s' := ((RammPriceBand.syncPriceBand capital_ supply_).run s).snd\\n    s'.storage 2 = div (mul 1000000000000000000 capital_) supply_ := by\\n  simp [RammPriceBand.syncPriceBand, hSupply, RammPriceBand.bookValue,\\n    RammPriceBand.sellSpotPrice, RammPriceBand.buySpotPrice,\\n    setStorage, Verity.require, Verity.bind, Bind.bind,\\n    Contract.run, ContractResult.snd]\\n  native_decide\\n\\n/--\\nExecuting `syncPriceBand` stores the synchronized book value.\\n-/\\ntheorem syncPriceBand_sets_book_value\\n    (capital_ supply_ : Uint256) (s : ContractState)\\n    (hSupply : supply_ != 0) :\\n    let s' := ((RammPriceBand.syncPriceBand capital_ supply_).run s).snd\\n    syncPriceBand_sets_book_value_spec capital_ supply_ s s' := by\\n  unfold syncPriceBand_sets_book_value_spec\\n  simpa using sync_sets_book_value_helper capital_ supply_ s hSupply\\n\\nend Benchmark.Cases.NexusMutual.RammPriceBand\\n\"}",
+                    "name": "write_editable_proof"
+                  },
+                  "id": "call_-7780050613496177860",
+                  "index": 0,
+                  "type": "function"
+                }
+              ]
+            }
+          }
+        ],
+        "created": 1774287744,
+        "id": "20260324014221c06ec3ffaf85432b",
+        "model": "glm-5-turbo",
+        "object": "chat.completion",
+        "request_id": "20260324014221c06ec3ffaf85432b",
+        "usage": {
+          "completion_tokens": 391,
+          "completion_tokens_details": {
+            "reasoning_tokens": 0
+          },
+          "prompt_tokens": 3720,
+          "prompt_tokens_details": {
+            "cached_tokens": 2591
+          },
+          "total_tokens": 4111
+        }
+      },
+      "response_text": "Looking at the error, the `simp` leaves behind an `if` expression because the concrete slot numbers aren't being resolved. I need to add the storage field definitions so the slot constants are known, then use `native_decide` to close the remaining concrete equality.",
+      "tool_calls": [
+        {
+          "function": {
+            "arguments": "{\"content\":\"import Benchmark.Cases.NexusMutual.RammPriceBand.Specs\\n\\nnamespace Benchmark.Cases.NexusMutual.RammPriceBand\\n\\nopen Verity\\nopen Verity.EVM.Uint256\\n\\nprivate theorem sync_sets_book_value_helper\\n    (capital_ supply_ : Uint256) (s : ContractState)\\n    (hSupply : supply_ != 0) :\\n    let s' := ((RammPriceBand.syncPriceBand capital_ supply_).run s).snd\\n    s'.storage 2 = div (mul 1000000000000000000 capital_) supply_ := by\\n  simp [RammPriceBand.syncPriceBand, hSupply, RammPriceBand.bookValue,\\n    RammPriceBand.sellSpotPrice, RammPriceBand.buySpotPrice,\\n    setStorage, Verity.require, Verity.bind, Bind.bind,\\n    Contract.run, ContractResult.snd]\\n  native_decide\\n\\n/--\\nExecuting `syncPriceBand` stores the synchronized book value.\\n-/\\ntheorem syncPriceBand_sets_book_value\\n    (capital_ supply_ : Uint256) (s : ContractState)\\n    (hSupply : supply_ != 0) :\\n    let s' := ((RammPriceBand.syncPriceBand capital_ supply_).run s).snd\\n    syncPriceBand_sets_book_value_spec capital_ supply_ s s' := by\\n  unfold syncPriceBand_sets_book_value_spec\\n  simpa using sync_sets_book_value_helper capital_ supply_ s hSupply\\n\\nend Benchmark.Cases.NexusMutual.RammPriceBand\\n\"}",
+            "name": "write_editable_proof"
+          },
+          "id": "call_-7780050613496177860",
+          "index": 0,
+          "type": "function"
+        }
+      ],
+      "tool_results": [
+        {
+          "tool_call_id": "call_-7780050613496177860",
+          "name": "write_editable_proof",
+          "arguments": {
+            "content": "import Benchmark.Cases.NexusMutual.RammPriceBand.Specs\n\nnamespace Benchmark.Cases.NexusMutual.RammPriceBand\n\nopen Verity\nopen Verity.EVM.Uint256\n\nprivate theorem sync_sets_book_value_helper\n    (capital_ supply_ : Uint256) (s : ContractState)\n    (hSupply : supply_ != 0) :\n    let s' := ((RammPriceBand.syncPriceBand capital_ supply_).run s).snd\n    s'.storage 2 = div (mul 1000000000000000000 capital_) supply_ := by\n  simp [RammPriceBand.syncPriceBand, hSupply, RammPriceBand.bookValue,\n    RammPriceBand.sellSpotPrice, RammPriceBand.buySpotPrice,\n    setStorage, Verity.require, Verity.bind, Bind.bind,\n    Contract.run, ContractResult.snd]\n  native_decide\n\n/--\nExecuting `syncPriceBand` stores the synchronized book value.\n-/\ntheorem syncPriceBand_sets_book_value\n    (capital_ supply_ : Uint256) (s : ContractState)\n    (hSupply : supply_ != 0) :\n    let s' := ((RammPriceBand.syncPriceBand capital_ supply_).run s).snd\n    syncPriceBand_sets_book_value_spec capital_ supply_ s s' := by\n  unfold syncPriceBand_sets_book_value_spec\n  simpa using sync_sets_book_value_helper capital_ supply_ s hSupply\n\nend Benchmark.Cases.NexusMutual.RammPriceBand\n"
+          },
+          "result": {
+            "status": "ok",
+            "path": "Benchmark/Generated/NexusMutual/RammPriceBand/Tasks/SyncSetsBookValue.lean",
+            "bytes": 1153,
+            "lines": 30
+          }
+        }
+      ]
+    },
+    {
+      "attempt": 4,
+      "mode": "interactive",
+      "messages": [
+        {
+          "role": "system",
+          "content": "[harness/PROMPT.md]\n# Harness Prompt\n\nEach task gives the agent:\n- fixed implementation files\n- fixed specification files\n- one editable proof file\n- one theorem target\n\nThe agent must return the full proof file. It must not change specs, change implementations, or rely on hidden solved proofs.\n\nThe harness rejects placeholders, runs Lean in a temp workspace, and checks the target theorem.\n\n[harness/POLICY.md]\n# Harness Policy\n\n- `tasks/*.yaml` is the execution unit.\n- The task manifest defines the proof contract.\n- Only run tasks with `proof_status` `partial` or `complete`.\n- Write deterministic outputs under `results/tasks/`.\n\n[harness/TOOLS.md]\n# Harness Tools\n\nThe fixed harness uses only repo-local tools:\n- `lake build <target>`\n- `scripts/run_task.sh`\n- `scripts/run_all.sh`\n\nThe tool surface stays narrow so runs remain comparable.\n\n[harness/PROOF_PATTERNS.md]\n# Proof Patterns\n\nUse public operational proof patterns, not hidden case solutions.\n\nVerity execution proofs often reduce with `simp` once the execution path is fixed.\nTypical symbols to unfold or simplify are:\n\n- `getStorage`, `setStorage`, `setMapping`, `setMappingUint`\n- `Verity.require`, `Verity.bind`, `Bind.bind`\n- `Verity.pure`, `Pure.pure`\n- `Contract.run`, `ContractResult.snd`\n- the contract's storage labels, such as `ContractName.counter`\n\nCommon pattern for a successful-path slot-write theorem:\n\n```lean\nprivate theorem slot_write_helper\n    (x : Uint256) (s : ContractState)\n    (hGuard : ...) :\n    let s' := ((ContractName.fn x).run s).snd\n    s'.storage slot = expected := by\n  simp [ContractName.fn, hGuard, ContractName.slotField,\n    getStorage, setStorage, Verity.require, Verity.bind, Bind.bind,\n    Verity.pure, Pure.pure, Contract.run, ContractResult.snd]\n```\n\nCommon pattern for a branch theorem:\n\n```lean\nby_cases hBranch : condition\n\u00b7 simp [ContractName.fn, hBranch, ...]\n\u00b7 have hNotBranch : \u00ac condition := hBranch\n  simp [ContractName.fn, hNotBranch, ...]\n```\n\nDo not use `split` on the final post-state goal unless the goal itself is explicitly a conjunction or a sum-type elimination. Generated Verity execution terms often simplify better if you first prove the exact branch facts used by the contract and then call `simp`.\n\nFor arithmetic threshold branches, the negated fact often needs to be restated in the comparator form used by the generated code. Example:\n\n```lean\nhave hNotFull : \u00ac 32000000000 \u2264 depositAmount := Nat.not_le_of_lt hSmall\nsimp [ContractName.fn, hCount, hMin, hNotFull, ...]\n```\n\nIf one theorem has to work for both sides of a branch, prove two private helpers first, one per branch, then use `by_cases` in the public theorem and `simpa using` the matching helper.\n\nIf `simp` reduces the goal to concrete slot equalities or a finite `if` over concrete slot numbers, `native_decide` or `decide` often closes the remaining goal.\n\nTypical shape:\n\n```lean\nhave hSlot : s'.storage slot = expected := by\n  simp [ContractName.fn, hGuard, ...]\n  native_decide\n```\n\nIf `simp` already solves the goal, do not leave a trailing `decide`, `exact`, or extra tactic line after it; Lean will report `no goals to be solved`.\n\nIf the public theorem is just a named spec, it is often cleaner to:\n\n1. prove a private helper theorem about the concrete post-state slots,\n2. unfold the spec,\n3. finish with `simpa using ...`."
+        },
+        {
+          "role": "user",
+          "content": "You are running the default benchmark agent for verity-benchmark.\nTreat this as a strict proof-generation benchmark.\nDo not invent specs, modify implementations, or rely on hidden reference proofs.\n\nYou are in interactive mode.\nAll implementation, specification, and editable proof files are already provided below. Do NOT re-read them with read_public_file \u2014 start working immediately.\nWorkflow: call write_editable_proof with your complete proof file, then call run_lean_check to verify.\nIf the check fails, read the error, fix the proof, and repeat write_editable_proof + run_lean_check.\nOnly use read_public_file or search_public_defs if you need a definition not shown below.\nDo not ask for or attempt arbitrary shell access, arbitrary filesystem access, or files outside this task.\n\nDo not claim that you will inspect more files or run commands.\nReason only from the task payload and the file contents included below.\nReturn Lean code only if you answer with a final proof file.\nTask ref: nexus_mutual/ramm_price_band/sync_sets_book_value\nTheorem name: Benchmark.Cases.NexusMutual.RammPriceBand.syncPriceBand_sets_book_value\nProof family: functional_correctness\nEditable file: Benchmark/Generated/NexusMutual/RammPriceBand/Tasks/SyncSetsBookValue.lean\n\nImplementation file contents:\n[Benchmark/Cases/NexusMutual/RammPriceBand/Contract.lean]\nimport Contracts.Common\n\nnamespace Benchmark.Cases.NexusMutual.RammPriceBand\n\nopen Verity hiding pure bind\nopen Verity.EVM.Uint256\nopen Verity.Stdlib.Math\n\n/-\n  Focused Verity slice of Nexus Mutual's RAMM pricing surface.\n  The real contract derives buy and sell prices from reserves, ratchets, and a\n  1% buffer around book value. This benchmark freezes that invariant-relevant\n  boundary computation and omits reserve adjustment, TWAP, and swap execution.\n-/\nverity_contract RammPriceBand where\n  storage\n    capital : Uint256 := slot 0\n    supply : Uint256 := slot 1\n    bookValue : Uint256 := slot 2\n    buySpotPrice : Uint256 := slot 3\n    sellSpotPrice : Uint256 := slot 4\n\n  function syncPriceBand (capital_ : Uint256, supply_ : Uint256) : Unit := do\n    require (supply_ != 0) \"SupplyMustBePositive\"\n\n    let bv := div (mul 1000000000000000000 capital_) supply_\n    let buy := div (mul bv 10100) 10000\n    let sell := div (mul bv 9900) 10000\n\n    setStorage capital capital_\n    setStorage supply supply_\n    setStorage bookValue bv\n    setStorage buySpotPrice buy\n    setStorage sellSpotPrice sell\n\nend Benchmark.Cases.NexusMutual.RammPriceBand\n\nSpecification file contents:\n[Benchmark/Cases/NexusMutual/RammPriceBand/Specs.lean]\nimport Verity.Specs.Common\nimport Benchmark.Cases.NexusMutual.RammPriceBand.Contract\n\nnamespace Benchmark.Cases.NexusMutual.RammPriceBand\n\nopen Verity\nopen Verity.EVM.Uint256\n\ndef syncPriceBand_sets_capital_spec\n    (capital_ : Uint256) (_s s' : ContractState) : Prop :=\n  s'.storage 0 = capital_\n\ndef syncPriceBand_sets_book_value_spec\n    (capital_ supply_ : Uint256) (_s s' : ContractState) : Prop :=\n  s'.storage 2 = div (mul 1000000000000000000 capital_) supply_\n\ndef syncPriceBand_sets_buy_price_spec\n    (capital_ supply_ : Uint256) (_s s' : ContractState) : Prop :=\n  let bv := div (mul 1000000000000000000 capital_) supply_\n  s'.storage 3 = div (mul bv 10100) 10000\n\ndef syncPriceBand_sets_sell_price_spec\n    (capital_ supply_ : Uint256) (_s s' : ContractState) : Prop :=\n  let bv := div (mul 1000000000000000000 capital_) supply_\n  s'.storage 4 = div (mul bv 9900) 10000\n\nend Benchmark.Cases.NexusMutual.RammPriceBand\n\nEditable proof template contents:\n[Benchmark/Generated/NexusMutual/RammPriceBand/Tasks/SyncSetsBookValue.lean]\nimport Benchmark.Cases.NexusMutual.RammPriceBand.Specs\n\nnamespace Benchmark.Cases.NexusMutual.RammPriceBand\n\nopen Verity\nopen Verity.EVM.Uint256\n\n/--\nExecuting `syncPriceBand` stores the synchronized book value.\n-/\ntheorem syncPriceBand_sets_book_value\n    (capital_ supply_ : Uint256) (s : ContractState)\n    (hSupply : supply_ != 0) :\n    let s' := ((RammPriceBand.syncPriceBand capital_ supply_).run s).snd\n    syncPriceBand_sets_book_value_spec capital_ supply_ s s' := by\n  -- Replace this placeholder with a complete Lean proof.\n  exact ?_\n\nend Benchmark.Cases.NexusMutual.RammPriceBand\n\nPublic proof hints:\n- Verity execution proofs often need `simp` with the operational definitions, not just the theorem spec.\n- Useful simplification symbols are often: `getStorage`, `setStorage`, `Verity.require`, `Verity.bind`, `Bind.bind`, `Verity.pure`, `Pure.pure`, `Contract.run`, and `ContractResult.snd`.\n- If `simp` gets stuck on a conditional execution path, prove branch-specific private helper theorems with explicit hypotheses instead of splitting the final post-state directly.\n- If helpful, add imports required for proof automation, for example `import Verity.Proofs.Stdlib.Automation`.\n- For functional-correctness theorems, unfold the spec to the mathematical target form before simplifying the execution result.\n"
+        },
+        {
+          "role": "user",
+          "content": "Your proof attempt (attempt 2 of 16) failed the Lean checker.\nFix the proof and resubmit using write_editable_proof, then call run_lean_check.\n\nFailed proof:\n```lean\nimport Benchmark.Cases.NexusMutual.RammPriceBand.Specs\n\nnamespace Benchmark.Cases.NexusMutual.RammPriceBand\n\nopen Verity\nopen Verity.EVM.Uint256\n\nprivate theorem sync_sets_book_value_helper\n    (capital_ supply_ : Uint256) (s : ContractState)\n    (hSupply : supply_ != 0) :\n    let s' := ((RammPriceBand.syncPriceBand capital_ supply_).run s).snd\n    s'.storage 2 = div (mul 1000000000000000000 capital_) supply_ := by\n  simp [RammPriceBand.syncPriceBand, hSupply, RammPriceBand.bookValue,\n    getStorage, setStorage, Verity.require, Verity.bind, Bind.bind,\n    Verity.pure, Pure.pure, Contract.run, ContractResult.snd]\n\n/--\nExecuting `syncPriceBand` stores the synchronized book value.\n-/\ntheorem syncPriceBand_sets_book_value\n    (capital_ supply_ : Uint256) (s : ContractState)\n    (hSupply : supply_ != 0) :\n    let s' := ((RammPriceBand.syncPriceBand capital_ supply_).run s).snd\n    syncPriceBand_sets_book_value_spec capital_ supply_ s s' := by\n  unfold syncPriceBand_sets_book_value_spec\n  simpa using sync_sets_book_value_helper capital_ supply_ s hSupply\n\nend Benchmark.Cases.NexusMutual.RammPriceBand\n```\n\nLean checker output:\nCandidateCheck.lean:12:69: error: unsolved goals\ncapital_ supply_ : Uint256\ns : ContractState\nhSupply : (supply_ != 0) = true\n\u22a2 (if 2 = RammPriceBand.sellSpotPrice.slot then div (mul (div (mul 1000000000000000000 capital_) supply_) 9900) 10000\n    else\n      if 2 = RammPriceBand.buySpotPrice.slot then div (mul (div (mul 1000000000000000000 capital_) supply_) 10100) 10000\n      else div (mul 1000000000000000000 capital_) supply_) =\n    div (mul 1000000000000000000 capital_) supply_\nCandidateCheck.lean:14:4: warning: This simp argument is unused:\n  getStorage\n\nHint: Omit it from the simp argument list.\n  simp [RammPriceBand.syncPriceBand, hSupply, RammPriceBand.bookValue, g\u0335e\u0335t\u0335S\u0335t\u0335o\u0335r\u0335a\u0335g\u0335e\u0335,\u0335 \u0335setStorage, Verity.require,\n  \u0332  \u0332 \u0332 \u0332Verity.bind, Bind.bind, Verity.pure, Pure.pure, Contract.run, ContractResult.snd]\n\nNote: This linter can be disabled with `set_option linter.unusedSimpArgs false`\nCandidateCheck.lean:15:4: warning: This simp argument is unused:\n  Verity.pure\n\nHint: Omit it from the simp argument list.\n  simp [RammPriceBand.syncPriceBand, hSupply, RammPriceBand.bookValue,\n  \u0335  \u0335 \u0335 \u0335getStorage, setStorage,\n  \u0332  \u0332 \u0332 \u0332Verity.require, Verity.bind, Bind.bind,\n  \u0335  \u0335 \u0335 \u0335V\u0335e\u0335r\u0335i\u0335t\u0335y\u0335.\u0335p\u0335u\u0335r\u0335e\u0335,\u0335 \u0335Pure.pure, Contract.run, ContractResult.snd]\n\nNote: This linter can be disabled with `set_option linter.unusedSimpArgs false`\nCandidateCheck.lean:15:17: warning: This simp argument is unused:\n  Pure.pure\n\nHint: Omit it from the simp argument list.\n  simp [RammPriceBand.syncPriceBand, hSupply, RammPriceBand.bookValue,\n  \u0335  \u0335 \u0335 \u0335getStorage, setStorage,\n  \u0332  \u0332 \u0332 \u0332Verity.require, Verity.bind, Bind.bind,\n  \u0335  \u0335 \u0335 \u0335Verity.pure, P\u0335u\u0335r\u0335e\u0335.\u0335p\u0335u\u0335r\u0335e\u0335,\u0335 \u0335Contract.run, ContractResult.snd]\n\nNote: This linter can be disabled with `set_option linter.unusedSimpArgs false`\nBenchmark.Cases.NexusMutual.RammPriceBand.syncPriceBand_sets_book_value (capital_ supply_ : Verity.Uint256)\n  (s : Verity.ContractState) (hSupply : (supply_ != 0) = true) :\n  have s' := ((Benchmark.Cases.NexusMutual.RammPriceBand.RammPriceBand.syncPriceBand capital_ supply_).run s).snd;\n  Benchmark.Cases.NexusMutual.RammPriceBand.syncPriceBand_sets_book_value_spec capital_ supply_ s s'\n\nRepair guidance:\n- If `simp` leaves finite residual equalities or `if` expressions, finish those with `native_decide` or `decide`.\n"
+        },
+        {
+          "role": "assistant",
+          "content": "Looking at the error, the `simp` leaves behind an `if` expression because the concrete slot numbers aren't being resolved. I need to add the storage field definitions so the slot constants are known, then use `native_decide` to close the remaining concrete equality.",
+          "tool_calls": [
+            {
+              "function": {
+                "arguments": "{\"content\":\"import Benchmark.Cases.NexusMutual.RammPriceBand.Specs\\n\\nnamespace Benchmark.Cases.NexusMutual.RammPriceBand\\n\\nopen Verity\\nopen Verity.EVM.Uint256\\n\\nprivate theorem sync_sets_book_value_helper\\n    (capital_ supply_ : Uint256) (s : ContractState)\\n    (hSupply : supply_ != 0) :\\n    let s' := ((RammPriceBand.syncPriceBand capital_ supply_).run s).snd\\n    s'.storage 2 = div (mul 1000000000000000000 capital_) supply_ := by\\n  simp [RammPriceBand.syncPriceBand, hSupply, RammPriceBand.bookValue,\\n    RammPriceBand.sellSpotPrice, RammPriceBand.buySpotPrice,\\n    setStorage, Verity.require, Verity.bind, Bind.bind,\\n    Contract.run, ContractResult.snd]\\n  native_decide\\n\\n/--\\nExecuting `syncPriceBand` stores the synchronized book value.\\n-/\\ntheorem syncPriceBand_sets_book_value\\n    (capital_ supply_ : Uint256) (s : ContractState)\\n    (hSupply : supply_ != 0) :\\n    let s' := ((RammPriceBand.syncPriceBand capital_ supply_).run s).snd\\n    syncPriceBand_sets_book_value_spec capital_ supply_ s s' := by\\n  unfold syncPriceBand_sets_book_value_spec\\n  simpa using sync_sets_book_value_helper capital_ supply_ s hSupply\\n\\nend Benchmark.Cases.NexusMutual.RammPriceBand\\n\"}",
+                "name": "write_editable_proof"
+              },
+              "id": "call_-7780050613496177860",
+              "index": 0,
+              "type": "function"
+            }
+          ]
+        },
+        {
+          "role": "tool",
+          "tool_call_id": "call_-7780050613496177860",
+          "content": "{\n  \"bytes\": 1153,\n  \"lines\": 30,\n  \"path\": \"Benchmark/Generated/NexusMutual/RammPriceBand/Tasks/SyncSetsBookValue.lean\",\n  \"status\": \"ok\"\n}"
+        }
+      ],
+      "response": {
+        "choices": [
+          {
+            "finish_reason": "tool_calls",
+            "index": 0,
+            "message": {
+              "content": "",
+              "role": "assistant",
+              "tool_calls": [
+                {
+                  "function": {
+                    "arguments": "{}",
+                    "name": "run_lean_check"
+                  },
+                  "id": "call_-7780046387248361697",
+                  "index": 0,
+                  "type": "function"
+                }
+              ]
+            }
+          }
+        ],
+        "created": 1774287746,
+        "id": "202603240142254ab81f7e1c114978",
+        "model": "glm-5-turbo",
+        "object": "chat.completion",
+        "request_id": "202603240142254ab81f7e1c114978",
+        "usage": {
+          "completion_tokens": 7,
+          "completion_tokens_details": {
+            "reasoning_tokens": 0
+          },
+          "prompt_tokens": 4165,
+          "prompt_tokens_details": {
+            "cached_tokens": 3719
+          },
+          "total_tokens": 4172
+        }
+      },
+      "response_text": "",
+      "tool_calls": [
+        {
+          "function": {
+            "arguments": "{}",
+            "name": "run_lean_check"
+          },
+          "id": "call_-7780046387248361697",
+          "index": 0,
+          "type": "function"
+        }
+      ],
+      "tool_results": [
+        {
+          "tool_call_id": "call_-7780046387248361697",
+          "name": "run_lean_check",
+          "arguments": {},
+          "result": {
+            "status": "failed",
+            "failure_mode": "lean_check_failed",
+            "details": "CandidateCheck.lean:17:2: error: no goals to be solved\nBenchmark.Cases.NexusMutual.RammPriceBand.syncPriceBand_sets_book_value (capital_ supply_ : Verity.Uint256)\n  (s : Verity.ContractState) (hSupply : (supply_ != 0) = true) :\n  have s' := ((Benchmark.Cases.NexusMutual.RammPriceBand.RammPriceBand.syncPriceBand capital_ supply_).run s).snd;\n  Benchmark.Cases.NexusMutual.RammPriceBand.syncPriceBand_sets_book_value_spec capital_ supply_ s s'",
+            "command": [
+              "lake",
+              "env",
+              "lean",
+              "--root=.",
+              "CandidateCheck.lean"
+            ],
+            "candidate_workspace": "Benchmark/Generated/NexusMutual/RammPriceBand/Tasks/SyncSetsBookValue.lean",
+            "repair_hints": "- A previous `simp` likely closed the goal already. Remove trailing tactics after the goal is solved."
+          }
+        }
+      ]
+    },
+    {
+      "attempt": 5,
+      "mode": "interactive",
+      "messages": [
+        {
+          "role": "system",
+          "content": "[harness/PROMPT.md]\n# Harness Prompt\n\nEach task gives the agent:\n- fixed implementation files\n- fixed specification files\n- one editable proof file\n- one theorem target\n\nThe agent must return the full proof file. It must not change specs, change implementations, or rely on hidden solved proofs.\n\nThe harness rejects placeholders, runs Lean in a temp workspace, and checks the target theorem.\n\n[harness/POLICY.md]\n# Harness Policy\n\n- `tasks/*.yaml` is the execution unit.\n- The task manifest defines the proof contract.\n- Only run tasks with `proof_status` `partial` or `complete`.\n- Write deterministic outputs under `results/tasks/`.\n\n[harness/TOOLS.md]\n# Harness Tools\n\nThe fixed harness uses only repo-local tools:\n- `lake build <target>`\n- `scripts/run_task.sh`\n- `scripts/run_all.sh`\n\nThe tool surface stays narrow so runs remain comparable.\n\n[harness/PROOF_PATTERNS.md]\n# Proof Patterns\n\nUse public operational proof patterns, not hidden case solutions.\n\nVerity execution proofs often reduce with `simp` once the execution path is fixed.\nTypical symbols to unfold or simplify are:\n\n- `getStorage`, `setStorage`, `setMapping`, `setMappingUint`\n- `Verity.require`, `Verity.bind`, `Bind.bind`\n- `Verity.pure`, `Pure.pure`\n- `Contract.run`, `ContractResult.snd`\n- the contract's storage labels, such as `ContractName.counter`\n\nCommon pattern for a successful-path slot-write theorem:\n\n```lean\nprivate theorem slot_write_helper\n    (x : Uint256) (s : ContractState)\n    (hGuard : ...) :\n    let s' := ((ContractName.fn x).run s).snd\n    s'.storage slot = expected := by\n  simp [ContractName.fn, hGuard, ContractName.slotField,\n    getStorage, setStorage, Verity.require, Verity.bind, Bind.bind,\n    Verity.pure, Pure.pure, Contract.run, ContractResult.snd]\n```\n\nCommon pattern for a branch theorem:\n\n```lean\nby_cases hBranch : condition\n\u00b7 simp [ContractName.fn, hBranch, ...]\n\u00b7 have hNotBranch : \u00ac condition := hBranch\n  simp [ContractName.fn, hNotBranch, ...]\n```\n\nDo not use `split` on the final post-state goal unless the goal itself is explicitly a conjunction or a sum-type elimination. Generated Verity execution terms often simplify better if you first prove the exact branch facts used by the contract and then call `simp`.\n\nFor arithmetic threshold branches, the negated fact often needs to be restated in the comparator form used by the generated code. Example:\n\n```lean\nhave hNotFull : \u00ac 32000000000 \u2264 depositAmount := Nat.not_le_of_lt hSmall\nsimp [ContractName.fn, hCount, hMin, hNotFull, ...]\n```\n\nIf one theorem has to work for both sides of a branch, prove two private helpers first, one per branch, then use `by_cases` in the public theorem and `simpa using` the matching helper.\n\nIf `simp` reduces the goal to concrete slot equalities or a finite `if` over concrete slot numbers, `native_decide` or `decide` often closes the remaining goal.\n\nTypical shape:\n\n```lean\nhave hSlot : s'.storage slot = expected := by\n  simp [ContractName.fn, hGuard, ...]\n  native_decide\n```\n\nIf `simp` already solves the goal, do not leave a trailing `decide`, `exact`, or extra tactic line after it; Lean will report `no goals to be solved`.\n\nIf the public theorem is just a named spec, it is often cleaner to:\n\n1. prove a private helper theorem about the concrete post-state slots,\n2. unfold the spec,\n3. finish with `simpa using ...`."
+        },
+        {
+          "role": "user",
+          "content": "You are running the default benchmark agent for verity-benchmark.\nTreat this as a strict proof-generation benchmark.\nDo not invent specs, modify implementations, or rely on hidden reference proofs.\n\nYou are in interactive mode.\nAll implementation, specification, and editable proof files are already provided below. Do NOT re-read them with read_public_file \u2014 start working immediately.\nWorkflow: call write_editable_proof with your complete proof file, then call run_lean_check to verify.\nIf the check fails, read the error, fix the proof, and repeat write_editable_proof + run_lean_check.\nOnly use read_public_file or search_public_defs if you need a definition not shown below.\nDo not ask for or attempt arbitrary shell access, arbitrary filesystem access, or files outside this task.\n\nDo not claim that you will inspect more files or run commands.\nReason only from the task payload and the file contents included below.\nReturn Lean code only if you answer with a final proof file.\nTask ref: nexus_mutual/ramm_price_band/sync_sets_book_value\nTheorem name: Benchmark.Cases.NexusMutual.RammPriceBand.syncPriceBand_sets_book_value\nProof family: functional_correctness\nEditable file: Benchmark/Generated/NexusMutual/RammPriceBand/Tasks/SyncSetsBookValue.lean\n\nImplementation file contents:\n[Benchmark/Cases/NexusMutual/RammPriceBand/Contract.lean]\nimport Contracts.Common\n\nnamespace Benchmark.Cases.NexusMutual.RammPriceBand\n\nopen Verity hiding pure bind\nopen Verity.EVM.Uint256\nopen Verity.Stdlib.Math\n\n/-\n  Focused Verity slice of Nexus Mutual's RAMM pricing surface.\n  The real contract derives buy and sell prices from reserves, ratchets, and a\n  1% buffer around book value. This benchmark freezes that invariant-relevant\n  boundary computation and omits reserve adjustment, TWAP, and swap execution.\n-/\nverity_contract RammPriceBand where\n  storage\n    capital : Uint256 := slot 0\n    supply : Uint256 := slot 1\n    bookValue : Uint256 := slot 2\n    buySpotPrice : Uint256 := slot 3\n    sellSpotPrice : Uint256 := slot 4\n\n  function syncPriceBand (capital_ : Uint256, supply_ : Uint256) : Unit := do\n    require (supply_ != 0) \"SupplyMustBePositive\"\n\n    let bv := div (mul 1000000000000000000 capital_) supply_\n    let buy := div (mul bv 10100) 10000\n    let sell := div (mul bv 9900) 10000\n\n    setStorage capital capital_\n    setStorage supply supply_\n    setStorage bookValue bv\n    setStorage buySpotPrice buy\n    setStorage sellSpotPrice sell\n\nend Benchmark.Cases.NexusMutual.RammPriceBand\n\nSpecification file contents:\n[Benchmark/Cases/NexusMutual/RammPriceBand/Specs.lean]\nimport Verity.Specs.Common\nimport Benchmark.Cases.NexusMutual.RammPriceBand.Contract\n\nnamespace Benchmark.Cases.NexusMutual.RammPriceBand\n\nopen Verity\nopen Verity.EVM.Uint256\n\ndef syncPriceBand_sets_capital_spec\n    (capital_ : Uint256) (_s s' : ContractState) : Prop :=\n  s'.storage 0 = capital_\n\ndef syncPriceBand_sets_book_value_spec\n    (capital_ supply_ : Uint256) (_s s' : ContractState) : Prop :=\n  s'.storage 2 = div (mul 1000000000000000000 capital_) supply_\n\ndef syncPriceBand_sets_buy_price_spec\n    (capital_ supply_ : Uint256) (_s s' : ContractState) : Prop :=\n  let bv := div (mul 1000000000000000000 capital_) supply_\n  s'.storage 3 = div (mul bv 10100) 10000\n\ndef syncPriceBand_sets_sell_price_spec\n    (capital_ supply_ : Uint256) (_s s' : ContractState) : Prop :=\n  let bv := div (mul 1000000000000000000 capital_) supply_\n  s'.storage 4 = div (mul bv 9900) 10000\n\nend Benchmark.Cases.NexusMutual.RammPriceBand\n\nEditable proof template contents:\n[Benchmark/Generated/NexusMutual/RammPriceBand/Tasks/SyncSetsBookValue.lean]\nimport Benchmark.Cases.NexusMutual.RammPriceBand.Specs\n\nnamespace Benchmark.Cases.NexusMutual.RammPriceBand\n\nopen Verity\nopen Verity.EVM.Uint256\n\n/--\nExecuting `syncPriceBand` stores the synchronized book value.\n-/\ntheorem syncPriceBand_sets_book_value\n    (capital_ supply_ : Uint256) (s : ContractState)\n    (hSupply : supply_ != 0) :\n    let s' := ((RammPriceBand.syncPriceBand capital_ supply_).run s).snd\n    syncPriceBand_sets_book_value_spec capital_ supply_ s s' := by\n  -- Replace this placeholder with a complete Lean proof.\n  exact ?_\n\nend Benchmark.Cases.NexusMutual.RammPriceBand\n\nPublic proof hints:\n- Verity execution proofs often need `simp` with the operational definitions, not just the theorem spec.\n- Useful simplification symbols are often: `getStorage`, `setStorage`, `Verity.require`, `Verity.bind`, `Bind.bind`, `Verity.pure`, `Pure.pure`, `Contract.run`, and `ContractResult.snd`.\n- If `simp` gets stuck on a conditional execution path, prove branch-specific private helper theorems with explicit hypotheses instead of splitting the final post-state directly.\n- If helpful, add imports required for proof automation, for example `import Verity.Proofs.Stdlib.Automation`.\n- For functional-correctness theorems, unfold the spec to the mathematical target form before simplifying the execution result.\n"
+        },
+        {
+          "role": "user",
+          "content": "Your proof attempt (attempt 2 of 16) failed the Lean checker.\nFix the proof and resubmit using write_editable_proof, then call run_lean_check.\n\nFailed proof:\n```lean\nimport Benchmark.Cases.NexusMutual.RammPriceBand.Specs\n\nnamespace Benchmark.Cases.NexusMutual.RammPriceBand\n\nopen Verity\nopen Verity.EVM.Uint256\n\nprivate theorem sync_sets_book_value_helper\n    (capital_ supply_ : Uint256) (s : ContractState)\n    (hSupply : supply_ != 0) :\n    let s' := ((RammPriceBand.syncPriceBand capital_ supply_).run s).snd\n    s'.storage 2 = div (mul 1000000000000000000 capital_) supply_ := by\n  simp [RammPriceBand.syncPriceBand, hSupply, RammPriceBand.bookValue,\n    getStorage, setStorage, Verity.require, Verity.bind, Bind.bind,\n    Verity.pure, Pure.pure, Contract.run, ContractResult.snd]\n\n/--\nExecuting `syncPriceBand` stores the synchronized book value.\n-/\ntheorem syncPriceBand_sets_book_value\n    (capital_ supply_ : Uint256) (s : ContractState)\n    (hSupply : supply_ != 0) :\n    let s' := ((RammPriceBand.syncPriceBand capital_ supply_).run s).snd\n    syncPriceBand_sets_book_value_spec capital_ supply_ s s' := by\n  unfold syncPriceBand_sets_book_value_spec\n  simpa using sync_sets_book_value_helper capital_ supply_ s hSupply\n\nend Benchmark.Cases.NexusMutual.RammPriceBand\n```\n\nLean checker output:\nCandidateCheck.lean:12:69: error: unsolved goals\ncapital_ supply_ : Uint256\ns : ContractState\nhSupply : (supply_ != 0) = true\n\u22a2 (if 2 = RammPriceBand.sellSpotPrice.slot then div (mul (div (mul 1000000000000000000 capital_) supply_) 9900) 10000\n    else\n      if 2 = RammPriceBand.buySpotPrice.slot then div (mul (div (mul 1000000000000000000 capital_) supply_) 10100) 10000\n      else div (mul 1000000000000000000 capital_) supply_) =\n    div (mul 1000000000000000000 capital_) supply_\nCandidateCheck.lean:14:4: warning: This simp argument is unused:\n  getStorage\n\nHint: Omit it from the simp argument list.\n  simp [RammPriceBand.syncPriceBand, hSupply, RammPriceBand.bookValue, g\u0335e\u0335t\u0335S\u0335t\u0335o\u0335r\u0335a\u0335g\u0335e\u0335,\u0335 \u0335setStorage, Verity.require,\n  \u0332  \u0332 \u0332 \u0332Verity.bind, Bind.bind, Verity.pure, Pure.pure, Contract.run, ContractResult.snd]\n\nNote: This linter can be disabled with `set_option linter.unusedSimpArgs false`\nCandidateCheck.lean:15:4: warning: This simp argument is unused:\n  Verity.pure\n\nHint: Omit it from the simp argument list.\n  simp [RammPriceBand.syncPriceBand, hSupply, RammPriceBand.bookValue,\n  \u0335  \u0335 \u0335 \u0335getStorage, setStorage,\n  \u0332  \u0332 \u0332 \u0332Verity.require, Verity.bind, Bind.bind,\n  \u0335  \u0335 \u0335 \u0335V\u0335e\u0335r\u0335i\u0335t\u0335y\u0335.\u0335p\u0335u\u0335r\u0335e\u0335,\u0335 \u0335Pure.pure, Contract.run, ContractResult.snd]\n\nNote: This linter can be disabled with `set_option linter.unusedSimpArgs false`\nCandidateCheck.lean:15:17: warning: This simp argument is unused:\n  Pure.pure\n\nHint: Omit it from the simp argument list.\n  simp [RammPriceBand.syncPriceBand, hSupply, RammPriceBand.bookValue,\n  \u0335  \u0335 \u0335 \u0335getStorage, setStorage,\n  \u0332  \u0332 \u0332 \u0332Verity.require, Verity.bind, Bind.bind,\n  \u0335  \u0335 \u0335 \u0335Verity.pure, P\u0335u\u0335r\u0335e\u0335.\u0335p\u0335u\u0335r\u0335e\u0335,\u0335 \u0335Contract.run, ContractResult.snd]\n\nNote: This linter can be disabled with `set_option linter.unusedSimpArgs false`\nBenchmark.Cases.NexusMutual.RammPriceBand.syncPriceBand_sets_book_value (capital_ supply_ : Verity.Uint256)\n  (s : Verity.ContractState) (hSupply : (supply_ != 0) = true) :\n  have s' := ((Benchmark.Cases.NexusMutual.RammPriceBand.RammPriceBand.syncPriceBand capital_ supply_).run s).snd;\n  Benchmark.Cases.NexusMutual.RammPriceBand.syncPriceBand_sets_book_value_spec capital_ supply_ s s'\n\nRepair guidance:\n- If `simp` leaves finite residual equalities or `if` expressions, finish those with `native_decide` or `decide`.\n"
+        },
+        {
+          "role": "user",
+          "content": "Your proof attempt (attempt 4 of 16) failed the Lean checker.\nFix the proof and resubmit using write_editable_proof, then call run_lean_check.\n\nFailed proof:\n```lean\nimport Benchmark.Cases.NexusMutual.RammPriceBand.Specs\n\nnamespace Benchmark.Cases.NexusMutual.RammPriceBand\n\nopen Verity\nopen Verity.EVM.Uint256\n\nprivate theorem sync_sets_book_value_helper\n    (capital_ supply_ : Uint256) (s : ContractState)\n    (hSupply : supply_ != 0) :\n    let s' := ((RammPriceBand.syncPriceBand capital_ supply_).run s).snd\n    s'.storage 2 = div (mul 1000000000000000000 capital_) supply_ := by\n  simp [RammPriceBand.syncPriceBand, hSupply, RammPriceBand.bookValue,\n    RammPriceBand.sellSpotPrice, RammPriceBand.buySpotPrice,\n    setStorage, Verity.require, Verity.bind, Bind.bind,\n    Contract.run, ContractResult.snd]\n  native_decide\n\n/--\nExecuting `syncPriceBand` stores the synchronized book value.\n-/\ntheorem syncPriceBand_sets_book_value\n    (capital_ supply_ : Uint256) (s : ContractState)\n    (hSupply : supply_ != 0) :\n    let s' := ((RammPriceBand.syncPriceBand capital_ supply_).run s).snd\n    syncPriceBand_sets_book_value_spec capital_ supply_ s s' := by\n  unfold syncPriceBand_sets_book_value_spec\n  simpa using sync_sets_book_value_helper capital_ supply_ s hSupply\n\nend Benchmark.Cases.NexusMutual.RammPriceBand\n```\n\nLean checker output:\nCandidateCheck.lean:17:2: error: no goals to be solved\nBenchmark.Cases.NexusMutual.RammPriceBand.syncPriceBand_sets_book_value (capital_ supply_ : Verity.Uint256)\n  (s : Verity.ContractState) (hSupply : (supply_ != 0) = true) :\n  have s' := ((Benchmark.Cases.NexusMutual.RammPriceBand.RammPriceBand.syncPriceBand capital_ supply_).run s).snd;\n  Benchmark.Cases.NexusMutual.RammPriceBand.syncPriceBand_sets_book_value_spec capital_ supply_ s s'\n\nRepair guidance:\n- A previous `simp` likely closed the goal already. Remove trailing tactics after the goal is solved.\n"
+        }
+      ],
+      "response": {
+        "choices": [
+          {
+            "finish_reason": "tool_calls",
+            "index": 0,
+            "message": {
+              "content": "",
+              "role": "assistant",
+              "tool_calls": [
+                {
+                  "function": {
+                    "arguments": "{\"content\":\"import Benchmark.Cases.NexusMutual.RammPriceBand.Specs\\n\\nnamespace Benchmark.Cases.NexusMutual.RammPriceBand\\n\\nopen Verity\\nopen Verity.EVM.Uint256\\n\\nprivate theorem sync_sets_book_value_helper\\n    (capital_ supply_ : Uint256) (s : ContractState)\\n    (hSupply : supply_ != 0) :\\n    let s' := ((RammPriceBand.syncPriceBand capital_ supply_).run s).snd\\n    s'.storage 2 = div (mul 1000000000000000000 capital_) supply_ := by\\n  simp [RammPriceBand.syncPriceBand, hSupply, RammPriceBand.bookValue,\\n    RammPriceBand.sellSpotPrice, RammPriceBand.buySpotPrice,\\n    setStorage, Verity.require, Verity.bind, Bind.bind,\\n    Contract.run, ContractResult.snd]\\n\\n/--\\nExecuting `syncPriceBand` stores the synchronized book value.\\n-/\\ntheorem syncPriceBand_sets_book_value\\n    (capital_ supply_ : Uint256) (s : ContractState)\\n    (hSupply : supply_ != 0) :\\n    let s' := ((RammPriceBand.syncPriceBand capital_ supply_).run s).snd\\n    syncPriceBand_sets_book_value_spec capital_ supply_ s s' := by\\n  unfold syncPriceBand_sets_book_value_spec\\n  simpa using sync_sets_book_value_helper capital_ supply_ s hSupply\\n\\nend Benchmark.Cases.NexusMutual.RammPriceBand\\n\"}",
+                    "name": "write_editable_proof"
+                  },
+                  "id": "call_-7780044497462751595",
+                  "index": 0,
+                  "type": "function"
+                }
+              ]
+            }
+          }
+        ],
+        "created": 1774287750,
+        "id": "20260324014228dbfd1cc8c0bb4a35",
+        "model": "glm-5-turbo",
+        "object": "chat.completion",
+        "request_id": "20260324014228dbfd1cc8c0bb4a35",
+        "usage": {
+          "completion_tokens": 331,
+          "completion_tokens_details": {
+            "reasoning_tokens": 0
+          },
+          "prompt_tokens": 4246,
+          "prompt_tokens_details": {
+            "cached_tokens": 3717
+          },
+          "total_tokens": 4577
+        }
+      },
+      "response_text": "",
+      "tool_calls": [
+        {
+          "function": {
+            "arguments": "{\"content\":\"import Benchmark.Cases.NexusMutual.RammPriceBand.Specs\\n\\nnamespace Benchmark.Cases.NexusMutual.RammPriceBand\\n\\nopen Verity\\nopen Verity.EVM.Uint256\\n\\nprivate theorem sync_sets_book_value_helper\\n    (capital_ supply_ : Uint256) (s : ContractState)\\n    (hSupply : supply_ != 0) :\\n    let s' := ((RammPriceBand.syncPriceBand capital_ supply_).run s).snd\\n    s'.storage 2 = div (mul 1000000000000000000 capital_) supply_ := by\\n  simp [RammPriceBand.syncPriceBand, hSupply, RammPriceBand.bookValue,\\n    RammPriceBand.sellSpotPrice, RammPriceBand.buySpotPrice,\\n    setStorage, Verity.require, Verity.bind, Bind.bind,\\n    Contract.run, ContractResult.snd]\\n\\n/--\\nExecuting `syncPriceBand` stores the synchronized book value.\\n-/\\ntheorem syncPriceBand_sets_book_value\\n    (capital_ supply_ : Uint256) (s : ContractState)\\n    (hSupply : supply_ != 0) :\\n    let s' := ((RammPriceBand.syncPriceBand capital_ supply_).run s).snd\\n    syncPriceBand_sets_book_value_spec capital_ supply_ s s' := by\\n  unfold syncPriceBand_sets_book_value_spec\\n  simpa using sync_sets_book_value_helper capital_ supply_ s hSupply\\n\\nend Benchmark.Cases.NexusMutual.RammPriceBand\\n\"}",
+            "name": "write_editable_proof"
+          },
+          "id": "call_-7780044497462751595",
+          "index": 0,
+          "type": "function"
+        }
+      ],
+      "tool_results": [
+        {
+          "tool_call_id": "call_-7780044497462751595",
+          "name": "write_editable_proof",
+          "arguments": {
+            "content": "import Benchmark.Cases.NexusMutual.RammPriceBand.Specs\n\nnamespace Benchmark.Cases.NexusMutual.RammPriceBand\n\nopen Verity\nopen Verity.EVM.Uint256\n\nprivate theorem sync_sets_book_value_helper\n    (capital_ supply_ : Uint256) (s : ContractState)\n    (hSupply : supply_ != 0) :\n    let s' := ((RammPriceBand.syncPriceBand capital_ supply_).run s).snd\n    s'.storage 2 = div (mul 1000000000000000000 capital_) supply_ := by\n  simp [RammPriceBand.syncPriceBand, hSupply, RammPriceBand.bookValue,\n    RammPriceBand.sellSpotPrice, RammPriceBand.buySpotPrice,\n    setStorage, Verity.require, Verity.bind, Bind.bind,\n    Contract.run, ContractResult.snd]\n\n/--\nExecuting `syncPriceBand` stores the synchronized book value.\n-/\ntheorem syncPriceBand_sets_book_value\n    (capital_ supply_ : Uint256) (s : ContractState)\n    (hSupply : supply_ != 0) :\n    let s' := ((RammPriceBand.syncPriceBand capital_ supply_).run s).snd\n    syncPriceBand_sets_book_value_spec capital_ supply_ s s' := by\n  unfold syncPriceBand_sets_book_value_spec\n  simpa using sync_sets_book_value_helper capital_ supply_ s hSupply\n\nend Benchmark.Cases.NexusMutual.RammPriceBand\n"
+          },
+          "result": {
+            "status": "ok",
+            "path": "Benchmark/Generated/NexusMutual/RammPriceBand/Tasks/SyncSetsBookValue.lean",
+            "bytes": 1137,
+            "lines": 29
+          }
+        }
+      ]
+    },
+    {
+      "attempt": 6,
+      "mode": "interactive",
+      "messages": [
+        {
+          "role": "system",
+          "content": "[harness/PROMPT.md]\n# Harness Prompt\n\nEach task gives the agent:\n- fixed implementation files\n- fixed specification files\n- one editable proof file\n- one theorem target\n\nThe agent must return the full proof file. It must not change specs, change implementations, or rely on hidden solved proofs.\n\nThe harness rejects placeholders, runs Lean in a temp workspace, and checks the target theorem.\n\n[harness/POLICY.md]\n# Harness Policy\n\n- `tasks/*.yaml` is the execution unit.\n- The task manifest defines the proof contract.\n- Only run tasks with `proof_status` `partial` or `complete`.\n- Write deterministic outputs under `results/tasks/`.\n\n[harness/TOOLS.md]\n# Harness Tools\n\nThe fixed harness uses only repo-local tools:\n- `lake build <target>`\n- `scripts/run_task.sh`\n- `scripts/run_all.sh`\n\nThe tool surface stays narrow so runs remain comparable.\n\n[harness/PROOF_PATTERNS.md]\n# Proof Patterns\n\nUse public operational proof patterns, not hidden case solutions.\n\nVerity execution proofs often reduce with `simp` once the execution path is fixed.\nTypical symbols to unfold or simplify are:\n\n- `getStorage`, `setStorage`, `setMapping`, `setMappingUint`\n- `Verity.require`, `Verity.bind`, `Bind.bind`\n- `Verity.pure`, `Pure.pure`\n- `Contract.run`, `ContractResult.snd`\n- the contract's storage labels, such as `ContractName.counter`\n\nCommon pattern for a successful-path slot-write theorem:\n\n```lean\nprivate theorem slot_write_helper\n    (x : Uint256) (s : ContractState)\n    (hGuard : ...) :\n    let s' := ((ContractName.fn x).run s).snd\n    s'.storage slot = expected := by\n  simp [ContractName.fn, hGuard, ContractName.slotField,\n    getStorage, setStorage, Verity.require, Verity.bind, Bind.bind,\n    Verity.pure, Pure.pure, Contract.run, ContractResult.snd]\n```\n\nCommon pattern for a branch theorem:\n\n```lean\nby_cases hBranch : condition\n\u00b7 simp [ContractName.fn, hBranch, ...]\n\u00b7 have hNotBranch : \u00ac condition := hBranch\n  simp [ContractName.fn, hNotBranch, ...]\n```\n\nDo not use `split` on the final post-state goal unless the goal itself is explicitly a conjunction or a sum-type elimination. Generated Verity execution terms often simplify better if you first prove the exact branch facts used by the contract and then call `simp`.\n\nFor arithmetic threshold branches, the negated fact often needs to be restated in the comparator form used by the generated code. Example:\n\n```lean\nhave hNotFull : \u00ac 32000000000 \u2264 depositAmount := Nat.not_le_of_lt hSmall\nsimp [ContractName.fn, hCount, hMin, hNotFull, ...]\n```\n\nIf one theorem has to work for both sides of a branch, prove two private helpers first, one per branch, then use `by_cases` in the public theorem and `simpa using` the matching helper.\n\nIf `simp` reduces the goal to concrete slot equalities or a finite `if` over concrete slot numbers, `native_decide` or `decide` often closes the remaining goal.\n\nTypical shape:\n\n```lean\nhave hSlot : s'.storage slot = expected := by\n  simp [ContractName.fn, hGuard, ...]\n  native_decide\n```\n\nIf `simp` already solves the goal, do not leave a trailing `decide`, `exact`, or extra tactic line after it; Lean will report `no goals to be solved`.\n\nIf the public theorem is just a named spec, it is often cleaner to:\n\n1. prove a private helper theorem about the concrete post-state slots,\n2. unfold the spec,\n3. finish with `simpa using ...`."
+        },
+        {
+          "role": "user",
+          "content": "You are running the default benchmark agent for verity-benchmark.\nTreat this as a strict proof-generation benchmark.\nDo not invent specs, modify implementations, or rely on hidden reference proofs.\n\nYou are in interactive mode.\nAll implementation, specification, and editable proof files are already provided below. Do NOT re-read them with read_public_file \u2014 start working immediately.\nWorkflow: call write_editable_proof with your complete proof file, then call run_lean_check to verify.\nIf the check fails, read the error, fix the proof, and repeat write_editable_proof + run_lean_check.\nOnly use read_public_file or search_public_defs if you need a definition not shown below.\nDo not ask for or attempt arbitrary shell access, arbitrary filesystem access, or files outside this task.\n\nDo not claim that you will inspect more files or run commands.\nReason only from the task payload and the file contents included below.\nReturn Lean code only if you answer with a final proof file.\nTask ref: nexus_mutual/ramm_price_band/sync_sets_book_value\nTheorem name: Benchmark.Cases.NexusMutual.RammPriceBand.syncPriceBand_sets_book_value\nProof family: functional_correctness\nEditable file: Benchmark/Generated/NexusMutual/RammPriceBand/Tasks/SyncSetsBookValue.lean\n\nImplementation file contents:\n[Benchmark/Cases/NexusMutual/RammPriceBand/Contract.lean]\nimport Contracts.Common\n\nnamespace Benchmark.Cases.NexusMutual.RammPriceBand\n\nopen Verity hiding pure bind\nopen Verity.EVM.Uint256\nopen Verity.Stdlib.Math\n\n/-\n  Focused Verity slice of Nexus Mutual's RAMM pricing surface.\n  The real contract derives buy and sell prices from reserves, ratchets, and a\n  1% buffer around book value. This benchmark freezes that invariant-relevant\n  boundary computation and omits reserve adjustment, TWAP, and swap execution.\n-/\nverity_contract RammPriceBand where\n  storage\n    capital : Uint256 := slot 0\n    supply : Uint256 := slot 1\n    bookValue : Uint256 := slot 2\n    buySpotPrice : Uint256 := slot 3\n    sellSpotPrice : Uint256 := slot 4\n\n  function syncPriceBand (capital_ : Uint256, supply_ : Uint256) : Unit := do\n    require (supply_ != 0) \"SupplyMustBePositive\"\n\n    let bv := div (mul 1000000000000000000 capital_) supply_\n    let buy := div (mul bv 10100) 10000\n    let sell := div (mul bv 9900) 10000\n\n    setStorage capital capital_\n    setStorage supply supply_\n    setStorage bookValue bv\n    setStorage buySpotPrice buy\n    setStorage sellSpotPrice sell\n\nend Benchmark.Cases.NexusMutual.RammPriceBand\n\nSpecification file contents:\n[Benchmark/Cases/NexusMutual/RammPriceBand/Specs.lean]\nimport Verity.Specs.Common\nimport Benchmark.Cases.NexusMutual.RammPriceBand.Contract\n\nnamespace Benchmark.Cases.NexusMutual.RammPriceBand\n\nopen Verity\nopen Verity.EVM.Uint256\n\ndef syncPriceBand_sets_capital_spec\n    (capital_ : Uint256) (_s s' : ContractState) : Prop :=\n  s'.storage 0 = capital_\n\ndef syncPriceBand_sets_book_value_spec\n    (capital_ supply_ : Uint256) (_s s' : ContractState) : Prop :=\n  s'.storage 2 = div (mul 1000000000000000000 capital_) supply_\n\ndef syncPriceBand_sets_buy_price_spec\n    (capital_ supply_ : Uint256) (_s s' : ContractState) : Prop :=\n  let bv := div (mul 1000000000000000000 capital_) supply_\n  s'.storage 3 = div (mul bv 10100) 10000\n\ndef syncPriceBand_sets_sell_price_spec\n    (capital_ supply_ : Uint256) (_s s' : ContractState) : Prop :=\n  let bv := div (mul 1000000000000000000 capital_) supply_\n  s'.storage 4 = div (mul bv 9900) 10000\n\nend Benchmark.Cases.NexusMutual.RammPriceBand\n\nEditable proof template contents:\n[Benchmark/Generated/NexusMutual/RammPriceBand/Tasks/SyncSetsBookValue.lean]\nimport Benchmark.Cases.NexusMutual.RammPriceBand.Specs\n\nnamespace Benchmark.Cases.NexusMutual.RammPriceBand\n\nopen Verity\nopen Verity.EVM.Uint256\n\n/--\nExecuting `syncPriceBand` stores the synchronized book value.\n-/\ntheorem syncPriceBand_sets_book_value\n    (capital_ supply_ : Uint256) (s : ContractState)\n    (hSupply : supply_ != 0) :\n    let s' := ((RammPriceBand.syncPriceBand capital_ supply_).run s).snd\n    syncPriceBand_sets_book_value_spec capital_ supply_ s s' := by\n  -- Replace this placeholder with a complete Lean proof.\n  exact ?_\n\nend Benchmark.Cases.NexusMutual.RammPriceBand\n\nPublic proof hints:\n- Verity execution proofs often need `simp` with the operational definitions, not just the theorem spec.\n- Useful simplification symbols are often: `getStorage`, `setStorage`, `Verity.require`, `Verity.bind`, `Bind.bind`, `Verity.pure`, `Pure.pure`, `Contract.run`, and `ContractResult.snd`.\n- If `simp` gets stuck on a conditional execution path, prove branch-specific private helper theorems with explicit hypotheses instead of splitting the final post-state directly.\n- If helpful, add imports required for proof automation, for example `import Verity.Proofs.Stdlib.Automation`.\n- For functional-correctness theorems, unfold the spec to the mathematical target form before simplifying the execution result.\n"
+        },
+        {
+          "role": "user",
+          "content": "Your proof attempt (attempt 2 of 16) failed the Lean checker.\nFix the proof and resubmit using write_editable_proof, then call run_lean_check.\n\nFailed proof:\n```lean\nimport Benchmark.Cases.NexusMutual.RammPriceBand.Specs\n\nnamespace Benchmark.Cases.NexusMutual.RammPriceBand\n\nopen Verity\nopen Verity.EVM.Uint256\n\nprivate theorem sync_sets_book_value_helper\n    (capital_ supply_ : Uint256) (s : ContractState)\n    (hSupply : supply_ != 0) :\n    let s' := ((RammPriceBand.syncPriceBand capital_ supply_).run s).snd\n    s'.storage 2 = div (mul 1000000000000000000 capital_) supply_ := by\n  simp [RammPriceBand.syncPriceBand, hSupply, RammPriceBand.bookValue,\n    getStorage, setStorage, Verity.require, Verity.bind, Bind.bind,\n    Verity.pure, Pure.pure, Contract.run, ContractResult.snd]\n\n/--\nExecuting `syncPriceBand` stores the synchronized book value.\n-/\ntheorem syncPriceBand_sets_book_value\n    (capital_ supply_ : Uint256) (s : ContractState)\n    (hSupply : supply_ != 0) :\n    let s' := ((RammPriceBand.syncPriceBand capital_ supply_).run s).snd\n    syncPriceBand_sets_book_value_spec capital_ supply_ s s' := by\n  unfold syncPriceBand_sets_book_value_spec\n  simpa using sync_sets_book_value_helper capital_ supply_ s hSupply\n\nend Benchmark.Cases.NexusMutual.RammPriceBand\n```\n\nLean checker output:\nCandidateCheck.lean:12:69: error: unsolved goals\ncapital_ supply_ : Uint256\ns : ContractState\nhSupply : (supply_ != 0) = true\n\u22a2 (if 2 = RammPriceBand.sellSpotPrice.slot then div (mul (div (mul 1000000000000000000 capital_) supply_) 9900) 10000\n    else\n      if 2 = RammPriceBand.buySpotPrice.slot then div (mul (div (mul 1000000000000000000 capital_) supply_) 10100) 10000\n      else div (mul 1000000000000000000 capital_) supply_) =\n    div (mul 1000000000000000000 capital_) supply_\nCandidateCheck.lean:14:4: warning: This simp argument is unused:\n  getStorage\n\nHint: Omit it from the simp argument list.\n  simp [RammPriceBand.syncPriceBand, hSupply, RammPriceBand.bookValue, g\u0335e\u0335t\u0335S\u0335t\u0335o\u0335r\u0335a\u0335g\u0335e\u0335,\u0335 \u0335setStorage, Verity.require,\n  \u0332  \u0332 \u0332 \u0332Verity.bind, Bind.bind, Verity.pure, Pure.pure, Contract.run, ContractResult.snd]\n\nNote: This linter can be disabled with `set_option linter.unusedSimpArgs false`\nCandidateCheck.lean:15:4: warning: This simp argument is unused:\n  Verity.pure\n\nHint: Omit it from the simp argument list.\n  simp [RammPriceBand.syncPriceBand, hSupply, RammPriceBand.bookValue,\n  \u0335  \u0335 \u0335 \u0335getStorage, setStorage,\n  \u0332  \u0332 \u0332 \u0332Verity.require, Verity.bind, Bind.bind,\n  \u0335  \u0335 \u0335 \u0335V\u0335e\u0335r\u0335i\u0335t\u0335y\u0335.\u0335p\u0335u\u0335r\u0335e\u0335,\u0335 \u0335Pure.pure, Contract.run, ContractResult.snd]\n\nNote: This linter can be disabled with `set_option linter.unusedSimpArgs false`\nCandidateCheck.lean:15:17: warning: This simp argument is unused:\n  Pure.pure\n\nHint: Omit it from the simp argument list.\n  simp [RammPriceBand.syncPriceBand, hSupply, RammPriceBand.bookValue,\n  \u0335  \u0335 \u0335 \u0335getStorage, setStorage,\n  \u0332  \u0332 \u0332 \u0332Verity.require, Verity.bind, Bind.bind,\n  \u0335  \u0335 \u0335 \u0335Verity.pure, P\u0335u\u0335r\u0335e\u0335.\u0335p\u0335u\u0335r\u0335e\u0335,\u0335 \u0335Contract.run, ContractResult.snd]\n\nNote: This linter can be disabled with `set_option linter.unusedSimpArgs false`\nBenchmark.Cases.NexusMutual.RammPriceBand.syncPriceBand_sets_book_value (capital_ supply_ : Verity.Uint256)\n  (s : Verity.ContractState) (hSupply : (supply_ != 0) = true) :\n  have s' := ((Benchmark.Cases.NexusMutual.RammPriceBand.RammPriceBand.syncPriceBand capital_ supply_).run s).snd;\n  Benchmark.Cases.NexusMutual.RammPriceBand.syncPriceBand_sets_book_value_spec capital_ supply_ s s'\n\nRepair guidance:\n- If `simp` leaves finite residual equalities or `if` expressions, finish those with `native_decide` or `decide`.\n"
+        },
+        {
+          "role": "user",
+          "content": "Your proof attempt (attempt 4 of 16) failed the Lean checker.\nFix the proof and resubmit using write_editable_proof, then call run_lean_check.\n\nFailed proof:\n```lean\nimport Benchmark.Cases.NexusMutual.RammPriceBand.Specs\n\nnamespace Benchmark.Cases.NexusMutual.RammPriceBand\n\nopen Verity\nopen Verity.EVM.Uint256\n\nprivate theorem sync_sets_book_value_helper\n    (capital_ supply_ : Uint256) (s : ContractState)\n    (hSupply : supply_ != 0) :\n    let s' := ((RammPriceBand.syncPriceBand capital_ supply_).run s).snd\n    s'.storage 2 = div (mul 1000000000000000000 capital_) supply_ := by\n  simp [RammPriceBand.syncPriceBand, hSupply, RammPriceBand.bookValue,\n    RammPriceBand.sellSpotPrice, RammPriceBand.buySpotPrice,\n    setStorage, Verity.require, Verity.bind, Bind.bind,\n    Contract.run, ContractResult.snd]\n  native_decide\n\n/--\nExecuting `syncPriceBand` stores the synchronized book value.\n-/\ntheorem syncPriceBand_sets_book_value\n    (capital_ supply_ : Uint256) (s : ContractState)\n    (hSupply : supply_ != 0) :\n    let s' := ((RammPriceBand.syncPriceBand capital_ supply_).run s).snd\n    syncPriceBand_sets_book_value_spec capital_ supply_ s s' := by\n  unfold syncPriceBand_sets_book_value_spec\n  simpa using sync_sets_book_value_helper capital_ supply_ s hSupply\n\nend Benchmark.Cases.NexusMutual.RammPriceBand\n```\n\nLean checker output:\nCandidateCheck.lean:17:2: error: no goals to be solved\nBenchmark.Cases.NexusMutual.RammPriceBand.syncPriceBand_sets_book_value (capital_ supply_ : Verity.Uint256)\n  (s : Verity.ContractState) (hSupply : (supply_ != 0) = true) :\n  have s' := ((Benchmark.Cases.NexusMutual.RammPriceBand.RammPriceBand.syncPriceBand capital_ supply_).run s).snd;\n  Benchmark.Cases.NexusMutual.RammPriceBand.syncPriceBand_sets_book_value_spec capital_ supply_ s s'\n\nRepair guidance:\n- A previous `simp` likely closed the goal already. Remove trailing tactics after the goal is solved.\n"
+        },
+        {
+          "role": "assistant",
+          "content": "",
+          "tool_calls": [
+            {
+              "function": {
+                "arguments": "{\"content\":\"import Benchmark.Cases.NexusMutual.RammPriceBand.Specs\\n\\nnamespace Benchmark.Cases.NexusMutual.RammPriceBand\\n\\nopen Verity\\nopen Verity.EVM.Uint256\\n\\nprivate theorem sync_sets_book_value_helper\\n    (capital_ supply_ : Uint256) (s : ContractState)\\n    (hSupply : supply_ != 0) :\\n    let s' := ((RammPriceBand.syncPriceBand capital_ supply_).run s).snd\\n    s'.storage 2 = div (mul 1000000000000000000 capital_) supply_ := by\\n  simp [RammPriceBand.syncPriceBand, hSupply, RammPriceBand.bookValue,\\n    RammPriceBand.sellSpotPrice, RammPriceBand.buySpotPrice,\\n    setStorage, Verity.require, Verity.bind, Bind.bind,\\n    Contract.run, ContractResult.snd]\\n\\n/--\\nExecuting `syncPriceBand` stores the synchronized book value.\\n-/\\ntheorem syncPriceBand_sets_book_value\\n    (capital_ supply_ : Uint256) (s : ContractState)\\n    (hSupply : supply_ != 0) :\\n    let s' := ((RammPriceBand.syncPriceBand capital_ supply_).run s).snd\\n    syncPriceBand_sets_book_value_spec capital_ supply_ s s' := by\\n  unfold syncPriceBand_sets_book_value_spec\\n  simpa using sync_sets_book_value_helper capital_ supply_ s hSupply\\n\\nend Benchmark.Cases.NexusMutual.RammPriceBand\\n\"}",
+                "name": "write_editable_proof"
+              },
+              "id": "call_-7780044497462751595",
+              "index": 0,
+              "type": "function"
+            }
+          ]
+        },
+        {
+          "role": "tool",
+          "tool_call_id": "call_-7780044497462751595",
+          "content": "{\n  \"bytes\": 1137,\n  \"lines\": 29,\n  \"path\": \"Benchmark/Generated/NexusMutual/RammPriceBand/Tasks/SyncSetsBookValue.lean\",\n  \"status\": \"ok\"\n}"
+        }
+      ],
+      "response": {
+        "choices": [
+          {
+            "finish_reason": "tool_calls",
+            "index": 0,
+            "message": {
+              "content": "",
+              "role": "assistant",
+              "tool_calls": [
+                {
+                  "function": {
+                    "arguments": "{}",
+                    "name": "run_lean_check"
+                  },
+                  "id": "call_-7780044085145889507",
+                  "index": 0,
+                  "type": "function"
+                }
+              ]
+            }
+          }
+        ],
+        "created": 1774287752,
+        "id": "20260324014231a624f98c672848ea",
+        "model": "glm-5-turbo",
+        "object": "chat.completion",
+        "request_id": "20260324014231a624f98c672848ea",
+        "usage": {
+          "completion_tokens": 7,
+          "completion_tokens_details": {
+            "reasoning_tokens": 0
+          },
+          "prompt_tokens": 4631,
+          "prompt_tokens_details": {
+            "cached_tokens": 4245
+          },
+          "total_tokens": 4638
+        }
+      },
+      "response_text": "",
+      "tool_calls": [
+        {
+          "function": {
+            "arguments": "{}",
+            "name": "run_lean_check"
+          },
+          "id": "call_-7780044085145889507",
+          "index": 0,
+          "type": "function"
+        }
+      ],
+      "tool_results": [
+        {
+          "tool_call_id": "call_-7780044085145889507",
+          "name": "run_lean_check",
+          "arguments": {},
+          "result": {
+            "status": "passed",
+            "failure_mode": null,
+            "details": "Benchmark.Cases.NexusMutual.RammPriceBand.syncPriceBand_sets_book_value (capital_ supply_ : Verity.Uint256)\n  (s : Verity.ContractState) (hSupply : (supply_ != 0) = true) :\n  have s' := ((Benchmark.Cases.NexusMutual.RammPriceBand.RammPriceBand.syncPriceBand capital_ supply_).run s).snd;\n  Benchmark.Cases.NexusMutual.RammPriceBand.syncPriceBand_sets_book_value_spec capital_ supply_ s s'",
+            "command": [
+              "lake",
+              "env",
+              "lean",
+              "--root=.",
+              "CandidateCheck.lean"
+            ],
+            "candidate_workspace": "Benchmark/Generated/NexusMutual/RammPriceBand/Tasks/SyncSetsBookValue.lean"
+          }
+        }
+      ],
+      "candidate_file_contents": "import Benchmark.Cases.NexusMutual.RammPriceBand.Specs\n\nnamespace Benchmark.Cases.NexusMutual.RammPriceBand\n\nopen Verity\nopen Verity.EVM.Uint256\n\nprivate theorem sync_sets_book_value_helper\n    (capital_ supply_ : Uint256) (s : ContractState)\n    (hSupply : supply_ != 0) :\n    let s' := ((RammPriceBand.syncPriceBand capital_ supply_).run s).snd\n    s'.storage 2 = div (mul 1000000000000000000 capital_) supply_ := by\n  simp [RammPriceBand.syncPriceBand, hSupply, RammPriceBand.bookValue,\n    RammPriceBand.sellSpotPrice, RammPriceBand.buySpotPrice,\n    setStorage, Verity.require, Verity.bind, Bind.bind,\n    Contract.run, ContractResult.snd]\n\n/--\nExecuting `syncPriceBand` stores the synchronized book value.\n-/\ntheorem syncPriceBand_sets_book_value\n    (capital_ supply_ : Uint256) (s : ContractState)\n    (hSupply : supply_ != 0) :\n    let s' := ((RammPriceBand.syncPriceBand capital_ supply_).run s).snd\n    syncPriceBand_sets_book_value_spec capital_ supply_ s s' := by\n  unfold syncPriceBand_sets_book_value_spec\n  simpa using sync_sets_book_value_helper capital_ supply_ s hSupply\n\nend Benchmark.Cases.NexusMutual.RammPriceBand\n",
+      "evaluation": {
+        "status": "passed",
+        "failure_mode": null,
+        "details": "Benchmark.Cases.NexusMutual.RammPriceBand.syncPriceBand_sets_book_value (capital_ supply_ : Verity.Uint256)\n  (s : Verity.ContractState) (hSupply : (supply_ != 0) = true) :\n  have s' := ((Benchmark.Cases.NexusMutual.RammPriceBand.RammPriceBand.syncPriceBand capital_ supply_).run s).snd;\n  Benchmark.Cases.NexusMutual.RammPriceBand.syncPriceBand_sets_book_value_spec capital_ supply_ s s'",
+        "command": [
+          "lake",
+          "env",
+          "lean",
+          "--root=.",
+          "CandidateCheck.lean"
+        ],
+        "candidate_workspace": "Benchmark/Generated/NexusMutual/RammPriceBand/Tasks/SyncSetsBookValue.lean"
+      }
+    }
+  ],
+  "tool_calls_used": 6
+}
