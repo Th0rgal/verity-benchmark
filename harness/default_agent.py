@@ -467,12 +467,91 @@ def render_file_bundle(paths: list[str]) -> str:
     return "\n\n".join(sections).strip()
 
 
+def extract_contract_simp_terms(task: dict[str, Any]) -> list[str]:
+    """Extract concrete simp terms from implementation files.
+
+    Parses verity_contract storage field declarations and function names
+    to generate the exact simp lemma set needed.
+    """
+    terms: list[str] = []
+    contract_name = ""
+    for rel_path in task.get("implementation_files", []):
+        path = ROOT / rel_path
+        if not path.is_file():
+            continue
+        content = path.read_text(encoding="utf-8")
+        # Extract contract name from 'verity_contract ContractName where'
+        contract_match = re.search(r"verity_contract\s+(\w+)\s+where", content)
+        if contract_match:
+            contract_name = contract_match.group(1)
+        # Extract storage field names
+        for field_match in re.finditer(
+            r"^\s+(\w+)\s*:.*:=\s*slot\s+\d+",
+            content,
+            re.MULTILINE,
+        ):
+            field_name = field_match.group(1)
+            if contract_name:
+                terms.append(f"{contract_name}.{field_name}")
+        # Extract function names
+        for fn_match in re.finditer(
+            r"^\s+function\s+(\w+)\s*\(",
+            content,
+            re.MULTILINE,
+        ):
+            fn_name = fn_match.group(1)
+            if contract_name:
+                terms.append(f"{contract_name}.{fn_name}")
+    # Also extract helper def names from spec files (non-spec helper definitions)
+    spec_helpers: list[str] = []
+    spec_defs: list[str] = []
+    for rel_path in task.get("specification_files", []):
+        path = ROOT / rel_path
+        if not path.is_file():
+            continue
+        content = path.read_text(encoding="utf-8")
+        for def_match in re.finditer(
+            r"^def\s+(\w+)\b",
+            content,
+            re.MULTILINE,
+        ):
+            def_name = def_match.group(1)
+            if def_name.endswith("_spec"):
+                spec_defs.append(def_name)
+            elif def_name not in terms:
+                spec_helpers.append(def_name)
+    terms.extend(spec_helpers)
+    return terms
+
+
+def extract_contract_branches(task: dict[str, Any]) -> list[str]:
+    """Extract conditional branch conditions from contract implementation files."""
+    branches: list[str] = []
+    for rel_path in task.get("implementation_files", []):
+        path = ROOT / rel_path
+        if not path.is_file():
+            continue
+        content = path.read_text(encoding="utf-8")
+        # Match 'if <condition> then' patterns in contract code
+        for m in re.finditer(r"if\s+(.+?)\s+then", content):
+            cond = m.group(1).strip()
+            if cond not in branches:
+                branches.append(cond)
+    return branches
+
+
 def build_proof_hints(task: dict[str, Any]) -> str:
     family = str(task.get("proof_family", ""))
+    # Extract concrete simp terms from contract files
+    contract_terms = extract_contract_simp_terms(task)
     shared = [
         "Verity execution proofs often need `simp` with the operational definitions, not just the theorem spec.",
-        "Useful simplification symbols are often: `getStorage`, `setStorage`, `Verity.require`, `Verity.bind`, `Bind.bind`, `Verity.pure`, `Pure.pure`, `Contract.run`, and `ContractResult.snd`.",
-        "If `simp` gets stuck on a conditional execution path, prove branch-specific private helper theorems with explicit hypotheses instead of splitting the final post-state directly.",
+        "Useful simplification symbols are often: `getStorage`, `setStorage`, `getMapping`, `setMapping`, `getMappingUint`, `setMappingUint`, `msgSender`, `Verity.require`, `Verity.bind`, `Bind.bind`, `Verity.pure`, `Pure.pure`, `Contract.run`, and `ContractResult.snd`.",
+        "CRITICAL: Include ALL storage field definitions (e.g., `ContractName.depositCount`, `ContractName.chainStarted`) in the simp set so that `.slot` reduces to concrete slot numbers. Without these, simp leaves unresolved `if` expressions.",
+        "CRITICAL: Pass ALL precondition hypotheses (`hCount`, `hMin`, etc.) to simp so it can evaluate `if` branches. Simp needs the hypotheses to reduce conditional execution paths.",
+        "For mapping storage, the contract may use `setMappingUint`/`getMappingUint`. Include `setMappingUint`/`getMappingUint` and the mapping field definitions in simp.",
+        "If the contract has conditional branches (e.g., `if depositAmount >= threshold then ...`), use `by_cases` on each condition BEFORE calling `simp`, not `split` after. Pass ALL case hypotheses to `simp`. For nested conditionals, nest `by_cases`. Example pattern:\n  ```\n  by_cases hBig : depositAmount >= 32000000000\n  · by_cases hThresh : add (s.storage 1) 1 = 65536\n    · simp [..., hBig, hThresh]\n    · simp [..., hBig, hThresh]\n  · simp [..., hBig]\n  ```",
+        "If `simp` leaves unsolved goals because a hypothesis (e.g., `hBound`) uses a spec helper name while the goal has it unfolded, use `simp_all` instead of `simp`. `simp_all` rewrites hypotheses into the goal context, allowing it to match and discharge conditions that `simp` alone cannot.",
         "If helpful, add imports required for proof automation, for example `import Verity.Proofs.Stdlib.Automation`.",
     ]
     family_specific: list[str] = []
@@ -487,7 +566,7 @@ def build_proof_hints(task: dict[str, Any]) -> str:
         ]
     elif family == "authorization_enablement":
         family_specific = [
-            "For authorization theorems, unfold the spec and simplify the guarded execution path using the permission hypotheses.",
+            "For authorization theorems, unfold the spec then use `simp_all` (NOT `simp`) with the full simp set including all spec helpers. `simp_all` rewrites hypotheses into the goal, resolving require-guard conditions automatically. Do NOT use `dsimp` + `simp only` - use a single `simp_all` call.",
         ]
     elif family == "refinement_equivalence":
         family_specific = [
@@ -498,16 +577,32 @@ def build_proof_hints(task: dict[str, Any]) -> str:
             "For functional-correctness theorems, unfold the spec to the mathematical target form before simplifying the execution result.",
         ]
     lines = ["Public proof hints:"] + [f"- {item}" for item in [*shared, *family_specific]]
+    if contract_terms:
+        lines.append(f"\nContract-specific simp terms for this task (include ALL of these in your simp calls):")
+        lines.append(f"  simp_all [{', '.join(contract_terms)}, getStorage, setStorage, getMapping, setMapping, getMappingUint, setMappingUint, msgSender, Verity.require, Verity.bind, Bind.bind, Verity.pure, Pure.pure, Contract.run, ContractResult.snd]")
+        lines.append(f"  (Use `simp_all` instead of `simp` when hypotheses reference spec helpers like `computedClaimAmount`. If `simp_all` is too aggressive, fall back to `simp [..., <hypotheses>]`.)")
+    # Extract and show branch conditions
+    branches = extract_contract_branches(task)
+    if branches:
+        lines.append(f"\nConditional branches in this contract (use `by_cases` on each relevant condition before simp):")
+        for i, branch in enumerate(branches):
+            lines.append(f"  {i+1}. `{branch}`")
     return "\n".join(lines)
 
 
 def build_user_prompt(task: dict[str, Any], *, interactive: bool) -> str:
     editable_file = task["editable_files"][0]
     mode_instructions = (
-        "You are in interactive mode.\n"
-        "Use the provided tools to read task-scoped public files, write the editable proof, run the official Lean check, inspect goals if available, and search public definitions.\n"
+        "You are in interactive mode with verification tools.\n"
+        "Workflow:\n"
+        "1. Read the implementation and specification files to understand the definitions.\n"
+        "2. Write your proof attempt using write_editable_proof.\n"
+        "3. Run run_lean_check to verify. If it fails, read the failure_class and repair_hints in the result.\n"
+        "4. For unknown_identifier errors: use search_public_defs to find correct names.\n"
+        "5. For unsolved_goals: use inspect_lean_goals with a ?_ hole to see the exact goal, then write targeted tactics.\n"
+        "6. Fix the specific error, write the corrected proof, and re-check. Do not rewrite from scratch unless the approach is fundamentally wrong.\n"
+        "7. When the check passes, return the final proof file as your response.\n"
         "Do not ask for or attempt arbitrary shell access, arbitrary filesystem access, or files outside this task.\n"
-        "When you are satisfied, return the final complete Lean proof file or leave the final proof in the editable file via the tool.\n"
     ) if interactive else (
         "The harness may give you several bounded repair rounds for the same task.\n"
         "On every round, return the complete editable Lean proof file, not a patch or explanation.\n"
@@ -541,27 +636,180 @@ def build_messages(config: ResolvedAgentConfig, task: dict[str, Any]) -> list[di
     ]
 
 
+def classify_failure(details: str) -> str:
+    """Classify a Lean checker failure into a coarse category for dispatch."""
+    if not details:
+        return "unknown"
+    if "unknown identifier" in details.lower() or "Unknown identifier" in details:
+        return "unknown_identifier"
+    if "unknown constant" in details.lower():
+        return "unknown_identifier"
+    if "unsolved goals" in details.lower():
+        return "unsolved_goals"
+    if "type mismatch" in details.lower():
+        return "type_mismatch"
+    if "tactic 'split' failed" in details:
+        return "split_failed"
+    if "no goals to be solved" in details:
+        return "no_goals"
+    if "expected type must not contain free variables" in details:
+        return "free_variables"
+    if "declaration uses 'sorry'" in details.lower() or "declaration uses 'admit'" in details.lower():
+        return "placeholder"
+    if "unknown tactic" in details.lower():
+        return "unknown_tactic"
+    if "function expected" in details.lower():
+        return "type_error"
+    if "application type mismatch" in details.lower():
+        return "type_error"
+    if "simp made no progress" in details.lower():
+        return "simp_no_progress"
+    if "failed to unfold" in details.lower():
+        return "unfold_failed"
+    if "dsimp made no progress" in details.lower():
+        return "simp_no_progress"
+    if "tactic 'rfl' failed" in details:
+        return "rfl_failed"
+    return "other"
+
+
+def score_evaluation(evaluation: dict[str, Any], *, candidate_text: str, previous_score: dict[str, Any] | None) -> dict[str, Any]:
+    """Score an evaluation result for progress tracking.
+
+    Returns a dict with:
+      - parses: bool (candidate parsed without syntax errors)
+      - failure_class: str
+      - first_error_line: int | None
+      - error_count: int
+      - goal_count: int (unsolved goals mentioned)
+      - score: float (higher is better, 0.0-1.0 scale)
+      - improved: bool | None (vs previous)
+    """
+    status = evaluation.get("status", "failed")
+    if status == "passed":
+        return {
+            "parses": True,
+            "failure_class": "none",
+            "first_error_line": None,
+            "error_count": 0,
+            "goal_count": 0,
+            "score": 1.0,
+            "improved": True if previous_score and previous_score["score"] < 1.0 else None,
+        }
+
+    details = str(evaluation.get("details", ""))
+    failure_mode = str(evaluation.get("failure_mode", ""))
+    failure_class = classify_failure(details)
+
+    # Quick rejections get low scores
+    if failure_mode in ("placeholder_detected", "hidden_proof_import_detected",
+                        "hidden_case_import_detected", "theorem_statement_mismatch",
+                        "empty_response"):
+        return {
+            "parses": failure_mode != "empty_response",
+            "failure_class": failure_class,
+            "first_error_line": None,
+            "error_count": 0,
+            "goal_count": 0,
+            "score": 0.05,
+            "improved": False if previous_score and previous_score["score"] > 0.05 else None,
+        }
+
+    # Parse error lines from Lean output
+    error_lines: list[int] = []
+    for match in re.finditer(r":(\d+):\d+: error:", details):
+        error_lines.append(int(match.group(1)))
+    first_error_line = min(error_lines) if error_lines else None
+    error_count = len(error_lines)
+
+    # Count unsolved goals
+    goal_matches = re.findall(r"unsolved goals", details, re.IGNORECASE)
+    goal_count = len(goal_matches)
+
+    # Score: higher first_error_line is better (deeper into proof),
+    # fewer errors is better, fewer unsolved goals is better
+    candidate_lines = len(candidate_text.splitlines()) if candidate_text else 1
+    line_progress = (first_error_line / max(candidate_lines, 1)) if first_error_line else 0.0
+    error_penalty = min(error_count * 0.1, 0.4)
+    goal_penalty = min(goal_count * 0.05, 0.2)
+
+    # Failure class severity ordering
+    class_bonus = {
+        "no_goals": 0.15,  # close to done, just over-proved
+        "unsolved_goals": 0.1,
+        "type_mismatch": 0.05,
+        "split_failed": 0.05,
+        "unknown_identifier": 0.0,
+        "free_variables": 0.0,
+        "unknown_tactic": -0.05,
+        "type_error": -0.05,
+    }.get(failure_class, 0.0)
+
+    raw_score = 0.1 + line_progress * 0.5 + class_bonus - error_penalty - goal_penalty
+    score = max(0.05, min(0.95, raw_score))
+
+    improved = None
+    if previous_score is not None:
+        improved = score > previous_score["score"]
+
+    return {
+        "parses": True,
+        "failure_class": failure_class,
+        "first_error_line": first_error_line,
+        "error_count": error_count,
+        "goal_count": goal_count,
+        "score": round(score, 3),
+        "improved": improved,
+    }
+
+
 def build_repair_guidance(details: str) -> str:
     hints: list[str] = []
-    if "tactic 'split' failed" in details:
+    failure_class = classify_failure(details)
+
+    if failure_class == "split_failed":
         hints.append(
             "- Do not `split` the final post-state blindly. Prove branch-specific helper theorems first, then use `by_cases` plus `simpa`."
         )
-    if "no goals to be solved" in details:
+    if failure_class == "no_goals":
         hints.append(
             "- A previous `simp` likely closed the goal already. Remove trailing tactics after the goal is solved."
         )
-    if "expected type must not contain free variables" in details:
+    if failure_class == "free_variables":
         hints.append(
             "- Do not use `native_decide` or `decide` on goals that still contain parameters. First reduce to concrete equalities."
         )
-    if "Unknown identifier" in details:
+    if failure_class == "unknown_identifier":
         hints.append(
             "- Fix typos or missing imports directly. Standard names such as `Nat.lt_of_not_ge` and `Nat.not_le_of_lt` are often useful."
         )
-    if "unsolved goals" in details and "if " in details:
         hints.append(
-            "- If `simp` leaves finite residual equalities or `if` expressions, finish those with `native_decide` or `decide`."
+            "- Use the `search_public_defs` tool to find correct definition names from the specification and implementation files."
+        )
+    if failure_class == "unsolved_goals":
+        if "if " in details or "match" in details:
+            hints.append(
+                "- If `simp` leaves `if`/`match` expressions with free variables, use `by_cases` on each unresolved condition BEFORE calling simp. Pass all case hypotheses to simp. Do NOT use `split` after simp or `native_decide`/`decide` on goals with free variables."
+            )
+        hints.append(
+            "- Try `inspect_lean_goals` with a `?_` hole to see the exact goal state, then write targeted tactics."
+        )
+    if failure_class == "rfl_failed":
+        if "match" in details or "if " in details:
+            hints.append(
+                "- rfl failed because the goal has unresolved `if`/`match` expressions. Use `by_cases` on each unresolved condition BEFORE simp, not `split` after. Pass all case hypotheses to simp. For nested conditions, nest `by_cases`."
+            )
+        else:
+            hints.append(
+                "- rfl failed. Try replacing `rfl` with `simp` or adding more definitions to the simp set."
+            )
+    if failure_class == "type_mismatch":
+        hints.append(
+            "- Check that your proof term has the expected type. Unfold definitions to align both sides."
+        )
+    if failure_class == "unknown_tactic":
+        hints.append(
+            "- Use standard Lean 4 / Mathlib tactics. Remove any tactic the checker does not recognize."
         )
     return "\n".join(hints)
 

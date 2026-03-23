@@ -287,13 +287,36 @@ class TaskProofRuntime:
         if name == "write_editable_proof":
             return self.write_editable_proof(str(arguments.get("content", "")))
         if name == "run_lean_check":
-            return self.evaluate_current()
+            result = self.evaluate_current()
+            if result.get("status") == "failed":
+                result = self._annotate_check_result(result)
+            return result
         if name == "inspect_lean_goals":
             return self.inspect_goals()
         if name == "search_public_defs":
             limit = int(arguments.get("limit", 20))
             return self.search_public_defs(str(arguments.get("query", "")), limit=limit)
         return {"status": "rejected", "reason": "unknown_tool", "tool": name}
+
+    def _annotate_check_result(self, result: dict[str, Any]) -> dict[str, Any]:
+        """Annotate a failed check result with failure classification and repair hints."""
+        details = str(result.get("details", ""))
+        failure_class = _classify_failure(details)
+        hints = _build_check_hints(failure_class, details)
+        annotated = dict(result)
+        annotated["failure_class"] = failure_class
+        if hints:
+            annotated["repair_hints"] = hints
+
+        # Add structured error summary
+        error_lines: list[int] = []
+        for match in re.finditer(r":(\d+):\d+: error:", details):
+            error_lines.append(int(match.group(1)))
+        if error_lines:
+            annotated["error_count"] = len(error_lines)
+            annotated["first_error_line"] = min(error_lines)
+
+        return annotated
 
     def _materialize_workspace(self, workspace: Path) -> None:
         workspace.mkdir(parents=True, exist_ok=True)
@@ -351,6 +374,82 @@ class TaskProofRuntime:
         if suffix:
             module_path = module_path[: -len(suffix)]
         return module_path.replace("/", ".")
+
+
+def _classify_failure(details: str) -> str:
+    """Classify a Lean checker failure into a coarse category."""
+    if not details:
+        return "unknown"
+    lower = details.lower()
+    if "unknown identifier" in lower or "unknown constant" in lower:
+        return "unknown_identifier"
+    if "unsolved goals" in lower:
+        return "unsolved_goals"
+    if "type mismatch" in lower:
+        return "type_mismatch"
+    if "tactic 'split' failed" in details:
+        return "split_failed"
+    if "no goals to be solved" in details:
+        return "no_goals"
+    if "expected type must not contain free variables" in details:
+        return "free_variables"
+    if "unknown tactic" in lower:
+        return "unknown_tactic"
+    if "function expected" in lower or "application type mismatch" in lower:
+        return "type_error"
+    if "simp made no progress" in lower:
+        return "simp_no_progress"
+    if "failed to unfold" in lower or "unfold" in lower and "failed" in lower:
+        return "unfold_failed"
+    if "dsimp made no progress" in lower:
+        return "simp_no_progress"
+    if "tactic 'rfl' failed" in details:
+        return "rfl_failed"
+    if "invalid" in lower and "conv tactic" in lower:
+        return "tactic_misuse"
+    return "other"
+
+
+def _build_check_hints(failure_class: str, details: str) -> list[str]:
+    """Build targeted repair hints based on failure classification."""
+    hints: list[str] = []
+    if failure_class == "unknown_identifier":
+        hints.append("Use search_public_defs to find correct names from spec/impl files.")
+        hints.append("Check imports. Standard names: Nat.lt_of_not_ge, Nat.not_le_of_lt.")
+    elif failure_class == "unsolved_goals":
+        hints.append("Use inspect_lean_goals with a ?_ hole to see exact goal state.")
+        if "if " in details or "match" in details:
+            hints.append("If simp leaves `if`/`match` with free variables, use `by_cases` on each unresolved condition BEFORE calling simp. Pass all case hypotheses to simp. Do NOT use `split` after simp or `native_decide`/`decide` on goals with free variables.")
+        if "unused" in details.lower() and ("hBound" in details or "hypothesis" in details.lower()):
+            hints.append("If a hypothesis is reported as unused by simp, try `simp_all` instead of `simp`. `simp_all` rewrites hypotheses into the goal, resolving mismatches between spec helper names and unfolded definitions.")
+        hints.append("Try restructuring: `by_cases h : condition · simp [..., h] · simp [..., h]`.")
+    elif failure_class == "type_mismatch":
+        hints.append("Unfold definitions to align types. Check spec matches impl.")
+    elif failure_class == "split_failed":
+        hints.append("Do not split the post-state. Use by_cases with branch-specific helpers.")
+    elif failure_class == "no_goals":
+        hints.append("Previous simp closed the goal. Remove trailing tactics.")
+    elif failure_class == "free_variables":
+        hints.append("Reduce to concrete equalities before decide/native_decide.")
+    elif failure_class == "unknown_tactic":
+        hints.append("Use standard Lean 4 / Mathlib tactics only.")
+    elif failure_class == "simp_no_progress":
+        hints.append("simp/dsimp made no progress. The simp lemmas may be wrong or unnecessary.")
+        hints.append("If this is after a `split` or `by_cases`, provide the full simp set AND all case hypotheses. Bare `simp` won't work.")
+        hints.append("Check that you are using the correct function name from the implementation file.")
+    elif failure_class == "unfold_failed":
+        hints.append("unfold failed. The definition name may be wrong or not unfoldable.")
+        hints.append("Use search_public_defs to find the exact definition name.")
+    elif failure_class == "rfl_failed":
+        hints.append("rfl failed because the LHS is not definitionally equal to the RHS.")
+        if "match" in details or "if " in details:
+            hints.append("The goal has unresolved `if`/`match` expressions with free variables. Use `by_cases` on each condition BEFORE calling simp, not `split` after. Pass all case hypotheses to simp. For nested conditionals, nest `by_cases`. Example: `by_cases h : cond; · simp [..., h]; · simp [..., h]`.")
+        else:
+            hints.append("Try replacing `rfl` with `simp` or adding more definitions to the simp set.")
+    elif failure_class == "tactic_misuse":
+        hints.append("The tactic was used incorrectly for this goal shape.")
+        hints.append("Check the goal state with inspect_lean_goals using a ?_ hole.")
+    return hints
 
 
 def tool_result_json(result: dict[str, Any]) -> str:
