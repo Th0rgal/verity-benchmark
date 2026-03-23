@@ -69,6 +69,7 @@ Env handling:
 - `.env.keys` is local-only and gitignored
 - CI uses the `DOTENV_PRIVATE_KEY` secret
 - `.env.local` can override values locally
+- benchmark-managed credential vars from the parent shell are ignored by default; set `VERITY_BENCHMARK_ALLOW_PROCESS_SECRET_OVERRIDES=1` to opt back in
 
 Live backend checks are off by default. Set `VERITY_BENCHMARK_RUN_LIVE_AGENT_CHECKS=1` to enable them in `./scripts/check.sh`.
 

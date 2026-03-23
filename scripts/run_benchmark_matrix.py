@@ -65,7 +65,9 @@ def load_json(path: Path) -> dict[str, Any]:
 
 def write_json(path: Path, payload: dict[str, Any]) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_text(json.dumps(payload, indent=2) + "\n", encoding="utf-8")
+    tmp_path = path.with_suffix(path.suffix + ".tmp")
+    tmp_path.write_text(json.dumps(payload, indent=2) + "\n", encoding="utf-8")
+    tmp_path.replace(path)
 
 
 def format_average(value: float) -> str:
@@ -115,6 +117,8 @@ def build_temp_config(base_config_path: Path, run_slug: str, state_dir: Path) ->
 
 
 def run_suite(config_path: Path, *, log_handle: Any) -> Path:
+    resolved = resolve_config(config_path, require_secrets=True)
+    summary_path = ROOT / "results" / "agent_summaries" / resolved.track / f"{resolved.run_slug}.json"
     command = [
         str(ROOT / "scripts" / "exec_with_dotenvx.sh"),
         "python3",
@@ -126,10 +130,9 @@ def run_suite(config_path: Path, *, log_handle: Any) -> Path:
         relative(config_path),
     ]
     return_code = subprocess.call(command, cwd=ROOT, stdout=log_handle, stderr=subprocess.STDOUT)
-    if return_code != 0:
+    if return_code != 0 and not summary_path.is_file():
         raise SystemExit(f"run-suite failed with exit code {return_code}")
-    resolved = resolve_config(config_path, require_secrets=True)
-    return ROOT / "results" / "agent_summaries" / resolved.track / f"{resolved.run_slug}.json"
+    return summary_path
 
 
 def target_specs(args: argparse.Namespace) -> list[BenchmarkTarget]:
@@ -165,6 +168,30 @@ def resolve_state_dir(run_id: str | None) -> Path:
 def write_latest_run(run_id: str) -> None:
     MATRIX_RESULTS_DIR.mkdir(parents=True, exist_ok=True)
     (MATRIX_RESULTS_DIR / "latest-run.txt").write_text(run_id + "\n", encoding="utf-8")
+
+
+def spawn_worker(state_dir: Path, run_id: str, target_key: str, log_path: Path) -> int:
+    script_path = ROOT / "scripts" / "run_benchmark_matrix.py"
+    env = os.environ.copy()
+    worker_command = [
+        "python3",
+        str(script_path),
+        "worker",
+        "--run-id",
+        run_id,
+        "--target-key",
+        target_key,
+    ]
+    with log_path.open("a", encoding="utf-8") as log_handle:
+        process = subprocess.Popen(
+            worker_command,
+            cwd=ROOT,
+            stdout=log_handle,
+            stderr=subprocess.STDOUT,
+            start_new_session=True,
+            env=env,
+        )
+    return process.pid
 
 
 def pid_is_alive(pid: int) -> bool:
@@ -368,35 +395,16 @@ def command_start(args: argparse.Namespace) -> int:
         "targets": [],
     }
 
-    script_path = ROOT / "scripts" / "run_benchmark_matrix.py"
     for target in targets:
         config = load_config(target.config_path)
         log_path = state_dir / "logs" / f"{target.key}.log"
-        env = os.environ.copy()
-        worker_command = [
-            "python3",
-            str(script_path),
-            "worker",
-            "--run-id",
-            run_id,
-            "--target-key",
-            target.key,
-        ]
-        with log_path.open("a", encoding="utf-8") as log_handle:
-            process = subprocess.Popen(
-                worker_command,
-                cwd=ROOT,
-                stdout=log_handle,
-                stderr=subprocess.STDOUT,
-                start_new_session=True,
-                env=env,
-            )
+        pid = spawn_worker(state_dir, run_id, target.key, log_path)
 
         worker_payload = {
             "schema_version": 2,
             "target_key": target.key,
             "status": "running",
-            "pid": process.pid,
+            "pid": pid,
             "model": str(config["model"]),
             "repeats": target.repeats,
             "completed_runs": 0,
@@ -421,6 +429,44 @@ def command_start(args: argparse.Namespace) -> int:
     write_latest_run(run_id)
     print(f"started matrix run {run_id}")
     print(relative(state_dir))
+    return 0
+
+
+def command_retry_target(args: argparse.Namespace) -> int:
+    state_dir = resolve_state_dir(args.run_id)
+    state = load_json(state_dir / "state.json")
+    target_info = next((item for item in state["targets"] if item["key"] == args.target_key), None)
+    if target_info is None:
+        raise SystemExit(f"unknown target key {args.target_key!r}")
+
+    worker = load_worker_state(state_dir, args.target_key)
+    pid = int(worker.get("pid", 0))
+    if worker.get("status") == "running" and pid > 0 and pid_is_alive(pid):
+        raise SystemExit(f"target {args.target_key!r} is still running")
+
+    log_path = ROOT / str(worker["log_path"])
+    if args.clear_log:
+        log_path.write_text("", encoding="utf-8")
+
+    worker.pop("error", None)
+    worker.pop("failed_at", None)
+    worker.pop("finished_at", None)
+    worker.update(
+        {
+            "status": "running",
+            "pid": 0,
+            "completed_runs": 0,
+            "current_run_index": 1 if int(worker.get("repeats", 0)) > 0 else 0,
+            "started_at": utc_now(),
+            "runs": [],
+        }
+    )
+    write_worker_state(state_dir, args.target_key, worker)
+
+    pid = spawn_worker(state_dir, state["run_id"], args.target_key, log_path)
+    worker["pid"] = pid
+    write_worker_state(state_dir, args.target_key, worker)
+    print(f"{args.target_key}: restarted pid={pid}")
     return 0
 
 
@@ -671,6 +717,11 @@ def build_parser() -> argparse.ArgumentParser:
     wait_parser.add_argument("--poll-seconds", type=int, default=30)
     wait_parser.add_argument("--timeout-seconds", type=int, default=0)
 
+    retry_parser = subparsers.add_parser("retry-target", help="Restart one failed or stopped matrix worker")
+    retry_parser.add_argument("--run-id")
+    retry_parser.add_argument("--target-key", required=True)
+    retry_parser.add_argument("--clear-log", action="store_true")
+
     return parser
 
 
@@ -696,6 +747,8 @@ def main() -> int:
         return command_render(args)
     if args.command == "wait":
         return command_wait(args)
+    if args.command == "retry-target":
+        return command_retry_target(args)
     raise SystemExit(f"unsupported command {args.command!r}")
 
 
