@@ -605,14 +605,14 @@ def build_user_prompt(task: dict[str, Any], *, interactive: bool) -> str:
     editable_file = task["editable_files"][0]
     mode_instructions = (
         "You are in interactive mode with verification tools.\n"
-        "Workflow:\n"
-        "1. Read the implementation and specification files to understand the definitions.\n"
-        "2. Write your proof attempt using write_editable_proof.\n"
-        "3. Run run_lean_check to verify. If it fails, read the failure_class and repair_hints in the result.\n"
-        "4. For unknown_identifier errors: use search_public_defs to find correct names.\n"
-        "5. For unsolved_goals: use inspect_lean_goals with a ?_ hole to see the exact goal, then write targeted tactics.\n"
-        "6. Fix the specific error, write the corrected proof, and re-check. Do not rewrite from scratch unless the approach is fundamentally wrong.\n"
-        "7. When the check passes, return the final proof file as your response.\n"
+        "All implementation, specification, and editable proof files are already provided below. "
+        "Do NOT re-read them with read_public_file — start working immediately.\n"
+        "Workflow: call write_editable_proof with your complete proof file, then call run_lean_check to verify.\n"
+        "If the check fails, read the failure_class and repair_hints in the result.\n"
+        "For unknown_identifier errors: use search_public_defs to find correct names.\n"
+        "For unsolved_goals: use inspect_lean_goals with a ?_ hole to see the exact goal, then write targeted tactics.\n"
+        "Fix the specific error, write the corrected proof, and re-check. Do not rewrite from scratch unless the approach is fundamentally wrong.\n"
+        "Only use read_public_file or search_public_defs if you need a definition not shown below.\n"
         "Do not ask for or attempt arbitrary shell access, arbitrary filesystem access, or files outside this task.\n"
     ) if interactive else (
         "The harness may give you several bounded repair rounds for the same task.\n"
@@ -774,10 +774,33 @@ def score_evaluation(evaluation: dict[str, Any], *, candidate_text: str, previou
     }
 
 
-def build_repair_guidance(details: str) -> str:
+def build_repair_guidance(details: str, failure_mode: str | None = None) -> str:
     hints: list[str] = []
     failure_class = classify_failure(details)
 
+    # Failure-mode-specific hints (from main)
+    if failure_mode == "empty_response":
+        hints.append(
+            "- Your previous reply did not include a usable Lean file. Return only the complete Lean proof file."
+        )
+    if failure_mode == "placeholder_detected":
+        hints.append(
+            "- Do not use `sorry`, `admit`, or `axiom`. Replace every placeholder with a real proof term or tactic."
+        )
+    if failure_mode == "theorem_statement_mismatch":
+        hints.append(
+            "- Keep the editable theorem statement byte-for-byte identical to the original. Only change the proof body."
+        )
+    if failure_mode == "hidden_proof_import_detected":
+        hints.append(
+            "- Remove any `Benchmark.Cases.*.Proofs` imports. Only import task-public modules."
+        )
+    if failure_mode == "hidden_case_import_detected":
+        hints.append(
+            "- Only import task-public modules. Remove any non-public `Benchmark.Cases` imports."
+        )
+
+    # Failure-class-specific hints (from our branch, more targeted)
     if failure_class == "split_failed":
         hints.append(
             "- Do not `split` the final post-state blindly. Prove branch-specific helper theorems first, then use `by_cases` plus `simpa`."
@@ -792,15 +815,28 @@ def build_repair_guidance(details: str) -> str:
         )
     if failure_class == "unknown_identifier":
         hints.append(
-            "- Fix typos or missing imports directly. Standard names such as `Nat.lt_of_not_ge` and `Nat.not_le_of_lt` are often useful."
+            "- You are referencing a lemma or constant that does not exist in this Lean 4 environment. "
+            "Do not guess lemma names. Instead, use `simp` with the relevant definitions, `omega` for arithmetic, "
+            "or `decide`/`native_decide` for decidable propositions. Remove all references to unknown names."
         )
         hints.append(
             "- Use the `search_public_defs` tool to find correct definition names from the specification and implementation files."
         )
     if failure_class == "unsolved_goals":
-        if "if " in details or "match" in details:
+        if "match" in details:
             hints.append(
-                "- If `simp` leaves `if`/`match` expressions with free variables, use `by_cases` on each unresolved condition BEFORE calling simp. Pass all case hypotheses to simp. Do NOT use `split` after simp or `native_decide`/`decide` on goals with free variables."
+                "- The remaining goal contains a `match` expression. Use `split` to case-split on the match, "
+                "then solve each branch separately. If the match is on a ContractResult, try "
+                "`simp only [...]` to reduce it first, or use `cases` on the matched expression."
+            )
+        if "if " in details:
+            hints.append(
+                "- The remaining goal contains an `if` expression. Use `by_cases h : <condition>` to split on the condition, "
+                "then `simp [h, ...]` in each branch. Do NOT use `split` after simp or `native_decide`/`decide` on goals with free variables."
+            )
+        if "match" not in details and "if " not in details:
+            hints.append(
+                "- Unsolved goals remain. Check that `simp` is given all necessary definitions and hypotheses."
             )
         hints.append(
             "- Try `inspect_lean_goals` with a `?_` hole to see the exact goal state, then write targeted tactics."
@@ -822,6 +858,26 @@ def build_repair_guidance(details: str) -> str:
         hints.append(
             "- Use standard Lean 4 / Mathlib tactics. Remove any tactic the checker does not recognize."
         )
+    if failure_class == "simp_no_progress":
+        hints.append(
+            "- `simp` made no progress with the given arguments. Add more definitions to unfold, "
+            "or the simp arguments may already be fully reduced. Try removing the unproductive simp call."
+        )
+    # Additional hints from main for patterns not covered by failure_class
+    if "failed to infer binder type" in details:
+        hints.append(
+            "- Lean cannot infer a binder type. Add explicit type annotations to your helper lemma parameters."
+        )
+    if "unexpected token" in details or "expected 'by'" in details:
+        hints.append(
+            "- Syntax error. Ensure the theorem body uses `:= by` followed by tactics. "
+            "Do not use `:=` with a term-mode proof unless you are certain of the syntax."
+        )
+    if "Function expected at" in details:
+        hints.append(
+            "- Use `s.storage 0` (function application) not `s.storage[0]` or `s.storage.0`. "
+            "ContractState.storage is a function `Nat → Uint256`."
+        )
     return "\n".join(hints)
 
 
@@ -833,11 +889,14 @@ def build_repair_messages(
     attempt_index: int,
     max_attempts: int,
 ) -> list[dict[str, Any]]:
+    failure_mode = str(evaluation.get("failure_mode") or "").strip() or None
     details = str(evaluation.get("details", "")).strip()
     trimmed_details = details[:MAX_ERROR_FEEDBACK_CHARS]
-    guidance = build_repair_guidance(trimmed_details)
+    guidance = build_repair_guidance(trimmed_details, failure_mode=failure_mode)
+    failure_summary = f"Failure mode: {failure_mode}\n" if failure_mode else ""
     repair_prompt = (
         f"The previous Lean file did not pass the checker (attempt {attempt_index} of {max_attempts}).\n"
+        f"{failure_summary}"
         "Return a corrected complete replacement for the editable Lean proof file.\n"
         "Return Lean code only, with no markdown fences or extra explanation.\n\n"
         "Previous candidate file:\n"
@@ -1103,13 +1162,14 @@ def send_chat_completion(
     messages: list[dict[str, Any]],
     *,
     tools: list[dict[str, Any]] | None = None,
+    max_tokens_override: int | None = None,
 ) -> dict[str, Any]:
     url = f"{config.base_url}{config.chat_completions_path}"
     payload = {
         "model": config.model,
         "messages": messages,
         "temperature": config.temperature,
-        "max_tokens": config.max_completion_tokens,
+        "max_tokens": max_tokens_override or config.max_completion_tokens,
     }
     if tools:
         payload["tools"] = tools
@@ -1642,7 +1702,7 @@ def execute_strict_agent_task(
     task: dict[str, Any],
     messages: list[dict[str, Any]],
 ) -> tuple[dict[str, Any], str, dict[str, Any], list[dict[str, Any]]]:
-    attempt_messages = messages
+    attempt_messages = list(messages)
     response: dict[str, Any] = {}
     response_text = ""
     candidate_text = ""
@@ -1653,25 +1713,107 @@ def execute_strict_agent_task(
     }
     attempts: list[dict[str, Any]] = []
 
-    attempt_start = time.perf_counter()
-    response = send_chat_completion(config, attempt_messages)
-    attempt_latency = time.perf_counter() - attempt_start
-    response_text = extract_text(response)
-    candidate_text = extract_candidate_file(response_text)
-    evaluation = evaluate_candidate_submission(task, candidate_text)
-    attempts.append(
-        build_attempt_record(
-            attempt_index=1,
-            mode="strict",
-            messages=attempt_messages,
-            response=response,
-            candidate_text=candidate_text,
-            evaluation=evaluation,
-            previous_attempt=None,
-            latency_seconds=attempt_latency,
+    for attempt_index in range(1, config.max_attempts + 1):
+        attempt_start = time.perf_counter()
+        response = send_chat_completion(config, attempt_messages)
+        attempt_latency = time.perf_counter() - attempt_start
+        response_text = extract_text(response)
+        candidate_text = extract_candidate_file(response_text)
+        evaluation = evaluate_candidate_submission(task, candidate_text)
+        previous_attempt = latest_candidate_attempt(attempts)
+        attempts.append(
+            build_attempt_record(
+                attempt_index=attempt_index,
+                mode="strict",
+                messages=attempt_messages,
+                response=response,
+                candidate_text=candidate_text,
+                evaluation=evaluation,
+                previous_attempt=previous_attempt,
+                latency_seconds=attempt_latency,
+            )
         )
-    )
+        if evaluation.get("status") == "passed":
+            break
+        if attempt_index >= config.max_attempts:
+            break
+        # Build repair messages for the next attempt
+        attempt_messages = build_repair_messages(
+            messages,
+            candidate_text,
+            evaluation,
+            attempt_index=attempt_index,
+            max_attempts=config.max_attempts,
+        )
     return response, response_text, evaluation, attempts
+
+
+RESTART_AFTER_CONSECUTIVE_FAILURES = 6
+
+
+def _compact_interactive_transcript(
+    transcript: list[dict[str, Any]],
+    base_message_count: int,
+    proof_text: str,
+    error_details: str,
+    attempt_index: int,
+    max_attempts: int,
+    consecutive_failures: int = 0,
+) -> list[dict[str, Any]]:
+    """Compact transcript by keeping base messages + first exploration + compact repair.
+
+    We preserve the initial exploration (file reads, searches) but drop intermediate
+    failed write-check cycles to prevent context pollution and save tokens.
+    The latest failed proof and error are injected as a single user message.
+
+    After RESTART_AFTER_CONSECUTIVE_FAILURES consecutive lean check failures, we drop
+    the failed proof from the repair message and instead instruct the model to try a
+    completely different proof strategy (a "restart").
+    """
+    # Find the first write_editable_proof call to split exploration from repair
+    cutoff = len(transcript)
+    for i, msg in enumerate(transcript):
+        if i < base_message_count:
+            continue
+        if msg.get("role") == "assistant":
+            tool_calls = msg.get("tool_calls", [])
+            for tc in tool_calls:
+                fn = tc.get("function", {})
+                if fn.get("name") == "write_editable_proof":
+                    cutoff = i
+                    break
+            if cutoff < len(transcript):
+                break
+
+    # Keep base messages + exploration phase (up to first write), then add repair
+    kept = transcript[:cutoff]
+
+    if consecutive_failures >= RESTART_AFTER_CONSECUTIVE_FAILURES:
+        # Strategy restart: don't show the failed proof, ask for a fresh approach
+        repair_msg = (
+            f"You have failed {consecutive_failures} consecutive Lean check attempts "
+            f"(attempt {attempt_index} of {max_attempts}).\n"
+            "Your current approach is not working. Try a fundamentally different proof strategy:\n"
+            "- If you were using `simp` with many definitions, try proving with `by_cases` and smaller helper lemmas.\n"
+            "- If you were using `by_cases`, try a direct `simp` with all relevant definitions.\n"
+            "- If you were using named lemmas, switch to `omega`, `decide`, or `native_decide`.\n"
+            "- Consider unfolding the spec first with `unfold` before applying tactics.\n\n"
+            f"Last error:\n{error_details[:2000]}\n\n"
+            "Submit a completely new proof using write_editable_proof, then call run_lean_check.\n"
+        )
+    else:
+        guidance = build_repair_guidance(error_details)
+        repair_msg = (
+            f"Your proof attempt (attempt {attempt_index} of {max_attempts}) failed the Lean checker.\n"
+            "Fix the proof and resubmit using write_editable_proof, then call run_lean_check.\n\n"
+            f"Failed proof:\n```lean\n{proof_text.rstrip()}\n```\n\n"
+            f"Lean checker output:\n{error_details}\n"
+        )
+        if guidance:
+            repair_msg += f"\nRepair guidance:\n{guidance}\n"
+
+    kept.append({"role": "user", "content": repair_msg})
+    return kept
 
 
 def execute_interactive_agent_task(
@@ -1680,30 +1822,70 @@ def execute_interactive_agent_task(
     messages: list[dict[str, Any]],
 ) -> tuple[dict[str, Any], str, str, dict[str, Any], list[dict[str, Any]], int]:
     runtime = TaskProofRuntime(task)
+    base_messages: list[dict[str, Any]] = list(messages)
     transcript: list[dict[str, Any]] = list(messages)
     attempts: list[dict[str, Any]] = []
     response: dict[str, Any] = {}
     response_text = ""
     tool_calls_used = 0
+    last_lean_error: str | None = None
+    consecutive_lean_failures = 0
+    proof_attempts = 0
+    consecutive_search_turns = 0
+    consecutive_length_stops = 0
+    max_total_turns = config.max_attempts * 2  # hard cap to prevent infinite loops
+    token_budget = config.max_completion_tokens
 
-    for attempt_index in range(1, config.max_attempts + 1):
-        attempt_start = time.perf_counter()
-        response = send_chat_completion(config, transcript, tools=runtime.tool_specs())
-        attempt_latency = time.perf_counter() - attempt_start
+    turn = 0
+    while proof_attempts < config.max_attempts and turn < max_total_turns:
+        turn += 1
+        response = send_chat_completion(
+            config, transcript, tools=runtime.tool_specs(),
+            max_tokens_override=token_budget if token_budget != config.max_completion_tokens else None,
+        )
         response_text = extract_text(response)
         tool_calls = extract_tool_calls(response)
-        previous_attempt = latest_candidate_attempt(attempts)
+
+        # Detect finish_reason=length with no usable output (model hit token limit
+        # during internal reasoning). Bump token budget and retry without counting
+        # this as a proof attempt.
+        finish_reason = ""
+        choices = response.get("choices", [])
+        if choices:
+            finish_reason = choices[0].get("finish_reason", "")
+        if finish_reason == "length" and not tool_calls and not response_text.strip():
+            consecutive_length_stops += 1
+            if consecutive_length_stops == 1:
+                # First length stop: bump token budget once and retry silently
+                token_budget = min(int(token_budget * 1.5), 4500)
+                continue
+            # Subsequent length stops: inject a nudge to simplify and use tools
+            transcript.append({"role": "assistant", "content": ""})
+            transcript.append({
+                "role": "user",
+                "content": (
+                    "Your response was cut off. Do not over-think. "
+                    "Immediately call write_editable_proof with a simple proof attempt, "
+                    "then call run_lean_check. Keep the proof short."
+                ),
+            })
+            if consecutive_length_stops >= 3:
+                # Reset budget back to configured value after persistent overruns
+                token_budget = config.max_completion_tokens
+            continue
+        else:
+            consecutive_length_stops = 0
+
         attempts.append(
-            build_attempt_record(
-                attempt_index=attempt_index,
-                mode="interactive",
-                messages=list(transcript),
-                response=response,
-                candidate_text="",
-                evaluation=None,
-                previous_attempt=previous_attempt,
-                latency_seconds=attempt_latency,
-            )
+            {
+                "attempt": turn,
+                "proof_attempt": proof_attempts + 1,
+                "mode": "interactive",
+                "messages": list(transcript),
+                "response": response,
+                "response_text": response_text,
+                "tool_calls": tool_calls,
+            }
         )
         attempts[-1]["tool_calls"] = tool_calls
         if not tool_calls:
@@ -1712,33 +1894,44 @@ def execute_interactive_agent_task(
             # not natural-language explanation.
             if final_candidate.strip() and _looks_like_lean(final_candidate):
                 runtime.write_editable_proof(final_candidate)
-            evaluation = runtime.evaluate_current()
-            refresh_attempt_record(
-                attempts[-1],
-                candidate_text=runtime.current_proof_text,
-                evaluation=evaluation,
-                previous_attempt=previous_attempt,
-                latency_seconds=attempt_latency,
-            )
-            if evaluation.get("status") == "passed":
-                return response, response_text, runtime.current_proof_text, evaluation, attempts, tool_calls_used
-            # Proof failed — feed the failure back and continue the loop
-            details = str(evaluation.get("details", ""))[:2000]
-            failure_class = evaluation.get("failure_class", "")
-            transcript.append({"role": "assistant", "content": response_text or ""})
-            transcript.append({
-                "role": "user",
-                "content": (
-                    f"Your proof did not pass (attempt {attempt_index} of {config.max_attempts}). "
-                    f"Failure: {failure_class or 'unknown'}.\n"
-                    f"Details: {details}\n\n"
-                    "Use write_editable_proof to write a corrected proof, then run_lean_check to verify. "
-                    "Do not return text — use the tools."
-                ),
-            })
+                proof_attempts += 1
+                evaluation = runtime.evaluate_current()
+                attempts[-1]["candidate_file_contents"] = runtime.current_proof_text
+                attempts[-1]["evaluation"] = evaluation
+                if evaluation["status"] == "passed":
+                    return response, response_text, runtime.current_proof_text, evaluation, attempts, tool_calls_used
+                # Failed candidate without tool calls: compact and retry
+                failure_mode = evaluation.get("failure_mode", "")
+                if failure_mode == "lean_check_failed":
+                    consecutive_lean_failures += 1
+                    details = str(evaluation.get("details", ""))[:MAX_ERROR_FEEDBACK_CHARS]
+                    transcript = _compact_interactive_transcript(
+                        transcript, len(base_messages), runtime.current_proof_text, details,
+                        proof_attempts, config.max_attempts,
+                        consecutive_failures=consecutive_lean_failures,
+                    )
+                elif failure_mode in ("placeholder_detected", "theorem_statement_mismatch"):
+                    retry_msg = (
+                        f"Your response did not produce a valid proof candidate (proof attempt {proof_attempts} of {config.max_attempts}, "
+                        f"failure: {failure_mode}).\n"
+                        "Use the write_editable_proof tool to submit the complete editable Lean proof file, "
+                        "then use run_lean_check to verify it.\n"
+                        "Do not explain or analyze. Use the tools directly.\n"
+                    )
+                    transcript.append({"role": "assistant", "content": response_text})
+                    transcript.append({"role": "user", "content": retry_msg})
+                else:
+                    return response, response_text, runtime.current_proof_text, evaluation, attempts, tool_calls_used
+            else:
+                # Empty response or no valid candidate: nudge model to use tools
+                nudge_msg = (
+                    "You must use the write_editable_proof tool to submit your proof, "
+                    "then call run_lean_check to verify it. Do not respond with text only.\n"
+                )
+                transcript.append({"role": "assistant", "content": response_text or ""})
+                transcript.append({"role": "user", "content": nudge_msg})
             continue
 
-        message = response.get("choices", [{}])[0].get("message", {})
         transcript.append(
             {
                 "role": "assistant",
@@ -1746,6 +1939,8 @@ def execute_interactive_agent_task(
                 "tool_calls": tool_calls,
             }
         )
+        saw_lean_failure = False
+        turn_had_proof_action = False
         for tool_call in tool_calls:
             if tool_calls_used >= config.max_tool_calls:
                 evaluation = runtime.evaluate_current()
@@ -1756,19 +1951,16 @@ def execute_interactive_agent_task(
                         "details": f"interactive tool-call budget exhausted after {tool_calls_used} tool calls",
                     }
                 attempts[-1]["budget_exhausted"] = True
-                refresh_attempt_record(
-                    attempts[-1],
-                    candidate_text=runtime.current_proof_text,
-                    evaluation=evaluation,
-                    previous_attempt=previous_attempt,
-                    latency_seconds=attempt_latency,
-                )
+                attempts[-1]["candidate_file_contents"] = runtime.current_proof_text
+                attempts[-1]["evaluation"] = evaluation
                 return response, response_text, runtime.current_proof_text, evaluation, attempts, tool_calls_used
             function_call = tool_call.get("function", {})
             tool_name = str(function_call.get("name", ""))
             arguments = parse_tool_arguments(function_call.get("arguments"))
             result = runtime.execute_tool(tool_name, arguments)
             tool_calls_used += 1
+            if tool_name in ("write_editable_proof", "run_lean_check"):
+                turn_had_proof_action = True
             transcript.append(
                 {
                     "role": "tool",
@@ -1784,36 +1976,60 @@ def execute_interactive_agent_task(
                     "result": result,
                 }
             )
-            # Early exit: if a verification tool passed, stop immediately
-            if tool_name in ("run_lean_check", "try_tactic_at_hole") and result.get("status") == "passed":
+            if tool_name == "run_lean_check" and result.get("failure_mode") == "lean_check_failed":
+                last_lean_error = str(result.get("details", ""))[:MAX_ERROR_FEEDBACK_CHARS]
+                saw_lean_failure = True
+                consecutive_lean_failures += 1
+            elif tool_name in ("run_lean_check", "try_tactic_at_hole") and result.get("status") == "passed":
                 evaluation = result
-                refresh_attempt_record(
-                    attempts[-1],
-                    candidate_text=runtime.current_proof_text,
-                    evaluation=evaluation,
-                    previous_attempt=previous_attempt,
-                    latency_seconds=time.perf_counter() - attempt_start,
-                )
+                attempts[-1]["candidate_file_contents"] = runtime.current_proof_text
+                attempts[-1]["evaluation"] = evaluation
                 return response, response_text, runtime.current_proof_text, evaluation, attempts, tool_calls_used
+
+        if turn_had_proof_action:
+            proof_attempts += 1
+            consecutive_search_turns = 0
+            if not saw_lean_failure:
+                consecutive_lean_failures = 0
+        else:
+            consecutive_search_turns += 1
+            if consecutive_search_turns >= 2:
+                transcript.append(
+                    {
+                        "role": "user",
+                        "content": (
+                            "Stop searching and write a proof now. The search_public_defs tool only searches "
+                            "this task's implementation and specification files, not the Lean standard library. "
+                            "Use write_editable_proof to submit your best proof attempt, then run_lean_check to verify."
+                        ),
+                    }
+                )
+                consecutive_search_turns = 0
+
+        # After processing all tool calls, compact transcript if we saw a lean failure
+        if saw_lean_failure and last_lean_error:
+            transcript = _compact_interactive_transcript(
+                transcript, len(base_messages), runtime.current_proof_text, last_lean_error,
+                proof_attempts, config.max_attempts,
+                consecutive_failures=consecutive_lean_failures,
+            )
 
     evaluation = runtime.evaluate_current()
     if evaluation.get("failure_mode") == "empty_response":
         evaluation = {
             "status": "failed",
             "failure_mode": "attempt_budget_exhausted",
-            "details": f"interactive attempt budget exhausted after {config.max_attempts} assistant turns",
+            "details": f"interactive attempt budget exhausted after {proof_attempts} proof attempts ({turn} total turns)",
         }
     attempts.append(
-        build_attempt_record(
-            attempt_index=config.max_attempts,
-            mode="interactive",
-            messages=list(transcript),
-            response={},
-            candidate_text=runtime.current_proof_text,
-            evaluation=evaluation,
-            previous_attempt=latest_candidate_attempt(attempts),
-            latency_seconds=None,
-        )
+        {
+            "attempt": turn,
+            "proof_attempt": proof_attempts,
+            "mode": "interactive",
+            "budget_exhausted": True,
+            "candidate_file_contents": runtime.current_proof_text,
+            "evaluation": evaluation,
+        }
     )
     attempts[-1]["budget_exhausted"] = True
     return response, response_text, runtime.current_proof_text, evaluation, attempts, tool_calls_used
