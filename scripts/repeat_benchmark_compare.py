@@ -44,6 +44,7 @@ def run_single_task(
         profile,
     ]
     env = dict(os.environ)
+    env["VERITY_REPEAT_INDEX"] = str(repeat_index)
     try:
         completed = subprocess.run(
             cmd,

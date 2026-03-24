@@ -363,7 +363,12 @@ class TaskProofRuntime:
                 if result.get("failure_mode") == "lean_check_failed":
                     guidance = _build_repair_guidance(str(result.get("details", "")))
                     if guidance:
-                        result["repair_hints"] = guidance
+                        existing = result.get("repair_hints", [])
+                        if isinstance(existing, list):
+                            existing.append(guidance)
+                            result["repair_hints"] = existing
+                        else:
+                            result["repair_hints"] = [existing, guidance] if existing else [guidance]
             return result
         if name == "inspect_lean_goals":
             return self.inspect_goals()
@@ -449,7 +454,7 @@ class TaskProofRuntime:
 
     def _build_escalation_hint(self, failure_class: str) -> str | None:
         """Build an escalation hint when the model is stagnating on a failure class."""
-        terms = _extract_simp_terms_for_task(self._task)
+        terms = extract_contract_simp_terms(self._task)
         if terms:
             full_set = ", ".join(terms)
             full_set += ", getStorage, setStorage, Verity.require, Verity.bind, Bind.bind, Verity.pure, Pure.pure, Contract.run, ContractResult.snd"
@@ -538,8 +543,12 @@ class TaskProofRuntime:
         return module_path.replace("/", ".")
 
 
-def _extract_simp_terms_for_task(task: dict[str, Any]) -> list[str]:
-    """Extract concrete simp terms from implementation files for escalation hints."""
+def extract_contract_simp_terms(task: dict[str, Any]) -> list[str]:
+    """Extract concrete simp terms from implementation and specification files.
+
+    Parses verity_contract storage field declarations, function names,
+    and non-spec helper definitions to generate the simp lemma set.
+    """
     terms: list[str] = []
     contract_name = ""
     for rel_path in task.get("implementation_files", []):
@@ -597,7 +606,7 @@ def _classify_failure(details: str) -> str:
         return "type_error"
     if "simp made no progress" in lower:
         return "simp_no_progress"
-    if "failed to unfold" in lower or "unfold" in lower and "failed" in lower:
+    if "failed to unfold" in lower or ("unfold" in lower and "failed" in lower):
         return "unfold_failed"
     if "dsimp made no progress" in lower:
         return "simp_no_progress"

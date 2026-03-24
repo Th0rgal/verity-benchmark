@@ -16,7 +16,7 @@ from typing import Any
 from urllib import error, request
 
 from benchmark_config import load_benchmark_agent_defaults
-from interactive_runtime import TaskProofRuntime, tool_result_json
+from interactive_runtime import TaskProofRuntime, tool_result_json, extract_contract_simp_terms
 from task_runner import ROOT, load_task_record, resolve_task_manifest
 
 AGENT_RESULTS_DIR = ROOT / "results" / "agent_runs"
@@ -347,10 +347,16 @@ def resolve_mode(config: dict[str, Any], *, profile: str | None) -> str:
 def resolve_run_slug(config: dict[str, Any], *, agent_id: str, profile: str | None) -> str:
     explicit = normalize_string(config.get("run_slug"))
     if explicit:
-        return slugify(explicit)
-    if profile:
-        return slugify(profile)
-    return slugify(agent_id)
+        base = slugify(explicit)
+    elif profile:
+        base = slugify(profile)
+    else:
+        base = slugify(agent_id)
+    # Support repeat-index disambiguation for parallel benchmark runs
+    repeat_idx = os.environ.get("VERITY_REPEAT_INDEX")
+    if repeat_idx and repeat_idx != "1":
+        return f"{base}-r{repeat_idx}"
+    return base
 
 
 def resolve_field(config: dict[str, Any], field: str, *, required: bool) -> str | None:
@@ -466,62 +472,6 @@ def render_file_bundle(paths: list[str]) -> str:
         sections.append(f"[{rel_path}]\n{contents}")
     return "\n\n".join(sections).strip()
 
-
-def extract_contract_simp_terms(task: dict[str, Any]) -> list[str]:
-    """Extract concrete simp terms from implementation files.
-
-    Parses verity_contract storage field declarations and function names
-    to generate the exact simp lemma set needed.
-    """
-    terms: list[str] = []
-    contract_name = ""
-    for rel_path in task.get("implementation_files", []):
-        path = ROOT / rel_path
-        if not path.is_file():
-            continue
-        content = path.read_text(encoding="utf-8")
-        # Extract contract name from 'verity_contract ContractName where'
-        contract_match = re.search(r"verity_contract\s+(\w+)\s+where", content)
-        if contract_match:
-            contract_name = contract_match.group(1)
-        # Extract storage field names
-        for field_match in re.finditer(
-            r"^\s+(\w+)\s*:.*:=\s*slot\s+\d+",
-            content,
-            re.MULTILINE,
-        ):
-            field_name = field_match.group(1)
-            if contract_name:
-                terms.append(f"{contract_name}.{field_name}")
-        # Extract function names
-        for fn_match in re.finditer(
-            r"^\s+function\s+(\w+)\s*\(",
-            content,
-            re.MULTILINE,
-        ):
-            fn_name = fn_match.group(1)
-            if contract_name:
-                terms.append(f"{contract_name}.{fn_name}")
-    # Also extract helper def names from spec files (non-spec helper definitions)
-    spec_helpers: list[str] = []
-    spec_defs: list[str] = []
-    for rel_path in task.get("specification_files", []):
-        path = ROOT / rel_path
-        if not path.is_file():
-            continue
-        content = path.read_text(encoding="utf-8")
-        for def_match in re.finditer(
-            r"^def\s+(\w+)\b",
-            content,
-            re.MULTILINE,
-        ):
-            def_name = def_match.group(1)
-            if def_name.endswith("_spec"):
-                spec_defs.append(def_name)
-            elif def_name not in terms:
-                spec_helpers.append(def_name)
-    terms.extend(spec_helpers)
-    return terms
 
 
 def extract_contract_branches(task: dict[str, Any]) -> list[str]:
@@ -683,95 +633,6 @@ def classify_failure(details: str) -> str:
         return "rfl_failed"
     return "other"
 
-
-def score_evaluation(evaluation: dict[str, Any], *, candidate_text: str, previous_score: dict[str, Any] | None) -> dict[str, Any]:
-    """Score an evaluation result for progress tracking.
-
-    Returns a dict with:
-      - parses: bool (candidate parsed without syntax errors)
-      - failure_class: str
-      - first_error_line: int | None
-      - error_count: int
-      - goal_count: int (unsolved goals mentioned)
-      - score: float (higher is better, 0.0-1.0 scale)
-      - improved: bool | None (vs previous)
-    """
-    status = evaluation.get("status", "failed")
-    if status == "passed":
-        return {
-            "parses": True,
-            "failure_class": "none",
-            "first_error_line": None,
-            "error_count": 0,
-            "goal_count": 0,
-            "score": 1.0,
-            "improved": True if previous_score and previous_score["score"] < 1.0 else None,
-        }
-
-    details = str(evaluation.get("details", ""))
-    failure_mode = str(evaluation.get("failure_mode", ""))
-    failure_class = classify_failure(details)
-
-    # Quick rejections get low scores
-    if failure_mode in ("placeholder_detected", "hidden_proof_import_detected",
-                        "hidden_case_import_detected", "theorem_statement_mismatch",
-                        "empty_response"):
-        return {
-            "parses": failure_mode != "empty_response",
-            "failure_class": failure_class,
-            "first_error_line": None,
-            "error_count": 0,
-            "goal_count": 0,
-            "score": 0.05,
-            "improved": False if previous_score and previous_score["score"] > 0.05 else None,
-        }
-
-    # Parse error lines from Lean output
-    error_lines: list[int] = []
-    for match in re.finditer(r":(\d+):\d+: error:", details):
-        error_lines.append(int(match.group(1)))
-    first_error_line = min(error_lines) if error_lines else None
-    error_count = len(error_lines)
-
-    # Count unsolved goals
-    goal_matches = re.findall(r"unsolved goals", details, re.IGNORECASE)
-    goal_count = len(goal_matches)
-
-    # Score: higher first_error_line is better (deeper into proof),
-    # fewer errors is better, fewer unsolved goals is better
-    candidate_lines = len(candidate_text.splitlines()) if candidate_text else 1
-    line_progress = (first_error_line / max(candidate_lines, 1)) if first_error_line else 0.0
-    error_penalty = min(error_count * 0.1, 0.4)
-    goal_penalty = min(goal_count * 0.05, 0.2)
-
-    # Failure class severity ordering
-    class_bonus = {
-        "no_goals": 0.15,  # close to done, just over-proved
-        "unsolved_goals": 0.1,
-        "type_mismatch": 0.05,
-        "split_failed": 0.05,
-        "unknown_identifier": 0.0,
-        "free_variables": 0.0,
-        "unknown_tactic": -0.05,
-        "type_error": -0.05,
-    }.get(failure_class, 0.0)
-
-    raw_score = 0.1 + line_progress * 0.5 + class_bonus - error_penalty - goal_penalty
-    score = max(0.05, min(0.95, raw_score))
-
-    improved = None
-    if previous_score is not None:
-        improved = score > previous_score["score"]
-
-    return {
-        "parses": True,
-        "failure_class": failure_class,
-        "first_error_line": first_error_line,
-        "error_count": error_count,
-        "goal_count": goal_count,
-        "score": round(score, 3),
-        "improved": improved,
-    }
 
 
 def build_repair_guidance(details: str, failure_mode: str | None = None) -> str:
@@ -1895,7 +1756,7 @@ def execute_interactive_agent_task(
             arguments = parse_tool_arguments(function_call.get("arguments"))
             result = runtime.execute_tool(tool_name, arguments)
             tool_calls_used += 1
-            if tool_name in ("write_editable_proof", "run_lean_check"):
+            if tool_name in ("write_editable_proof", "run_lean_check", "try_tactic_at_hole"):
                 turn_had_proof_action = True
             transcript.append(
                 {
@@ -1916,7 +1777,9 @@ def execute_interactive_agent_task(
                 saw_lean_failure = True
                 consecutive_lean_failures += 1
             elif tool_name in ("run_lean_check", "try_tactic_at_hole") and result.get("status") == "passed":
-                evaluation = result
+                # Normalize to evaluation schema (try_tactic_at_hole returns tactic/details without failure_mode)
+                evaluation = dict(result)
+                evaluation.setdefault("failure_mode", None)
                 attempts[-1]["candidate_file_contents"] = runtime.current_proof_text
                 attempts[-1]["evaluation"] = evaluation
                 return response, response_text, runtime.current_proof_text, evaluation, attempts, tool_calls_used
