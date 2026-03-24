@@ -138,8 +138,8 @@ class TaskProofRuntime:
         if not tactic.strip():
             return {"status": "rejected", "reason": "tactic_must_not_be_empty"}
         original = self.current_proof_text
-        # Replace all ?_ holes with the given tactic
-        modified = re.sub(r"\?_", tactic.strip(), original)
+        # Replace standalone ?_ holes (not named holes like ?_foo)
+        modified = re.sub(r"\?_(?!\w)", tactic.strip(), original)
         if modified == original:
             return {
                 "status": "unsupported",
@@ -375,13 +375,22 @@ class TaskProofRuntime:
 
     def _annotate_check_result(self, result: dict[str, Any]) -> dict[str, Any]:
         """Annotate a failed check result with failure classification and repair hints."""
+        failure_mode = result.get("failure_mode", "")
+        # Only track actual Lean checker failures for stagnation detection,
+        # not preflight failures (empty_response, placeholder_detected, etc.)
+        is_lean_failure = failure_mode == "lean_check_failed"
         details = str(result.get("details", ""))
         failure_class = classify_failure(details)
         hints = _build_check_hints(failure_class, details)
         annotated = dict(result)
         annotated["failure_class"] = failure_class
 
-        # Track failure history for stagnation detection
+        if not is_lean_failure:
+            if hints:
+                annotated["repair_hints"] = hints
+            return annotated
+
+        # Track failure history for stagnation detection (Lean check failures only)
         self._check_history.append(failure_class)
         total_failures = len(self._check_history)
 

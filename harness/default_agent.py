@@ -1088,7 +1088,8 @@ def extract_tool_calls(response: dict[str, Any]) -> list[dict[str, Any]]:
 
 def _looks_like_lean(text: str) -> bool:
     """Check if text looks like Lean code rather than natural-language explanation."""
-    lean_keywords = ("import ", "theorem ", "def ", "lemma ", "namespace ", "open ", ":= by", "simp", "exact")
+    # Use word-boundary-aware patterns to avoid matching English words like "simple", "exactly"
+    lean_keywords = ("import ", "theorem ", "def ", "lemma ", "namespace ", "open ", ":= by", "simp [", "simp\n", "exact ")
     return any(kw in text for kw in lean_keywords)
 
 
