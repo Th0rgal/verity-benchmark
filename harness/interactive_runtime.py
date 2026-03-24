@@ -595,6 +595,8 @@ def classify_failure(details: str) -> str:
         return "unknown_identifier"
     if "unsolved goals" in lower:
         return "unsolved_goals"
+    if "application type mismatch" in lower or "function expected" in lower:
+        return "type_error"
     if "type mismatch" in lower:
         return "type_mismatch"
     if "tactic 'split' failed" in details:
@@ -607,8 +609,6 @@ def classify_failure(details: str) -> str:
         return "placeholder"
     if "unknown tactic" in lower:
         return "unknown_tactic"
-    if "function expected" in lower or "application type mismatch" in lower:
-        return "type_error"
     if "simp made no progress" in lower:
         return "simp_no_progress"
     if "failed to unfold" in lower or ("unfold" in lower and "failed" in lower):

@@ -353,7 +353,9 @@ def resolve_run_slug(config: dict[str, Any], *, agent_id: str, profile: str | No
     else:
         base = slugify(agent_id)
     # Support repeat-index disambiguation for parallel benchmark runs
-    repeat_idx = os.environ.get("VERITY_REPEAT_INDEX")
+    repeat_idx = os.environ.get("VERITY_REPEAT_INDEX", "")
+    # Sanitize: only allow digits to prevent path traversal
+    repeat_idx = repeat_idx if repeat_idx.isdigit() else ""
     if repeat_idx and repeat_idx != "1":
         return f"{base}-r{repeat_idx}"
     return base
