@@ -287,7 +287,12 @@ class TaskProofRuntime:
         if name == "write_editable_proof":
             return self.write_editable_proof(str(arguments.get("content", "")))
         if name == "run_lean_check":
-            return self.evaluate_current()
+            result = self.evaluate_current()
+            if result.get("failure_mode") == "lean_check_failed":
+                guidance = _build_repair_guidance(str(result.get("details", "")))
+                if guidance:
+                    result["repair_hints"] = guidance
+            return result
         if name == "inspect_lean_goals":
             return self.inspect_goals()
         if name == "search_public_defs":
@@ -351,6 +356,67 @@ class TaskProofRuntime:
         if suffix:
             module_path = module_path[: -len(suffix)]
         return module_path.replace("/", ".")
+
+
+def _build_repair_guidance(details: str) -> str:
+    hints: list[str] = []
+    if "tactic 'split' failed" in details:
+        hints.append(
+            "- Do not `split` the final post-state blindly. Prove branch-specific helper theorems first, then use `by_cases` plus `simpa`."
+        )
+    if "no goals to be solved" in details:
+        hints.append(
+            "- A previous `simp` likely closed the goal already. Remove trailing tactics after the goal is solved."
+        )
+    if "expected type must not contain free variables" in details:
+        hints.append(
+            "- Do not use `native_decide` or `decide` on goals that still contain parameters. First reduce to concrete equalities."
+        )
+    if "unknown constant" in details or "Unknown identifier" in details or "unknown identifier" in details:
+        hints.append(
+            "- You are referencing a lemma or constant that does not exist in this Lean 4 environment. "
+            "Do not guess lemma names. Instead, use `simp` with the relevant definitions, `omega` for arithmetic, "
+            "or `decide`/`native_decide` for decidable propositions. Remove all references to unknown names."
+        )
+    if "unsolved goals" in details and "match" in details:
+        hints.append(
+            "- The remaining goal contains a `match` expression. Use `split` to case-split on the match, "
+            "then solve each branch separately. If the match is on a ContractResult, try "
+            "`simp only [...]` to reduce it first, or use `cases` on the matched expression."
+        )
+    if "unsolved goals" in details and "if " in details:
+        hints.append(
+            "- The remaining goal contains an `if` expression. Use `by_cases h : <condition>` to split on the condition, "
+            "then `simp [h, ...]` in each branch. Alternatively, add the condition's hypothesis to the `simp` call."
+        )
+    if "unsolved goals" in details and "match" not in details and "if " not in details:
+        hints.append(
+            "- Unsolved goals remain. Check that `simp` is given all necessary definitions and hypotheses."
+        )
+    if "type mismatch" in details:
+        hints.append(
+            "- A type mismatch often means the proof term or tactic result does not match the goal. Re-read the spec and ensure your proof targets the correct type."
+        )
+    if "simp made no progress" in details:
+        hints.append(
+            "- `simp` made no progress with the given arguments. Add more definitions to unfold, "
+            "or the simp arguments may already be fully reduced. Try removing the unproductive simp call."
+        )
+    if "failed to infer binder type" in details:
+        hints.append(
+            "- Lean cannot infer a binder type. Add explicit type annotations to your helper lemma parameters."
+        )
+    if "unexpected token" in details or "expected 'by'" in details:
+        hints.append(
+            "- Syntax error. Ensure the theorem body uses `:= by` followed by tactics. "
+            "Do not use `:=` with a term-mode proof unless you are certain of the syntax."
+        )
+    if "Function expected at" in details or "unknown identifier" in details:
+        hints.append(
+            "- Use `s.storage 0` (function application) not `s.storage[0]` or `s.storage.0`. "
+            "ContractState.storage is a function `Nat → Uint256`."
+        )
+    return "\n".join(hints)
 
 
 def tool_result_json(result: dict[str, Any]) -> str:
