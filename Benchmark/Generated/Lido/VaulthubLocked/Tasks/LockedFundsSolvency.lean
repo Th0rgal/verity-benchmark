@@ -30,11 +30,16 @@ theorem locked_funds_solvency
     -- No overflow: liability * reserveRatioBP fits in Uint256
     (hNoOverflow2 : (getPooledEthBySharesRoundUp maxLiabilityShares totalPooledEther totalShares).val
                     * reserveRatioBP.val < modulus)
+    -- No overflow: the add inside locked (liability + effectiveReserve) fits in Uint256
+    (hNoOverflow3 : let liab := getPooledEthBySharesRoundUp maxLiabilityShares totalPooledEther totalShares
+                    let reserve := ceilDiv (mul liab reserveRatioBP) (sub TOTAL_BASIS_POINTS reserveRatioBP)
+                    let eff := if reserve ≥ minimalReserve then reserve else minimalReserve
+                    liab.val + eff.val < modulus)
     -- No overflow: locked * (BP - RR) fits in Uint256
-    (hNoOverflow3 : (locked maxLiabilityShares minimalReserve reserveRatioBP totalPooledEther totalShares).val
+    (hNoOverflow4 : (locked maxLiabilityShares minimalReserve reserveRatioBP totalPooledEther totalShares).val
                     * (sub TOTAL_BASIS_POINTS reserveRatioBP).val < modulus)
     -- No overflow: liability * BP fits in Uint256
-    (hNoOverflow4 : (getPooledEthBySharesRoundUp liabilityShares totalPooledEther totalShares).val
+    (hNoOverflow5 : (getPooledEthBySharesRoundUp liabilityShares totalPooledEther totalShares).val
                     * TOTAL_BASIS_POINTS.val < modulus) :
     locked_funds_solvency_spec maxLiabilityShares liabilityShares minimalReserve reserveRatioBP
       totalPooledEther totalShares := by
