@@ -1508,6 +1508,8 @@ def execute_interactive_agent_task(
         if turn_had_proof_action:
             proof_attempts += 1
             consecutive_search_turns = 0
+            if not saw_lean_failure:
+                consecutive_lean_failures = 0
         else:
             consecutive_search_turns += 1
             if consecutive_search_turns >= 2:
