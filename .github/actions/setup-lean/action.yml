@@ -1,0 +1,215 @@
+name: Setup Lean
+description: Install elan, restore Lake cache, and fetch mathlib compiled cache
+
+inputs:
+  use-sticky-disks:
+    description: Mount Blacksmith sticky disks for stable Lean state instead of restoring GitHub caches
+    default: "false"
+  cache-bucket:
+    description: Cache bucket identifier (e.g. pr-42, ref-main) for sticky disk key derivation
+    default: ""
+  main-cache-bucket:
+    description: Main branch cache bucket for fallback seeding on PRs
+    default: "ref-main"
+  use-build-sticky-disk:
+    description: Mount a sticky disk for .lake/build so Lake can incrementally rebuild across runs
+    default: "false"
+
+runs:
+  using: composite
+  steps:
+    - name: Resolve persistence keys
+      id: persistence
+      shell: bash
+      env:
+        USE_STICKY: ${{ inputs.use-sticky-disks }}
+        USE_BUILD_STICKY: ${{ inputs.use-build-sticky-disk }}
+        CACHE_BUCKET: ${{ inputs.cache-bucket }}
+        MAIN_BUCKET: ${{ inputs.main-cache-bucket }}
+        RUNNER_OS_NAME: ${{ runner.os }}
+        LEAN_TOOLCHAIN_HASH: ${{ hashFiles('lean-toolchain') }}
+        LAKEFILE_HASH: ${{ hashFiles('lakefile.lean') }}
+        LAKE_MANIFEST_HASH: ${{ hashFiles('lake-manifest.json') }}
+      run: |
+        elan_key="elan-benchmark-${CACHE_BUCKET}-${RUNNER_OS_NAME}-${LEAN_TOOLCHAIN_HASH}"
+        packages_key="lake-packages-benchmark-${CACHE_BUCKET}-${RUNNER_OS_NAME}-${LEAN_TOOLCHAIN_HASH}-${LAKEFILE_HASH}-${LAKE_MANIFEST_HASH}"
+        packages_main_key="lake-packages-benchmark-${MAIN_BUCKET}-${RUNNER_OS_NAME}-${LEAN_TOOLCHAIN_HASH}-${LAKEFILE_HASH}-${LAKE_MANIFEST_HASH}"
+        build_key="lake-build-benchmark-${CACHE_BUCKET}-${RUNNER_OS_NAME}-${LEAN_TOOLCHAIN_HASH}-${LAKEFILE_HASH}-${LAKE_MANIFEST_HASH}"
+        build_main_key="lake-build-benchmark-${MAIN_BUCKET}-${RUNNER_OS_NAME}-${LEAN_TOOLCHAIN_HASH}-${LAKEFILE_HASH}-${LAKE_MANIFEST_HASH}"
+        {
+          echo "use_sticky=${USE_STICKY}"
+          echo "use_build_sticky=${USE_BUILD_STICKY}"
+          echo "elan_key=${elan_key}"
+          echo "packages_key=${packages_key}"
+          echo "packages_main_key=${packages_main_key}"
+          echo "build_key=${build_key}"
+          echo "build_main_key=${build_main_key}"
+        } >> "$GITHUB_OUTPUT"
+
+    # ── Elan ──
+
+    - name: Mount elan sticky disk
+      if: steps.persistence.outputs.use_sticky == 'true'
+      uses: useblacksmith/stickydisk@v1
+      with:
+        key: ${{ steps.persistence.outputs.elan_key }}
+        path: ~/.elan
+
+    - name: Cache elan + Lean toolchain
+      id: cache-elan
+      if: steps.persistence.outputs.use_sticky != 'true'
+      uses: actions/cache@v4
+      with:
+        path: ~/.elan
+        key: elan-${{ runner.os }}-${{ hashFiles('lean-toolchain') }}
+
+    - name: Install elan
+      if: steps.persistence.outputs.use_sticky == 'true' || steps.cache-elan.outputs.cache-hit != 'true'
+      shell: bash
+      run: |
+        if [ -x "$HOME/.elan/bin/elan" ]; then
+          exit 0
+        fi
+        curl -sSf https://raw.githubusercontent.com/leanprover/elan/master/elan-init.sh | sh -s -- -y --default-toolchain none
+
+    - name: Add elan to PATH
+      shell: bash
+      run: echo "$HOME/.elan/bin" >> $GITHUB_PATH
+
+    # ── Lake packages (.lake/packages) ──
+
+    - name: Prepare Lake directories for sticky disks
+      if: steps.persistence.outputs.use_sticky == 'true'
+      shell: bash
+      run: mkdir -p .lake/packages .lake/build
+
+    - name: Mount Lake packages sticky disk
+      if: steps.persistence.outputs.use_sticky == 'true'
+      uses: useblacksmith/stickydisk@v1
+      with:
+        key: ${{ steps.persistence.outputs.packages_key }}
+        path: .lake/packages
+
+    - name: Prepare fallback mount directory
+      if: steps.persistence.outputs.use_sticky == 'true'
+      shell: bash
+      run: mkdir -p "$RUNNER_TEMP/setup-lean-fallback/packages" "$RUNNER_TEMP/setup-lean-fallback/build"
+
+    - name: Mount main Lake packages fallback sticky disk
+      if: >-
+        steps.persistence.outputs.use_sticky == 'true' &&
+        steps.persistence.outputs.packages_main_key != steps.persistence.outputs.packages_key
+      uses: useblacksmith/stickydisk@v1
+      with:
+        key: ${{ steps.persistence.outputs.packages_main_key }}
+        path: ${{ runner.temp }}/setup-lean-fallback/packages
+
+    - name: Seed Lake packages from main fallback
+      if: >-
+        steps.persistence.outputs.use_sticky == 'true' &&
+        steps.persistence.outputs.packages_main_key != steps.persistence.outputs.packages_key
+      shell: bash
+      run: |
+        if find .lake/packages -mindepth 1 -print -quit 2>/dev/null | grep -q .; then
+          echo "Packages sticky disk already populated, skipping seed"
+          exit 0
+        fi
+        if ! find "$RUNNER_TEMP/setup-lean-fallback/packages" -mindepth 1 -print -quit 2>/dev/null | grep -q .; then
+          echo "Main fallback packages disk is empty, skipping seed"
+          exit 0
+        fi
+        echo "Seeding packages from main fallback..."
+        cp -a "$RUNNER_TEMP/setup-lean-fallback/packages/." .lake/packages/
+
+    # ── Lake build (.lake/build) ──
+
+    - name: Mount Lake build sticky disk
+      if: steps.persistence.outputs.use_sticky == 'true' && steps.persistence.outputs.use_build_sticky == 'true'
+      uses: useblacksmith/stickydisk@v1
+      with:
+        key: ${{ steps.persistence.outputs.build_key }}
+        path: .lake/build
+
+    - name: Mount main Lake build fallback sticky disk
+      if: >-
+        steps.persistence.outputs.use_sticky == 'true' &&
+        steps.persistence.outputs.use_build_sticky == 'true' &&
+        steps.persistence.outputs.build_main_key != steps.persistence.outputs.build_key
+      uses: useblacksmith/stickydisk@v1
+      with:
+        key: ${{ steps.persistence.outputs.build_main_key }}
+        path: ${{ runner.temp }}/setup-lean-fallback/build
+
+    - name: Seed Lake build from main fallback
+      if: >-
+        steps.persistence.outputs.use_sticky == 'true' &&
+        steps.persistence.outputs.use_build_sticky == 'true' &&
+        steps.persistence.outputs.build_main_key != steps.persistence.outputs.build_key
+      shell: bash
+      run: |
+        if find .lake/build -mindepth 1 -print -quit 2>/dev/null | grep -q .; then
+          echo "Build sticky disk already populated, skipping seed"
+          exit 0
+        fi
+        if ! find "$RUNNER_TEMP/setup-lean-fallback/build" -mindepth 1 -print -quit 2>/dev/null | grep -q .; then
+          echo "Main fallback build disk is empty, skipping seed"
+          exit 0
+        fi
+        echo "Seeding build from main fallback..."
+        cp -a "$RUNNER_TEMP/setup-lean-fallback/build/." .lake/build/
+
+    # ── GitHub Actions cache fallback (non-sticky path) ──
+
+    - name: Restore Lake cache (GitHub Actions)
+      id: cache-lake
+      if: steps.persistence.outputs.use_sticky != 'true'
+      uses: actions/cache@v4
+      with:
+        path: .lake
+        key: lake-${{ runner.os }}-${{ hashFiles('lean-toolchain') }}-${{ hashFiles('lakefile.lean') }}-${{ hashFiles('lake-manifest.json') }}
+        restore-keys: |
+          lake-${{ runner.os }}-${{ hashFiles('lean-toolchain') }}-${{ hashFiles('lakefile.lean') }}-
+          lake-${{ runner.os }}-${{ hashFiles('lean-toolchain') }}-
+
+    # ── Hydration (mathlib cache + lake resolve) ──
+
+    - name: Decide whether dependency hydration is required
+      id: hydration
+      shell: bash
+      env:
+        USING_STICKY: ${{ steps.persistence.outputs.use_sticky }}
+        CACHE_HIT: ${{ steps.cache-lake.outputs.cache-hit }}
+      run: |
+        required=true
+        if [ "${USING_STICKY}" = "true" ]; then
+          if [ -d ".lake/packages/mathlib/.lake/build" ]; then
+            required=false
+          fi
+        elif [ "${CACHE_HIT}" = "true" ]; then
+          required=false
+        fi
+        echo "required=${required}" >> "$GITHUB_OUTPUT"
+
+    - name: Fetch mathlib compiled cache
+      if: steps.hydration.outputs.required == 'true'
+      shell: bash
+      run: |
+        if lake exe cache get; then
+          exit 0
+        fi
+        for delay in 5 15; do
+          echo "::warning::lake exe cache get failed; retrying in ${delay}s"
+          sleep "${delay}"
+          if lake exe cache get; then
+            exit 0
+          fi
+        done
+        echo "::warning::Unable to download mathlib compiled cache after retries; continuing with source builds."
+
+outputs:
+  cache-hit:
+    description: Whether the Lake cache was a full hit
+    value: ${{ steps.cache-lake.outputs.cache-hit }}
+  using-sticky-disks:
+    description: Whether Blacksmith sticky disks were enabled
+    value: ${{ steps.persistence.outputs.use_sticky }}

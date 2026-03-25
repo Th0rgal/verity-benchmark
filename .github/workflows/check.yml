@@ -8,9 +8,18 @@ on:
       - codex/**
   pull_request:
 
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  CACHE_BUCKET: ${{ github.event_name == 'pull_request' && format('pr-{0}', github.event.pull_request.number) || format('ref-{0}', github.ref_name) }}
+  MAIN_CACHE_BUCKET: ref-main
+  USE_STICKY_DISKS: "true"
+
 jobs:
   check:
-    runs-on: ubuntu-latest
+    runs-on: blacksmith-4vcpu-ubuntu-2404
     env:
       DOTENV_PRIVATE_KEY: ${{ secrets.DOTENV_PRIVATE_KEY }}
     steps:
@@ -24,10 +33,12 @@ jobs:
         with:
           node-version: "20"
 
-      - name: Install Lean
-        run: |
-          curl -sSf https://raw.githubusercontent.com/leanprover/elan/master/elan-init.sh | sh -s -- -y
-          echo "$HOME/.elan/bin" >> "$GITHUB_PATH"
+      - uses: ./.github/actions/setup-lean
+        with:
+          use-sticky-disks: ${{ env.USE_STICKY_DISKS }}
+          cache-bucket: ${{ env.CACHE_BUCKET }}
+          main-cache-bucket: ${{ env.MAIN_CACHE_BUCKET }}
+          use-build-sticky-disk: "true"
 
       - name: Install dotenvx
         run: npm install -g @dotenvx/dotenvx@1.57.0
