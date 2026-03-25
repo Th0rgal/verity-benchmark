@@ -31,7 +31,7 @@ runs:
         LAKEFILE_HASH: ${{ hashFiles('lakefile.lean') }}
         LAKE_MANIFEST_HASH: ${{ hashFiles('lake-manifest.json') }}
       run: |
-        elan_key="elan-benchmark-${RUNNER_OS_NAME}-${LEAN_TOOLCHAIN_HASH}"
+        elan_key="elan-benchmark-${CACHE_BUCKET}-${RUNNER_OS_NAME}-${LEAN_TOOLCHAIN_HASH}"
         packages_key="lake-packages-benchmark-${CACHE_BUCKET}-${RUNNER_OS_NAME}-${LEAN_TOOLCHAIN_HASH}-${LAKEFILE_HASH}-${LAKE_MANIFEST_HASH}"
         packages_main_key="lake-packages-benchmark-${MAIN_BUCKET}-${RUNNER_OS_NAME}-${LEAN_TOOLCHAIN_HASH}-${LAKEFILE_HASH}-${LAKE_MANIFEST_HASH}"
         build_key="lake-build-benchmark-${CACHE_BUCKET}-${RUNNER_OS_NAME}-${LEAN_TOOLCHAIN_HASH}-${LAKEFILE_HASH}-${LAKE_MANIFEST_HASH}"
