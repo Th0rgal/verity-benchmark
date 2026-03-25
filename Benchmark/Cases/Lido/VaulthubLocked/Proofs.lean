@@ -145,12 +145,6 @@ theorem ceildiv_sandwich
   have hComm : q * d.val = d.val * q := Nat.mul_comm q d.val
   omega
 
--- Helper: ceilDiv for raw Nat values (used in shares_conversion_monotone)
-private theorem ceilDiv_raw_lt_modulus (n : Nat) (ts : Uint256) (hts : ts.val ≥ 1) (hn : n < modulus) :
-    (n + ts.val - 1) / ts.val < modulus := by
-  have := ceilDiv_nat_le n ts.val hts
-  omega
-
 theorem shares_conversion_monotone
     (a b : Uint256)
     (totalPooledEther totalShares : Uint256)
@@ -196,12 +190,6 @@ theorem reserve_ratio_bounds
     reserve_ratio_bounds_spec reserveRatioBP := by
   unfold reserve_ratio_bounds_spec
   exact ⟨hPos, hLt⟩
-
--- Helper for locked_funds_solvency: ceilDiv of product < modulus
-private theorem ceilDiv_prod_lt_modulus (prod : Nat) (comp : Uint256) (hcomp : comp.val ≥ 1) (hprod : prod < modulus) :
-    (prod + comp.val - 1) / comp.val < modulus := by
-  have := ceilDiv_nat_le prod comp.val hcomp
-  omega
 
 theorem locked_funds_solvency
     (maxLiabilityShares liabilityShares : Uint256)
