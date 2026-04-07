@@ -347,8 +347,10 @@ theorem locked_funds_solvency
                     let reserve := ceilDiv (mul liab (s.storage 3)) (sub TOTAL_BASIS_POINTS (s.storage 3))
                     let eff := if reserve ≥ s.storage 2 then reserve else s.storage 2
                     liab.val + eff.val < modulus)
-    (hNoOverflow4 : (lockedPure (s.storage 0) (s.storage 2) (s.storage 3) (s.storage 4) (s.storage 5)).val
-                    * (sub TOTAL_BASIS_POINTS (s.storage 3)).val < modulus)
+    (hNoOverflow4 : let liab := getPooledEthBySharesRoundUp (s.storage 0) (s.storage 4) (s.storage 5)
+                    let reserve := ceilDiv (mul liab (s.storage 3)) (sub TOTAL_BASIS_POINTS (s.storage 3))
+                    let eff := if reserve ≥ s.storage 2 then reserve else s.storage 2
+                    (add liab eff).val * (sub TOTAL_BASIS_POINTS (s.storage 3)).val < modulus)
     (hNoOverflow5 : (getPooledEthBySharesRoundUp (s.storage 1) (s.storage 4) (s.storage 5)).val
                     * TOTAL_BASIS_POINTS.val < modulus) :
     let s' := ((VaultHubLocked.syncLocked).run s).snd

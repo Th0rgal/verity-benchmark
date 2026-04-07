@@ -2,6 +2,7 @@
 
 - Repository: https://github.com/safe-global/safe-smart-account
 - Branch: `main`
+- Commit: `a2e19c6aa42a45ceec68057f3fa387f169c5b321`
 - Contract path: `contracts/base/OwnerManager.sol`
 - Functions of interest: `addOwnerWithThreshold`
 - Source language: Solidity ^0.7.0

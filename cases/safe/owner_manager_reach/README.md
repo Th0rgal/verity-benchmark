@@ -2,6 +2,7 @@
 
 Source:
 - `safe-global/safe-smart-account` (main)
+- commit `a2e19c6aa42a45ceec68057f3fa387f169c5b321`
 - file `contracts/base/OwnerManager.sol`
 
 Focus:

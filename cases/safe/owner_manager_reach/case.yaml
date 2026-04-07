@@ -10,9 +10,9 @@ translation_status: translated
 spec_status: frozen
 proof_status: complete
 upstream_repo: https://github.com/safe-global/safe-smart-account
-upstream_commit: main
+upstream_commit: a2e19c6aa42a45ceec68057f3fa387f169c5b321
 original_contract_path: contracts/base/OwnerManager.sol
-source_ref: https://github.com/safe-global/safe-smart-account@main:contracts/base/OwnerManager.sol
+source_ref: https://github.com/safe-global/safe-smart-account@a2e19c6aa42a45ceec68057f3fa387f169c5b321:contracts/base/OwnerManager.sol
 lean_target: Benchmark.Cases.Safe.OwnerManagerReach.Compile
 spec_target: Benchmark.Cases.Safe.OwnerManagerReach.Specs
 proof_target: Benchmark.Cases.Safe.OwnerManagerReach.Proofs
