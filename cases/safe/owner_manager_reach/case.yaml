@@ -1,0 +1,43 @@
+manifest_kind: case
+project: safe
+case_id: owner_manager_reach
+schema_version: 1
+split: active
+family_id: safe
+implementation_id: smart_account
+stage: build_green
+translation_status: translated
+spec_status: frozen
+proof_status: complete
+upstream_repo: https://github.com/safe-global/safe-smart-account
+upstream_commit: main
+original_contract_path: contracts/base/OwnerManager.sol
+source_ref: https://github.com/safe-global/safe-smart-account@main:contracts/base/OwnerManager.sol
+lean_target: Benchmark.Cases.Safe.OwnerManagerReach.Compile
+spec_target: Benchmark.Cases.Safe.OwnerManagerReach.Specs
+proof_target: Benchmark.Cases.Safe.OwnerManagerReach.Proofs
+selected_functions:
+  - addOwnerWithThreshold
+source_language: solidity
+verity_version: 4ebe4931d25e5a1594fcd3f43ff040ecc3c4225a
+lean_toolchain: leanprover/lean4:v4.22.0
+abstraction_level: protocol_slice
+abstraction_tags:
+  - threshold_elided
+  - removeOwner_elided
+  - swapOwner_elided
+  - setupOwners_elided
+  - linked_list_reachability_slice
+abstraction_notes: >
+  The benchmark isolates the linked list insertion logic of addOwnerWithThreshold
+  in the Safe OwnerManager. The threshold update is elided as it does not affect
+  the owners mapping. Only the inListReachable invariant from the Certora
+  OwnerReach.spec is modeled, proving that addOwner preserves reachability
+  from the SENTINEL node for all nodes with non-zero successors.
+unsupported_feature_codes: []
+notes: >
+  Linked list reachability invariant preservation for the Safe OwnerManager.
+  Based on the Certora OwnerReach.spec which defines the inListReachable
+  invariant over a ghost mapping tracking the owners linked list.
+  The proof uses explicit witness chains and chain lifting to show that
+  pre-state reachability implies post-state reachability after insertion.

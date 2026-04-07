@@ -1,0 +1,36 @@
+manifest_kind: task
+schema_version: 1
+task_id: in_list_reachable
+case_id: safe/owner_manager_reach
+split: active
+family_id: safe
+implementation_id: smart_account
+source_ref: https://github.com/safe-global/safe-smart-account@main:contracts/base/OwnerManager.sol
+task_interface_version: 2
+theorem_name: Benchmark.Cases.Safe.OwnerManagerReach.in_list_reachable
+proof_family: state_preservation_local_effects
+property_class: linked_list_invariant
+difficulty: hard
+category: invariant
+track: proof-only
+translation_status: translated
+proof_status: complete
+evaluation_engine: lean_proof_generation
+implementation_files:
+  - cases/safe/owner_manager_reach/verity/Contract.lean
+  - Benchmark/Cases/Safe/OwnerManagerReach/Contract.lean
+specification_files:
+  - cases/safe/owner_manager_reach/verity/Specs.lean
+  - Benchmark/Cases/Safe/OwnerManagerReach/Specs.lean
+editable_files:
+  - Benchmark/Generated/Safe/OwnerManagerReach/Tasks/InListReachable.lean
+reference_solution_module: Benchmark.Cases.Safe.OwnerManagerReach.Proofs
+reference_solution_declaration: Benchmark.Cases.Safe.OwnerManagerReach.in_list_reachable
+abstraction_level: protocol_slice
+abstraction_notes: >
+  Certora inListReachable invariant preservation under addOwnerWithThreshold.
+  The proof requires witness-chain construction: showing that every node
+  reachable in the pre-state remains reachable in the post-state after
+  inserting a new owner at the head of the linked list. Requires acyclicity
+  and freshness hypotheses to lift pre-state chains.
+unsupported_feature_codes: []
