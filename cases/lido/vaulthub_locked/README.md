@@ -13,14 +13,15 @@ Focus:
 - Certora P-VH-04: maxLiabilityShares bound
 
 Model:
-- `Benchmark.Cases.Lido.VaulthubLocked.Contract` defines pure arithmetic helpers
-  (`ceilDiv`, `getPooledEthBySharesRoundUp`, `locked`) plus an executable Verity
-  contract entrypoint `syncLocked`.
-- `syncLocked` reads the benchmark inputs from storage slots `0..5`, computes the
-  locked amount, stores it in slot `6`, and returns it.
-- `Benchmark.Cases.Lido.VaulthubLocked.Specs` states F-01 over the post-state of
-  that contract execution, while `Proofs.lean` bridges the executable contract
-  back to the pure arithmetic model.
+- `Benchmark.Cases.Lido.VaulthubLocked.Contract` defines shared arithmetic
+  helpers (`ceilDiv`, `getPooledEthBySharesRoundUp`) and an executable Verity
+  contract `VaultHubLocked` with a `syncLocked` entrypoint.
+- `syncLocked` reads vault/Lido state from storage slots 0..5, computes the
+  locked amount using `ceilDiv` and `getPooledEthBySharesRoundUp`, stores
+  the result in slot 6, and returns it.
+- `Specs.lean` states F-01 in the standard `(s, s')` pre/post-state pattern.
+- `Proofs.lean` bridges the executable contract to the algebraic model via
+  a private `syncLocked_slot_write` lemma and proves the solvency inequality.
 
 Verification:
 - `lake build Benchmark.Cases.Lido.VaulthubLocked.Compile` checks the reference

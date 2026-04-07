@@ -7,43 +7,44 @@ open Verity.EVM.Uint256
 
 /--
 Certora F-01: Locked funds solvency.
-The locked amount multiplied by the reserve ratio complement is at least
-the liability multiplied by total basis points:
+After executing `syncLocked`, the stored locked amount (slot 6) multiplied by
+the reserve ratio complement is at least the liability (from liabilityShares
+in slot 1) multiplied by total basis points:
 
-  locked(maxLS, minRes, RR) * (BP - RR) >= getPooledEthBySharesRoundUp(LS) * BP
+  s'.storage 6 * (BP - RR) >= getPooledEthBySharesRoundUp(LS, TPE, TS) * BP
 
 The proof requires a case split on whether the computed reserve or the minimal
 reserve dominates, then algebraic manipulation using the ceilDiv sandwich bound
 and share conversion monotonicity.
 -/
 theorem locked_funds_solvency
-    (maxLiabilityShares liabilityShares : Uint256)
-    (minimalReserve reserveRatioBP : Uint256)
-    (totalPooledEther totalShares : Uint256)
+    (s : ContractState)
     -- Axioms
-    (hMaxLS : maxLiabilityShares ≥ liabilityShares)
-    (hRR_pos : reserveRatioBP > 0)
-    (hRR_lt : reserveRatioBP < TOTAL_BASIS_POINTS)
-    (hTS : totalShares > 0)
-    (hTPE : totalPooledEther > 0)
+    (hMaxLS : s.storage 0 ≥ s.storage 1)
+    (hRR_pos : s.storage 3 > 0)
+    (hRR_lt : s.storage 3 < TOTAL_BASIS_POINTS)
+    (hTS : s.storage 5 > 0)
+    (hTPE : s.storage 4 > 0)
     -- No overflow: maxLiabilityShares * totalPooledEther fits in Uint256
-    (hNoOverflow1 : maxLiabilityShares.val * totalPooledEther.val < modulus)
+    (hNoOverflow1 : (s.storage 0).val * (s.storage 4).val < modulus)
     -- No overflow: liability * reserveRatioBP fits in Uint256
-    (hNoOverflow2 : (getPooledEthBySharesRoundUp maxLiabilityShares totalPooledEther totalShares).val
-                    * reserveRatioBP.val < modulus)
+    (hNoOverflow2 : (getPooledEthBySharesRoundUp (s.storage 0) (s.storage 4) (s.storage 5)).val
+                    * (s.storage 3).val < modulus)
     -- No overflow: the add inside locked (liability + effectiveReserve) fits in Uint256
-    (hNoOverflow3 : let liab := getPooledEthBySharesRoundUp maxLiabilityShares totalPooledEther totalShares
-                    let reserve := ceilDiv (mul liab reserveRatioBP) (sub TOTAL_BASIS_POINTS reserveRatioBP)
-                    let eff := if reserve ≥ minimalReserve then reserve else minimalReserve
+    (hNoOverflow3 : let liab := getPooledEthBySharesRoundUp (s.storage 0) (s.storage 4) (s.storage 5)
+                    let reserve := ceilDiv (mul liab (s.storage 3)) (sub TOTAL_BASIS_POINTS (s.storage 3))
+                    let eff := if reserve ≥ s.storage 2 then reserve else s.storage 2
                     liab.val + eff.val < modulus)
     -- No overflow: locked * (BP - RR) fits in Uint256
-    (hNoOverflow4 : (locked maxLiabilityShares minimalReserve reserveRatioBP totalPooledEther totalShares).val
-                    * (sub TOTAL_BASIS_POINTS reserveRatioBP).val < modulus)
+    (hNoOverflow4 : let liab := getPooledEthBySharesRoundUp (s.storage 0) (s.storage 4) (s.storage 5)
+                    let reserve := ceilDiv (mul liab (s.storage 3)) (sub TOTAL_BASIS_POINTS (s.storage 3))
+                    let eff := if reserve ≥ s.storage 2 then reserve else s.storage 2
+                    (add liab eff).val * (sub TOTAL_BASIS_POINTS (s.storage 3)).val < modulus)
     -- No overflow: liability * BP fits in Uint256
-    (hNoOverflow5 : (getPooledEthBySharesRoundUp liabilityShares totalPooledEther totalShares).val
+    (hNoOverflow5 : (getPooledEthBySharesRoundUp (s.storage 1) (s.storage 4) (s.storage 5)).val
                     * TOTAL_BASIS_POINTS.val < modulus) :
-    locked_funds_solvency_spec maxLiabilityShares liabilityShares minimalReserve reserveRatioBP
-      totalPooledEther totalShares := by
+    let s' := ((VaultHubLocked.syncLocked).run s).snd
+    locked_funds_solvency_spec s s' := by
   -- Replace this placeholder with a complete Lean proof.
   exact ?_
 
