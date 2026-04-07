@@ -13,7 +13,7 @@ open Verity.EVM.Uint256
 
   F-01 (Certora finding): The locked amount is sufficient to cover the vault's
   liability at the protocol level, i.e.:
-    locked(maxLS, minRes, RR) * (BP - RR) >= getPooledEthBySharesRoundUp(LS) * BP
+    locked * (BP - RR) >= getPooledEthBySharesRoundUp(LS) * BP
 
   P-VH-04 (Certora proven): maxLiabilityShares >= liabilityShares
   P-VH-03 (Certora proven): 0 < reserveRatioBP < TOTAL_BASIS_POINTS
@@ -25,36 +25,28 @@ open Verity.EVM.Uint256
     slot 3: reserveRatioBP
     slot 4: totalPooledEther
     slot 5: totalShares
+    slot 6: lockedAmount (output)
 -/
 
 /--
-  F-01: Locked funds solvency.
-  The amount locked on a vault, multiplied by the complement of the reserve ratio,
-  is at least as large as the liability (for the current liability shares) multiplied
-  by the full basis points.
+  F-01: Locked funds solvency after executing `syncLocked`.
+  The stored locked amount (slot 6), multiplied by the reserve ratio complement,
+  is at least as large as the liability (for the current liabilityShares in slot 1)
+  multiplied by the full basis points.
 
-  This ensures that the vault always locks enough collateral to cover its
-  stETH obligations with the required reserve buffer.
-
-  In symbols (all in Uint256 arithmetic):
-    locked(maxLS, minRes, RR, TPE, TS) * (BP - RR)
-      >= getPooledEthBySharesRoundUp(LS, TPE, TS) * BP
-
-  where maxLS >= LS (P-VH-04) and 0 < RR < BP (P-VH-03).
+  `syncLocked` computes locked from maxLiabilityShares (slot 0), ensuring the
+  locked amount covers even the peak obligation within the oracle period.
 -/
 def locked_funds_solvency_spec
-    (maxLiabilityShares liabilityShares : Uint256)
-    (minimalReserve reserveRatioBP : Uint256)
-    (totalPooledEther totalShares : Uint256) : Prop :=
-  let lockedAmount := locked maxLiabilityShares minimalReserve reserveRatioBP totalPooledEther totalShares
-  let liability := getPooledEthBySharesRoundUp liabilityShares totalPooledEther totalShares
-  let complement := sub TOTAL_BASIS_POINTS reserveRatioBP
+    (_s s' : ContractState) : Prop :=
+  let lockedAmount := s'.storage 6
+  let liability := getPooledEthBySharesRoundUp (s'.storage 1) (s'.storage 4) (s'.storage 5)
+  let complement := sub TOTAL_BASIS_POINTS (s'.storage 3)
   mul lockedAmount complement ≥ mul liability TOTAL_BASIS_POINTS
 
 /--
   P-VH-04 (Certora proven): maxLiabilityShares is an upper bound on liabilityShares.
   This invariant is maintained by the VaultHub's minting and reporting logic.
-  In the benchmark we prove it as a standalone lemma to confirm the Certora result.
 -/
 def max_liability_shares_bound_spec
     (maxLiabilityShares liabilityShares : Uint256) : Prop :=

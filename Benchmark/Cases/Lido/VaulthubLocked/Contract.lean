@@ -40,26 +40,6 @@ def getPooledEthBySharesRoundUp
     (shares : Uint256) (totalPooledEther totalShares : Uint256) : Uint256 :=
   ceilDiv (mul shares totalPooledEther) totalShares
 
-/--
-  Pure arithmetic core of the _locked function from VaultHub.sol (3-param overload).
-  Given liability shares, a minimal reserve, a reserve ratio in basis points,
-  and the Lido protocol state, returns the amount of ether that must be locked.
-
-  Solidity source (VaultHub.sol:1283-1295):
-    uint256 liability = _getPooledEthBySharesRoundUp(_liabilityShares);
-    uint256 reserve = Math256.ceilDiv(liability * _reserveRatioBP, TOTAL_BASIS_POINTS - _reserveRatioBP);
-    return liability + Math256.max(reserve, _minimalReserve);
--/
-def locked
-    (liabilityShares : Uint256)
-    (minimalReserve : Uint256)
-    (reserveRatioBP : Uint256)
-    (totalPooledEther totalShares : Uint256) : Uint256 :=
-  let liability := getPooledEthBySharesRoundUp liabilityShares totalPooledEther totalShares
-  let reserve := ceilDiv (mul liability reserveRatioBP) (sub TOTAL_BASIS_POINTS reserveRatioBP)
-  let effectiveReserve := if reserve ≥ minimalReserve then reserve else minimalReserve
-  add liability effectiveReserve
-
 verity_contract VaultHubLocked where
   storage
     -- VaultRecord fields
@@ -71,8 +51,41 @@ verity_contract VaultHubLocked where
     -- Lido protocol state (axiomatised external reads)
     totalPooledEther : Uint256 := slot 4
     totalShares : Uint256 := slot 5
+    -- Output: computed locked amount
+    lockedAmount : Uint256 := slot 6
 
-  -- The _locked function uses ceilDiv which is defined as a pure def above.
-  -- Proofs reference the pure `locked` directly.
+  -- Executable entrypoint modelling VaultHub._locked().
+  -- Reads vault/Lido state from storage, computes the locked collateral amount
+  -- using maxLiabilityShares (the peak shares in the current oracle period),
+  -- stores the result, and returns it.
+  --
+  -- The ceilDiv logic is inlined because verity_contract does not yet support
+  -- calling external helpers inside the function body (see #1003).
+  --
+  -- Solidity source (VaultHub.sol):
+  --   uint256 liability = _getPooledEthBySharesRoundUp(_liabilityShares);
+  --   uint256 reserve = Math256.ceilDiv(liability * _reserveRatioBP,
+  --                                      TOTAL_BASIS_POINTS - _reserveRatioBP);
+  --   return liability + Math256.max(reserve, _minimalReserve);
+  function syncLocked () : Uint256 := do
+    let maxLiabilityShares_ ← getStorage maxLiabilityShares
+    let minimalReserve_ ← getStorage minimalReserve
+    let reserveRatioBP_ ← getStorage reserveRatioBP
+    let totalPooledEther_ ← getStorage totalPooledEther
+    let totalShares_ ← getStorage totalShares
+
+    -- getPooledEthBySharesRoundUp(maxLiabilityShares, totalPooledEther, totalShares)
+    let liabilityProduct := mul maxLiabilityShares_ totalPooledEther_
+    let liability := ite (liabilityProduct == 0) 0 (add (div (sub liabilityProduct 1) totalShares_) 1)
+    -- ceilDiv(liability * reserveRatioBP, TOTAL_BASIS_POINTS - reserveRatioBP)
+    let reserveInput := mul liability reserveRatioBP_
+    let reserveDenominator := sub 10000 reserveRatioBP_
+    let reserve := ite (reserveInput == 0) 0 (add (div (sub reserveInput 1) reserveDenominator) 1)
+    -- Math256.max(reserve, minimalReserve)
+    let effectiveReserve := ite (reserve >= minimalReserve_) reserve minimalReserve_
+    let amount := add liability effectiveReserve
+
+    setStorage lockedAmount amount
+    return amount
 
 end Benchmark.Cases.Lido.VaulthubLocked

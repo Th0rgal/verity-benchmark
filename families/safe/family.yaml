@@ -1,0 +1,15 @@
+manifest_kind: family
+schema_version: 1
+family_id: safe
+display_name: Safe
+split: active
+status: active
+description: >
+  Benchmark family for Safe smart account (formerly Gnosis Safe) covering
+  the OwnerManager linked list invariants from the Certora OwnerReach.spec.
+implementation_ids:
+  - smart_account
+case_ids:
+  - safe/owner_manager_reach
+source_languages:
+  - solidity

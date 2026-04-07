@@ -1,0 +1,16 @@
+manifest_kind: implementation
+schema_version: 1
+family_id: safe
+implementation_id: smart_account
+display_name: Safe Smart Account
+split: active
+status: translated
+upstream_repo: https://github.com/safe-global/safe-smart-account
+upstream_commit: a2e19c6aa42a45ceec68057f3fa387f169c5b321
+source_language: solidity
+source_artifact_path: contracts/base/OwnerManager.sol
+case_ids:
+  - safe/owner_manager_reach
+notes: >
+  Implementation entry for the Safe smart account OwnerManager module,
+  benchmarking the linked list invariant preservation under addOwnerWithThreshold.

@@ -12,6 +12,26 @@ Focus:
 - Certora P-VH-03: reserve ratio bounds
 - Certora P-VH-04: maxLiabilityShares bound
 
+Model:
+- `Benchmark.Cases.Lido.VaulthubLocked.Contract` defines shared arithmetic
+  helpers (`ceilDiv`, `getPooledEthBySharesRoundUp`) and an executable Verity
+  contract `VaultHubLocked` with a `syncLocked` entrypoint.
+- `syncLocked` reads vault/Lido state from storage slots 0..5, computes the
+  locked amount using `ceilDiv` and `getPooledEthBySharesRoundUp`, stores
+  the result in slot 6, and returns it.
+- `Specs.lean` states F-01 in the standard `(s, s')` pre/post-state pattern.
+- `Proofs.lean` bridges the executable contract to the algebraic model via
+  a private `syncLocked_slot_write` lemma and proves the solvency inequality.
+
+Verification:
+- `lake build Benchmark.Cases.Lido.VaulthubLocked.Compile` checks the reference
+  implementation and proofs for the case.
+- `./scripts/run_case.sh lido/vaulthub_locked` runs the case's declared
+  `lean_target` and records the result under `results/`.
+- Files under `Benchmark/Generated/Lido/VaulthubLocked/Tasks/` are public,
+  editable proof templates. They are expected to contain holes until a benchmark
+  agent or user fills them in, so they are not part of the green reference build.
+
 Out of scope:
 - Oracle, LazyOracle, OperatorGrid
 - mintShares, burnShares, rebalance state transitions
