@@ -7,21 +7,27 @@ Source:
 
 Focus:
 - `addOwnerWithThreshold` (linked list head insertion)
-- Certora `inListReachable` invariant from `OwnerReach.spec`
+- `removeOwner` (linked list node removal)
+- `swapOwner` (atomic in-place replacement)
+- `setupOwners` (initial list construction — base case)
+- Certora `inListReachable` and `reachableInList` invariants from `OwnerReach.spec`
+- Acyclicity of the linked list
 
 Model:
 - `Benchmark.Cases.Safe.OwnerManagerReach.Contract` defines a Verity contract
   `OwnerManager` with an address-keyed mapping `owners` (slot 0) and a scalar
-  `ownerCount` (slot 1). The `addOwner` function models the linked list
-  insertion: it checks the owner is valid (non-zero, non-sentinel, fresh),
-  then splices the new owner at the head of the list.
-- `Specs.lean` defines `next`, `isChain`, `reachable` (witness-chain based),
-  and `in_list_reachable_spec` matching the Certora invariant.
-- `Proofs.lean` proves invariant preservation under `addOwner` by:
-  1. Characterizing the post-state storageMap (`addOwner_storageMap`)
-  2. Deriving the next-pointer update (`addOwner_next_eq`)
-  3. Lifting pre-state chains to the post-state (`isChain_lift`)
-  4. Constructing post-state reachability via chain prepending
+  `ownerCount` (slot 1). Four functions model the ownership-mutating operations.
+- `Specs.lean` defines:
+  - `next`, `isChain`, `reachable` (witness-chain based reachability)
+  - `inListReachable` — every node with non-zero successor is reachable from SENTINEL
+  - `reachableInList` — every reachable node is in the list or is zero
+  - `ownerListInvariant` — combined biconditional merging both invariants
+  - `acyclic` / `freshInList` — structural properties for eliminating axioms
+  - Per-function preservation and establishment specs
+- `Proofs.lean` contains:
+  - **Proven**: `in_list_reachable` (addOwner preserves inListReachable)
+  - **Sorry stubs**: removeOwner, swapOwner, setupOwners preservation for
+    inListReachable, ownerListInvariant, and acyclicity (11 proof tasks)
 
 Verification:
 - `lake build Benchmark.Cases.Safe.OwnerManagerReach.Compile` checks the
@@ -30,7 +36,5 @@ Verification:
   editable proof templates with holes for benchmark agents to fill.
 
 Out of scope:
-- Threshold management
-- removeOwner, swapOwner
-- setupOwners (initial setup)
-- Other OwnerReach.spec invariants (headReachable, isOwnerMapping, etc.)
+- Threshold management (elided — does not affect owners mapping)
+- Other OwnerReach.spec invariants (reach_invariant, reach_next, reachCount, etc.)

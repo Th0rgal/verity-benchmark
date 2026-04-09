@@ -19,6 +19,8 @@ open Verity.EVM.Uint256
     slot 1: ownerCount
 -/
 
+/-! ## Core definitions -/
+
 -- Linked list next-pointer accessor (reads storageMap slot 0 as Address).
 def next (s : ContractState) (a : Address) : Address :=
   wordToAddress (s.storageMap 0 a)
@@ -38,17 +40,124 @@ def reachable (s : ContractState) (a b : Address) : Prop :=
     chain.getLast? = some b ∧
     isChain s chain
 
+/-! ## Invariant: well-formed owner list
+
+  The `ownerListInvariant` combines the Certora `inListReachable` and
+  `reachableInList` invariants into a single biconditional property.
+  Together they state that the set of nodes with non-zero successors
+  is exactly the set of nodes reachable from SENTINEL.
+
+  Certora originals:
+    inListReachable:
+      ghostOwners[SENTINEL] != 0 ∧
+      (∀ key. ghostOwners[key] != 0 → reach(SENTINEL, key))
+    reachableInList:
+      (∀ X Y. reach(X, Y) → X = Y ∨ Y = 0 ∨ ghostOwners[Y] != 0)
+-/
+
 /--
   Certora `inListReachable` invariant:
-    ghostOwners[SENTINEL] != 0 &&
-    (forall address key. ghostOwners[key] != 0 => reach(SENTINEL, key))
-
-  After executing `addOwner`, every node with a non-zero successor in the
-  post-state is reachable from SENTINEL via the owners mapping.
+  The list is non-empty (SENTINEL has a successor) and every node with a
+  non-zero successor is reachable from SENTINEL.
 -/
+def inListReachable (s : ContractState) : Prop :=
+  next s SENTINEL ≠ zeroAddress ∧
+  ∀ key : Address, next s key ≠ zeroAddress → reachable s SENTINEL key
+
+/--
+  Certora `reachableInList` invariant:
+  Every address reachable from any node is either the source itself,
+  the zero address, or has a non-zero successor (i.e. is in the list).
+
+  Intuitively: reachability doesn't "leak" to addresses outside the list.
+-/
+def reachableInList (s : ContractState) : Prop :=
+  ∀ x y : Address, reachable s x y → x = y ∨ y = zeroAddress ∨ next s y ≠ zeroAddress
+
+/--
+  Combined owner list invariant: the list is non-empty, and membership
+  (having a non-zero successor) is equivalent to reachability from SENTINEL.
+  This merges inListReachable and reachableInList into a single property.
+-/
+def ownerListInvariant (s : ContractState) : Prop :=
+  next s SENTINEL ≠ zeroAddress ∧
+  (∀ key : Address, key ≠ zeroAddress →
+    (next s key ≠ zeroAddress ↔ reachable s SENTINEL key))
+
+/-! ## Acyclicity and termination
+
+  These definitions support proving that the linked list is acyclic
+  (SENTINEL appears only at the boundaries, no internal loops) and
+  that every path terminates. Proving these as theorems rather than
+  assuming them would eliminate the hAcyclic and hOwnerFresh axioms
+  from the current proofs.
+-/
+
+-- A chain has no duplicate addresses.
+def noDuplicates : List Address → Prop
+  | [] => True
+  | a :: rest => a ∉ rest ∧ noDuplicates rest
+
+/--
+  Acyclicity: the linked list from SENTINEL has no cycles.
+  Expressed as: there exists a chain from SENTINEL back to SENTINEL
+  (the full cycle) in which no address appears twice. Since the list
+  is circular (last owner points back to SENTINEL), this means the
+  only repetition is SENTINEL at the boundaries.
+-/
+def acyclic (s : ContractState) : Prop :=
+  ∀ key : Address, ∀ chain : List Address,
+    chain.head? = some (next s SENTINEL) →
+    chain.getLast? = some key →
+    isChain s chain →
+    SENTINEL ∉ chain
+
+/--
+  Freshness of a given address: it does not appear in any chain
+  starting from SENTINEL's successor. This is a consequence of
+  acyclicity + the address having a zero mapping value.
+-/
+def freshInList (s : ContractState) (addr : Address) : Prop :=
+  ∀ key : Address, ∀ chain : List Address,
+    chain.head? = some (next s SENTINEL) →
+    chain.getLast? = some key →
+    isChain s chain →
+    addr ∉ chain
+
+/-! ## Per-function preservation specs
+
+  Each theorem states: given the invariant holds on the pre-state,
+  it holds on the post-state after the function executes.
+  The legacy `in_list_reachable_spec` is kept for backward compatibility
+  with the existing addOwner proof.
+-/
+
+-- Legacy spec for backward compatibility with the existing proof.
 def in_list_reachable_spec
     (_s s' : ContractState) : Prop :=
   next s' SENTINEL ≠ zeroAddress ∧
   ∀ key : Address, next s' key ≠ zeroAddress → reachable s' SENTINEL key
+
+-- Preservation of ownerListInvariant under addOwner.
+def addOwner_preserves_invariant
+    (s s' : ContractState) : Prop :=
+  ownerListInvariant s → ownerListInvariant s'
+
+-- Preservation of ownerListInvariant under removeOwner.
+def removeOwner_preserves_invariant
+    (s s' : ContractState) : Prop :=
+  ownerListInvariant s → ownerListInvariant s'
+
+-- Preservation of ownerListInvariant under swapOwner.
+def swapOwner_preserves_invariant
+    (s s' : ContractState) : Prop :=
+  ownerListInvariant s → ownerListInvariant s'
+
+-- Establishment of ownerListInvariant by setupOwners.
+-- Unlike the other specs, this does not require a pre-state invariant:
+-- it is the base case.
+def setupOwners_establishes_invariant
+    (s' : ContractState) : Prop :=
+  ownerListInvariant s'
 
 end Benchmark.Cases.Safe.OwnerManagerReach

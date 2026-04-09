@@ -1,0 +1,34 @@
+manifest_kind: task
+schema_version: 1
+task_id: setup_owners_in_list_reachable
+case_id: safe/owner_manager_reach
+split: active
+family_id: safe
+implementation_id: smart_account
+source_ref: https://github.com/safe-global/safe-smart-account@a2e19c6aa42a45ceec68057f3fa387f169c5b321:contracts/base/OwnerManager.sol
+task_interface_version: 2
+theorem_name: Benchmark.Cases.Safe.OwnerManagerReach.setupOwners_inListReachable
+proof_family: state_establishment
+property_class: linked_list_invariant
+difficulty: medium
+category: invariant
+track: proof-only
+translation_status: translated
+proof_status: open
+evaluation_engine: lean_proof_generation
+implementation_files:
+  - cases/safe/owner_manager_reach/verity/Contract.lean
+  - Benchmark/Cases/Safe/OwnerManagerReach/Contract.lean
+specification_files:
+  - cases/safe/owner_manager_reach/verity/Specs.lean
+  - Benchmark/Cases/Safe/OwnerManagerReach/Specs.lean
+editable_files:
+  - Benchmark/Generated/Safe/OwnerManagerReach/Tasks/SetupOwnersInListReachable.lean
+reference_solution_module: Benchmark.Cases.Safe.OwnerManagerReach.Proofs
+reference_solution_declaration: Benchmark.Cases.Safe.OwnerManagerReach.setupOwners_inListReachable
+abstraction_level: protocol_slice
+abstraction_notes: >
+  Base case: setupOwners establishes the inListReachable invariant.
+  No pre-state invariant required. The proof constructs explicit witness
+  chains for the known list structure SENTINEL → o1 → o2 → o3 → SENTINEL.
+unsupported_feature_codes: []
