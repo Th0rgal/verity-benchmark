@@ -17,7 +17,7 @@
     "active_task_count": 36,
     "backlog_task_count": 8,
     "buildable_case_count": 9,
-    "runnable_task_count": 41,
+    "runnable_task_count": 44,
     "case_stage_counts": {
       "build_green": 7,
       "candidate": 2,
@@ -2261,7 +2261,7 @@
       "theorem_name": "Benchmark.Cases.Safe.OwnerManagerReach.addOwner_acyclicity",
       "proof_family": "state_preservation_local_effects",
       "translation_status": "translated",
-      "proof_status": "not_started",
+      "proof_status": "complete",
       "implementation_files": [
         "cases/safe/owner_manager_reach/verity/Contract.lean",
         "Benchmark/Cases/Safe/OwnerManagerReach/Contract.lean"
@@ -2276,15 +2276,15 @@
       "abstraction_level": "protocol_slice",
       "abstraction_notes": "Proving acyclicity preservation under addOwner would eliminate the hAcyclic axiom from the existing inListReachable proof, making the overall verification stronger.",
       "unsupported_feature_codes": [],
-      "reference_solution_module": "Benchmark.Cases.Safe.OwnerManagerReach.OpenProofs",
+      "reference_solution_module": "Benchmark.Cases.Safe.OwnerManagerReach.Proofs",
       "evaluation": {
         "engine": "lean_proof_generation",
         "target_kind": "proof_generation"
       },
       "readiness": {
         "prompt_context": "ready",
-        "editable_proof": "blocked",
-        "reference_solution": "blocked"
+        "editable_proof": "ready",
+        "reference_solution": "ready"
       }
     },
     {
@@ -2351,7 +2351,7 @@
       "theorem_name": "Benchmark.Cases.Safe.OwnerManagerReach.removeOwner_inListReachable",
       "proof_family": "state_preservation_local_effects",
       "translation_status": "translated",
-      "proof_status": "not_started",
+      "proof_status": "complete",
       "implementation_files": [
         "cases/safe/owner_manager_reach/verity/Contract.lean",
         "Benchmark/Cases/Safe/OwnerManagerReach/Contract.lean"
@@ -2366,15 +2366,15 @@
       "abstraction_level": "protocol_slice",
       "abstraction_notes": "Certora inListReachable invariant preservation under removeOwner. The proof requires showing that unlinking a node from the list preserves reachability for all remaining nodes. Chains through the removed node must be adapted by splicing it out.",
       "unsupported_feature_codes": [],
-      "reference_solution_module": "Benchmark.Cases.Safe.OwnerManagerReach.OpenProofs",
+      "reference_solution_module": "Benchmark.Cases.Safe.OwnerManagerReach.Proofs",
       "evaluation": {
         "engine": "lean_proof_generation",
         "target_kind": "proof_generation"
       },
       "readiness": {
         "prompt_context": "ready",
-        "editable_proof": "blocked",
-        "reference_solution": "blocked"
+        "editable_proof": "ready",
+        "reference_solution": "ready"
       }
     },
     {
@@ -2486,7 +2486,7 @@
       "theorem_name": "Benchmark.Cases.Safe.OwnerManagerReach.swapOwner_inListReachable",
       "proof_family": "state_preservation_local_effects",
       "translation_status": "translated",
-      "proof_status": "not_started",
+      "proof_status": "complete",
       "implementation_files": [
         "cases/safe/owner_manager_reach/verity/Contract.lean",
         "Benchmark/Cases/Safe/OwnerManagerReach/Contract.lean"
@@ -2501,15 +2501,15 @@
       "abstraction_level": "protocol_slice",
       "abstraction_notes": "Certora inListReachable invariant preservation under swapOwner. The proof requires showing that atomically replacing one node with another preserves reachability. The new node inherits the old node's successor, so chains are re-spliced in place.",
       "unsupported_feature_codes": [],
-      "reference_solution_module": "Benchmark.Cases.Safe.OwnerManagerReach.OpenProofs",
+      "reference_solution_module": "Benchmark.Cases.Safe.OwnerManagerReach.Proofs",
       "evaluation": {
         "engine": "lean_proof_generation",
         "target_kind": "proof_generation"
       },
       "readiness": {
         "prompt_context": "ready",
-        "editable_proof": "blocked",
-        "reference_solution": "blocked"
+        "editable_proof": "ready",
+        "reference_solution": "ready"
       }
     }
   ],
@@ -2875,5 +2875,5 @@
       }
     }
   ],
-  "generated_at": "2026-04-09T09:55:52.716224+00:00"
+  "generated_at": "2026-04-09T16:26:19.027673+00:00"
 }

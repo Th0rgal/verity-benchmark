@@ -349,7 +349,7 @@ def load_case_records_for_suite(suite: str) -> list[dict[str, Any]]:
 def aggregate_results(task_refs: list[str], suite: str) -> dict[str, Any]:
     explicit_task_refs = bool(task_refs)
     if not task_refs:
-        task_refs = discover_task_refs(suite)
+        task_refs = discover_task_refs(suite, runnable_only=True)
 
     results = []
     selected_case_ids: set[str] = set()

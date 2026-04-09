@@ -184,9 +184,9 @@ theorem in_list_reachable
     (hFresh : (wordToAddress (s.storageMap 0 owner) == zeroAddress) = true)
     (_hPreSentNZ : next s SENTINEL ≠ zeroAddress)
     (hPreReach : ∀ key : Address, next s key ≠ zeroAddress → reachable s SENTINEL key)
-    -- Raw acyclicity: SENTINEL ∉ any chain from next s SENTINEL ending at key ≠ SENTINEL.
+    -- Raw acyclicity: SENTINEL ∉ any chain from next s SENTINEL.
     -- Strictly stronger than `acyclic s` (no noDuplicates guard).
-    (hAcyclic : ∀ key : Address, key ≠ SENTINEL → ∀ chain : List Address,
+    (hAcyclic : ∀ key : Address, ∀ chain : List Address,
       chain.head? = some (next s SENTINEL) →
       chain.getLast? = some key →
       isChain s chain →
@@ -231,7 +231,7 @@ theorem in_list_reachable
           -- SENTINEL ∉ (b :: rest) by raw acyclicity
           have hSentNotIn : SENTINEL ∉ (b :: rest) := by
             have hHead' : (b :: rest).head? = some (next s SENTINEL) := by simp [hNextSent]
-            exact hAcyclic key hKeySent (b :: rest) hHead' hL hRestValid
+            exact hAcyclic key (b :: rest) hHead' hL hRestValid
           -- In the post-state, for elements not in {SENTINEL, owner}, next is unchanged.
           -- So (b :: rest) is still a valid chain in s' (since owner and SENTINEL are not in it).
           have hRestValid' : isChain s' (b :: rest) := by
