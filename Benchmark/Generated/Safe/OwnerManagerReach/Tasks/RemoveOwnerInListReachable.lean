@@ -28,7 +28,9 @@ theorem removeOwner_inListReachable
     -- Pre-state invariant
     (hPreInv : inListReachable s)
     -- Acyclicity
-    (hAcyclic : acyclic s) :
+    (hAcyclic : acyclic s)
+    -- Strong acyclicity: no non-SENTINEL cycles
+    (hStrongAcyclic : stronglyAcyclic s) :
     let s' := ((OwnerManager.removeOwner prevOwner owner).run s).snd
     inListReachable s' := by
   -- Replace this placeholder with a complete Lean proof.

@@ -27,10 +27,14 @@ theorem swapOwner_inListReachable
     (hOldNotZero : (oldOwner != zeroAddress) = true)
     (hOldNotSentinel : (oldOwner != SENTINEL) = true)
     (hPrevLink : (wordToAddress (s.storageMap 0 prevOwner) == oldOwner) = true)
+    -- prevOwner and oldOwner are distinct list nodes
+    (hOldNePrev : oldOwner ≠ prevOwner)
     -- Pre-state invariant
     (hPreInv : inListReachable s)
     -- Acyclicity
     (hAcyclic : acyclic s)
+    -- Strong acyclicity: no non-SENTINEL cycles
+    (hStrongAcyclic : stronglyAcyclic s)
     -- newOwner is fresh
     (hFresh : freshInList s newOwner) :
     let s' := ((OwnerManager.swapOwner prevOwner oldOwner newOwner).run s).snd

@@ -21,7 +21,8 @@ theorem removeOwner_inListReachable
     -- owners[SENTINEL] = 0, violating inListReachable.
     (hOwnerInList : next s owner ≠ zeroAddress)
     (hPreInv : inListReachable s)
-    (hAcyclic : acyclic s) :
+    (hAcyclic : acyclic s)
+    (hStrongAcyclic : stronglyAcyclic s) :
     let s' := ((OwnerManager.removeOwner prevOwner owner).run s).snd
     inListReachable s' := by
   sorry
@@ -34,8 +35,10 @@ theorem swapOwner_inListReachable
     (hOldNotZero : (oldOwner != zeroAddress) = true)
     (hOldNotSentinel : (oldOwner != SENTINEL) = true)
     (hPrevLink : (wordToAddress (s.storageMap 0 prevOwner) == oldOwner) = true)
+    (hOldNePrev : oldOwner ≠ prevOwner)
     (hPreInv : inListReachable s)
     (hAcyclic : acyclic s)
+    (hStrongAcyclic : stronglyAcyclic s)
     (hFresh : freshInList s newOwner) :
     let s' := ((OwnerManager.swapOwner prevOwner oldOwner newOwner).run s).snd
     inListReachable s' := by
@@ -92,6 +95,7 @@ theorem swapOwner_ownerListInvariant
     (hOldNotZero : (oldOwner != zeroAddress) = true)
     (hOldNotSentinel : (oldOwner != SENTINEL) = true)
     (hPrevLink : (wordToAddress (s.storageMap 0 prevOwner) == oldOwner) = true)
+    (hOldNePrev : oldOwner ≠ prevOwner)
     (hPreInv : ownerListInvariant s)
     (hAcyclic : acyclic s)
     (hFresh : freshInList s newOwner) :
@@ -145,6 +149,7 @@ theorem swapOwner_acyclicity
     (hOldNotZero : (oldOwner != zeroAddress) = true)
     (hOldNotSentinel : (oldOwner != SENTINEL) = true)
     (hPrevLink : (wordToAddress (s.storageMap 0 prevOwner) == oldOwner) = true)
+    (hOldNePrev : oldOwner ≠ prevOwner)
     (hPreAcyclic : acyclic s)
     (hFresh : freshInList s newOwner) :
     let s' := ((OwnerManager.swapOwner prevOwner oldOwner newOwner).run s).snd

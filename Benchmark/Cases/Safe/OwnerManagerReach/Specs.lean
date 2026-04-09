@@ -124,6 +124,21 @@ def acyclic (s : ContractState) : Prop :=
     SENTINEL ∉ chain
 
 /--
+  Strong acyclicity: the reachability relation is antisymmetric.
+  If `a` reaches `b` and `b` reaches `a`, then `a = b`.
+  This captures the Certora `reach_invariant` antisymmetry axiom from
+  OwnerReach.spec and prevents non-SENTINEL cycles in the linked list.
+
+  The weaker `acyclic` property only prevents SENTINEL from appearing
+  in chains starting at `next s SENTINEL`. It does not rule out cycles
+  among non-SENTINEL nodes (e.g. A → B → A). `stronglyAcyclic` closes
+  this gap, matching the Certora specification's full linear-order
+  invariant on the reach relation.
+-/
+def stronglyAcyclic (s : ContractState) : Prop :=
+  ∀ a b : Address, reachable s a b → reachable s b a → a = b
+
+/--
   Freshness of a given address: it does not appear in any duplicate-free
   chain starting from SENTINEL's successor. This is a consequence of
   acyclicity + the address having a zero mapping value.
