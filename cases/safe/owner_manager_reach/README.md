@@ -26,8 +26,11 @@ Model:
   - Per-function preservation and establishment specs
 - `Proofs.lean` contains:
   - **Proven**: `in_list_reachable` (addOwner preserves inListReachable)
-  - **Sorry stubs**: removeOwner, swapOwner, setupOwners preservation for
-    inListReachable, ownerListInvariant, and acyclicity (11 proof tasks)
+  - **Compiled reference proof set**: only completed theorems used by
+    runnable tasks
+  - `OpenProofs.lean`: theorem skeletons for removeOwner, swapOwner,
+    setupOwners preservation for inListReachable, ownerListInvariant, and
+    acyclicity (11 future proof tasks)
 
 Verification:
 - `lake build Benchmark.Cases.Safe.OwnerManagerReach.Compile` checks the

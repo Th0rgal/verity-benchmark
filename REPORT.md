@@ -4,11 +4,11 @@ This report is generated from the benchmark manifests.
 
 ## Summary
 
-- Families: 10
-- Implementations: 10
-- Active cases: 6
-- Buildable active cases: 6
-- Active tasks: 30
+- Families: 11
+- Implementations: 11
+- Active cases: 7
+- Buildable active cases: 7
+- Active tasks: 36
 - Backlog cases: 4
 
 ## Buildable active cases
@@ -72,6 +72,16 @@ This report is generated from the benchmark manifests.
 - Selected functions: `claimUsdc`, `_claimUsdc`
 - Source artifact: `src/StreamRecoveryClaim.sol`
 - Notes: Single-round accounting slice of the USDC claim path. Merkle verification is abstracted as a boolean witness and token transfer side effects are omitted.
+
+### `safe/owner_manager_reach`
+- Family / implementation: `safe` / `smart_account`
+- Stage: `build_green`
+- Status dimensions: translation=`translated`, spec=`frozen`, proof=`partial`
+- Lean target: `Benchmark.Cases.Safe.OwnerManagerReach.Compile`
+- Source ref: `https://github.com/safe-global/safe-smart-account@a2e19c6aa42a45ceec68057f3fa387f169c5b321:contracts/base/OwnerManager.sol`
+- Selected functions: `addOwnerWithThreshold`, `removeOwner`, `swapOwner`, `setupOwners`
+- Source artifact: `contracts/base/OwnerManager.sol`
+- Notes: Linked list reachability invariant preservation for the Safe OwnerManager. Based on the Certora OwnerReach.spec which defines the inListReachable and reachableInList invariants. The addOwner inListReachable proof is complete; the remaining theorem statements are scaffolded for future proof work and exposed as editable benchmark tasks.
 
 ## Non-buildable active cases
 
@@ -378,6 +388,66 @@ This report is generated from the benchmark manifests.
 - Specification files: `cases/paladin_votes/stream_recovery_claim_usdc/verity/Specs.lean`, `Benchmark/Cases/PaladinVotes/StreamRecoveryClaimUsdc/Specs.lean`
 - Editable proof file: `Benchmark/Generated/PaladinVotes/StreamRecoveryClaimUsdc/Tasks/NoOverclaim.lean`
 - Hidden reference solution: `Benchmark.Cases.PaladinVotes.StreamRecoveryClaimUsdc.Proofs`
+
+### `safe/owner_manager_reach/add_owner_acyclicity`
+- Track / property class / proof family: `proof-only` / `linked_list_acyclicity` / `state_preservation_local_effects`
+- Readiness: prompt_context=`ready`, editable_proof=`blocked`, reference_solution=`blocked`
+- Theorem target: `Benchmark.Cases.Safe.OwnerManagerReach.addOwner_acyclicity`
+- Evaluation: engine=`lean_proof_generation`, target_kind=`proof_generation`
+- Implementation files: `cases/safe/owner_manager_reach/verity/Contract.lean`, `Benchmark/Cases/Safe/OwnerManagerReach/Contract.lean`
+- Specification files: `cases/safe/owner_manager_reach/verity/Specs.lean`, `Benchmark/Cases/Safe/OwnerManagerReach/Specs.lean`
+- Editable proof file: `Benchmark/Generated/Safe/OwnerManagerReach/Tasks/AddOwnerAcyclicity.lean`
+- Hidden reference solution: `Benchmark.Cases.Safe.OwnerManagerReach.OpenProofs`
+
+### `safe/owner_manager_reach/in_list_reachable`
+- Track / property class / proof family: `proof-only` / `linked_list_invariant` / `state_preservation_local_effects`
+- Readiness: prompt_context=`ready`, editable_proof=`ready`, reference_solution=`ready`
+- Theorem target: `Benchmark.Cases.Safe.OwnerManagerReach.in_list_reachable`
+- Evaluation: engine=`lean_proof_generation`, target_kind=`proof_generation`
+- Implementation files: `cases/safe/owner_manager_reach/verity/Contract.lean`, `Benchmark/Cases/Safe/OwnerManagerReach/Contract.lean`
+- Specification files: `cases/safe/owner_manager_reach/verity/Specs.lean`, `Benchmark/Cases/Safe/OwnerManagerReach/Specs.lean`
+- Editable proof file: `Benchmark/Generated/Safe/OwnerManagerReach/Tasks/InListReachable.lean`
+- Hidden reference solution: `Benchmark.Cases.Safe.OwnerManagerReach.Proofs`
+
+### `safe/owner_manager_reach/remove_owner_in_list_reachable`
+- Track / property class / proof family: `proof-only` / `linked_list_invariant` / `state_preservation_local_effects`
+- Readiness: prompt_context=`ready`, editable_proof=`blocked`, reference_solution=`blocked`
+- Theorem target: `Benchmark.Cases.Safe.OwnerManagerReach.removeOwner_inListReachable`
+- Evaluation: engine=`lean_proof_generation`, target_kind=`proof_generation`
+- Implementation files: `cases/safe/owner_manager_reach/verity/Contract.lean`, `Benchmark/Cases/Safe/OwnerManagerReach/Contract.lean`
+- Specification files: `cases/safe/owner_manager_reach/verity/Specs.lean`, `Benchmark/Cases/Safe/OwnerManagerReach/Specs.lean`
+- Editable proof file: `Benchmark/Generated/Safe/OwnerManagerReach/Tasks/RemoveOwnerInListReachable.lean`
+- Hidden reference solution: `Benchmark.Cases.Safe.OwnerManagerReach.OpenProofs`
+
+### `safe/owner_manager_reach/setup_owners_acyclicity`
+- Track / property class / proof family: `proof-only` / `linked_list_acyclicity` / `protocol_transition_correctness`
+- Readiness: prompt_context=`ready`, editable_proof=`blocked`, reference_solution=`blocked`
+- Theorem target: `Benchmark.Cases.Safe.OwnerManagerReach.setupOwners_acyclicity`
+- Evaluation: engine=`lean_proof_generation`, target_kind=`proof_generation`
+- Implementation files: `cases/safe/owner_manager_reach/verity/Contract.lean`, `Benchmark/Cases/Safe/OwnerManagerReach/Contract.lean`
+- Specification files: `cases/safe/owner_manager_reach/verity/Specs.lean`, `Benchmark/Cases/Safe/OwnerManagerReach/Specs.lean`
+- Editable proof file: `Benchmark/Generated/Safe/OwnerManagerReach/Tasks/SetupOwnersAcyclicity.lean`
+- Hidden reference solution: `Benchmark.Cases.Safe.OwnerManagerReach.OpenProofs`
+
+### `safe/owner_manager_reach/setup_owners_in_list_reachable`
+- Track / property class / proof family: `proof-only` / `linked_list_invariant` / `protocol_transition_correctness`
+- Readiness: prompt_context=`ready`, editable_proof=`blocked`, reference_solution=`blocked`
+- Theorem target: `Benchmark.Cases.Safe.OwnerManagerReach.setupOwners_inListReachable`
+- Evaluation: engine=`lean_proof_generation`, target_kind=`proof_generation`
+- Implementation files: `cases/safe/owner_manager_reach/verity/Contract.lean`, `Benchmark/Cases/Safe/OwnerManagerReach/Contract.lean`
+- Specification files: `cases/safe/owner_manager_reach/verity/Specs.lean`, `Benchmark/Cases/Safe/OwnerManagerReach/Specs.lean`
+- Editable proof file: `Benchmark/Generated/Safe/OwnerManagerReach/Tasks/SetupOwnersInListReachable.lean`
+- Hidden reference solution: `Benchmark.Cases.Safe.OwnerManagerReach.OpenProofs`
+
+### `safe/owner_manager_reach/swap_owner_in_list_reachable`
+- Track / property class / proof family: `proof-only` / `linked_list_invariant` / `state_preservation_local_effects`
+- Readiness: prompt_context=`ready`, editable_proof=`blocked`, reference_solution=`blocked`
+- Theorem target: `Benchmark.Cases.Safe.OwnerManagerReach.swapOwner_inListReachable`
+- Evaluation: engine=`lean_proof_generation`, target_kind=`proof_generation`
+- Implementation files: `cases/safe/owner_manager_reach/verity/Contract.lean`, `Benchmark/Cases/Safe/OwnerManagerReach/Contract.lean`
+- Specification files: `cases/safe/owner_manager_reach/verity/Specs.lean`, `Benchmark/Cases/Safe/OwnerManagerReach/Specs.lean`
+- Editable proof file: `Benchmark/Generated/Safe/OwnerManagerReach/Tasks/SwapOwnerInListReachable.lean`
+- Hidden reference solution: `Benchmark.Cases.Safe.OwnerManagerReach.OpenProofs`
 
 ## Backlog
 

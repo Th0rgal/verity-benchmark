@@ -41,4 +41,5 @@ notes: >
   Linked list reachability invariant preservation for the Safe OwnerManager.
   Based on the Certora OwnerReach.spec which defines the inListReachable
   and reachableInList invariants. The addOwner inListReachable proof is
-  complete; all other proofs are sorry stubs for benchmark agents to fill.
+  complete; the remaining theorem statements are scaffolded for future proof
+  work and exposed as editable benchmark tasks.
