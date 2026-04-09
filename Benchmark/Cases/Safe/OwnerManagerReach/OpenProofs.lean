@@ -16,6 +16,10 @@ theorem removeOwner_inListReachable
     (hNotZero : (owner != zeroAddress) = true)
     (hNotSentinel : (owner != SENTINEL) = true)
     (hPrevLink : (wordToAddress (s.storageMap 0 prevOwner) == owner) = true)
+    -- The removed owner must have a non-zero successor (i.e. be in the list).
+    -- Without this, removing the sole remaining owner would make
+    -- owners[SENTINEL] = 0, violating inListReachable.
+    (hOwnerInList : next s owner ≠ zeroAddress)
     (hPreInv : inListReachable s)
     (hAcyclic : acyclic s) :
     let s' := ((OwnerManager.removeOwner prevOwner owner).run s).snd
@@ -47,7 +51,11 @@ theorem setupOwners_inListReachable
     (h3NS : (owner3 != SENTINEL) = true)
     (h12 : (owner1 != owner2) = true)
     (h13 : (owner1 != owner3) = true)
-    (h23 : (owner2 != owner3) = true) :
+    (h23 : (owner2 != owner3) = true)
+    -- Clean pre-state: no pre-existing owner links.
+    -- Without this, stale mappings from a prior state could leave nodes with
+    -- non-zero successors that are unreachable from SENTINEL after setup.
+    (hClean : ∀ addr : Address, s.storageMap 0 addr = 0) :
     let s' := ((OwnerManager.setupOwners owner1 owner2 owner3).run s).snd
     inListReachable s' := by
   sorry
@@ -69,6 +77,7 @@ theorem removeOwner_ownerListInvariant
     (hNotZero : (owner != zeroAddress) = true)
     (hNotSentinel : (owner != SENTINEL) = true)
     (hPrevLink : (wordToAddress (s.storageMap 0 prevOwner) == owner) = true)
+    (hOwnerInList : next s owner ≠ zeroAddress)
     (hPreInv : ownerListInvariant s)
     (hAcyclic : acyclic s) :
     let s' := ((OwnerManager.removeOwner prevOwner owner).run s).snd
@@ -100,7 +109,8 @@ theorem setupOwners_ownerListInvariant
     (h3NS : (owner3 != SENTINEL) = true)
     (h12 : (owner1 != owner2) = true)
     (h13 : (owner1 != owner3) = true)
-    (h23 : (owner2 != owner3) = true) :
+    (h23 : (owner2 != owner3) = true)
+    (hClean : ∀ addr : Address, s.storageMap 0 addr = 0) :
     let s' := ((OwnerManager.setupOwners owner1 owner2 owner3).run s).snd
     ownerListInvariant s' := by
   sorry
@@ -121,6 +131,7 @@ theorem removeOwner_acyclicity
     (hNotZero : (owner != zeroAddress) = true)
     (hNotSentinel : (owner != SENTINEL) = true)
     (hPrevLink : (wordToAddress (s.storageMap 0 prevOwner) == owner) = true)
+    (hOwnerInList : next s owner ≠ zeroAddress)
     (hPreAcyclic : acyclic s) :
     let s' := ((OwnerManager.removeOwner prevOwner owner).run s).snd
     acyclic s' := by
@@ -150,7 +161,8 @@ theorem setupOwners_acyclicity
     (h3NS : (owner3 != SENTINEL) = true)
     (h12 : (owner1 != owner2) = true)
     (h13 : (owner1 != owner3) = true)
-    (h23 : (owner2 != owner3) = true) :
+    (h23 : (owner2 != owner3) = true)
+    (hClean : ∀ addr : Address, s.storageMap 0 addr = 0) :
     let s' := ((OwnerManager.setupOwners owner1 owner2 owner3).run s).snd
     acyclic s' := by
   sorry

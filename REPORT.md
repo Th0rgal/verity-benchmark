@@ -421,23 +421,23 @@ This report is generated from the benchmark manifests.
 
 ### `safe/owner_manager_reach/setup_owners_acyclicity`
 - Track / property class / proof family: `proof-only` / `linked_list_acyclicity` / `protocol_transition_correctness`
-- Readiness: prompt_context=`ready`, editable_proof=`blocked`, reference_solution=`blocked`
+- Readiness: prompt_context=`ready`, editable_proof=`ready`, reference_solution=`ready`
 - Theorem target: `Benchmark.Cases.Safe.OwnerManagerReach.setupOwners_acyclicity`
 - Evaluation: engine=`lean_proof_generation`, target_kind=`proof_generation`
 - Implementation files: `cases/safe/owner_manager_reach/verity/Contract.lean`, `Benchmark/Cases/Safe/OwnerManagerReach/Contract.lean`
 - Specification files: `cases/safe/owner_manager_reach/verity/Specs.lean`, `Benchmark/Cases/Safe/OwnerManagerReach/Specs.lean`
 - Editable proof file: `Benchmark/Generated/Safe/OwnerManagerReach/Tasks/SetupOwnersAcyclicity.lean`
-- Hidden reference solution: `Benchmark.Cases.Safe.OwnerManagerReach.OpenProofs`
+- Hidden reference solution: `Benchmark.Cases.Safe.OwnerManagerReach.Proofs`
 
 ### `safe/owner_manager_reach/setup_owners_in_list_reachable`
 - Track / property class / proof family: `proof-only` / `linked_list_invariant` / `protocol_transition_correctness`
-- Readiness: prompt_context=`ready`, editable_proof=`blocked`, reference_solution=`blocked`
+- Readiness: prompt_context=`ready`, editable_proof=`ready`, reference_solution=`ready`
 - Theorem target: `Benchmark.Cases.Safe.OwnerManagerReach.setupOwners_inListReachable`
 - Evaluation: engine=`lean_proof_generation`, target_kind=`proof_generation`
 - Implementation files: `cases/safe/owner_manager_reach/verity/Contract.lean`, `Benchmark/Cases/Safe/OwnerManagerReach/Contract.lean`
 - Specification files: `cases/safe/owner_manager_reach/verity/Specs.lean`, `Benchmark/Cases/Safe/OwnerManagerReach/Specs.lean`
 - Editable proof file: `Benchmark/Generated/Safe/OwnerManagerReach/Tasks/SetupOwnersInListReachable.lean`
-- Hidden reference solution: `Benchmark.Cases.Safe.OwnerManagerReach.OpenProofs`
+- Hidden reference solution: `Benchmark.Cases.Safe.OwnerManagerReach.Proofs`
 
 ### `safe/owner_manager_reach/swap_owner_in_list_reachable`
 - Track / property class / proof family: `proof-only` / `linked_list_invariant` / `state_preservation_local_effects`

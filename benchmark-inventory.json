@@ -17,7 +17,7 @@
     "active_task_count": 36,
     "backlog_task_count": 8,
     "buildable_case_count": 9,
-    "runnable_task_count": 39,
+    "runnable_task_count": 41,
     "case_stage_counts": {
       "build_green": 7,
       "candidate": 2,
@@ -2396,7 +2396,7 @@
       "theorem_name": "Benchmark.Cases.Safe.OwnerManagerReach.setupOwners_acyclicity",
       "proof_family": "protocol_transition_correctness",
       "translation_status": "translated",
-      "proof_status": "not_started",
+      "proof_status": "complete",
       "implementation_files": [
         "cases/safe/owner_manager_reach/verity/Contract.lean",
         "Benchmark/Cases/Safe/OwnerManagerReach/Contract.lean"
@@ -2411,15 +2411,15 @@
       "abstraction_level": "protocol_slice",
       "abstraction_notes": "Base case: setupOwners establishes acyclicity of the owner linked list. The constructed list has no internal cycles by construction.",
       "unsupported_feature_codes": [],
-      "reference_solution_module": "Benchmark.Cases.Safe.OwnerManagerReach.OpenProofs",
+      "reference_solution_module": "Benchmark.Cases.Safe.OwnerManagerReach.Proofs",
       "evaluation": {
         "engine": "lean_proof_generation",
         "target_kind": "proof_generation"
       },
       "readiness": {
         "prompt_context": "ready",
-        "editable_proof": "blocked",
-        "reference_solution": "blocked"
+        "editable_proof": "ready",
+        "reference_solution": "ready"
       }
     },
     {
@@ -2441,7 +2441,7 @@
       "theorem_name": "Benchmark.Cases.Safe.OwnerManagerReach.setupOwners_inListReachable",
       "proof_family": "protocol_transition_correctness",
       "translation_status": "translated",
-      "proof_status": "not_started",
+      "proof_status": "complete",
       "implementation_files": [
         "cases/safe/owner_manager_reach/verity/Contract.lean",
         "Benchmark/Cases/Safe/OwnerManagerReach/Contract.lean"
@@ -2456,15 +2456,15 @@
       "abstraction_level": "protocol_slice",
       "abstraction_notes": "Base case: setupOwners establishes the inListReachable invariant. No pre-state invariant required. The proof constructs explicit witness chains for the known list structure SENTINEL \u2192 o1 \u2192 o2 \u2192 o3 \u2192 SENTINEL.",
       "unsupported_feature_codes": [],
-      "reference_solution_module": "Benchmark.Cases.Safe.OwnerManagerReach.OpenProofs",
+      "reference_solution_module": "Benchmark.Cases.Safe.OwnerManagerReach.Proofs",
       "evaluation": {
         "engine": "lean_proof_generation",
         "target_kind": "proof_generation"
       },
       "readiness": {
         "prompt_context": "ready",
-        "editable_proof": "blocked",
-        "reference_solution": "blocked"
+        "editable_proof": "ready",
+        "reference_solution": "ready"
       }
     },
     {
@@ -2875,5 +2875,5 @@
       }
     }
   ],
-  "generated_at": "2026-04-09T07:37:08.003978+00:00"
+  "generated_at": "2026-04-09T09:55:52.716224+00:00"
 }

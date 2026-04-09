@@ -78,6 +78,11 @@ def reachableInList (s : ContractState) : Prop :=
   Combined owner list invariant: the list is non-empty, and membership
   (having a non-zero successor) is equivalent to reachability from SENTINEL.
   This merges inListReachable and reachableInList into a single property.
+
+  The `key ≠ zeroAddress` guard matches Solidity semantics: address(0) is
+  never a valid owner (`require(owner != address(0))`), and in the Safe
+  contract `owners[address(0)]` is always 0. This guard excludes the zero
+  address from the biconditional since it is outside the owner domain.
 -/
 def ownerListInvariant (s : ContractState) : Prop :=
   next s SENTINEL ≠ zeroAddress ∧
