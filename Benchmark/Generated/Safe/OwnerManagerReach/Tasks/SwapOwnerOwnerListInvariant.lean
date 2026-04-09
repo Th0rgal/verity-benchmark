@@ -16,6 +16,7 @@ theorem swapOwner_ownerListInvariant
     (hOldNotZero : (oldOwner != zeroAddress) = true)
     (hOldNotSentinel : (oldOwner != SENTINEL) = true)
     (hPrevLink : (wordToAddress (s.storageMap 0 prevOwner) == oldOwner) = true)
+    (hOldNePrev : oldOwner ≠ prevOwner)
     (hPreInv : ownerListInvariant s)
     (hAcyclic : acyclic s)
     (hFresh : freshInList s newOwner) :

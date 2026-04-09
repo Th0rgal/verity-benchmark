@@ -1,0 +1,34 @@
+manifest_kind: task
+schema_version: 1
+task_id: add_owner_owner_list_invariant
+case_id: safe/owner_manager_reach
+split: active
+family_id: safe
+implementation_id: smart_account
+source_ref: https://github.com/safe-global/safe-smart-account@a2e19c6aa42a45ceec68057f3fa387f169c5b321:contracts/base/OwnerManager.sol
+task_interface_version: 2
+theorem_name: Benchmark.Cases.Safe.OwnerManagerReach.addOwner_ownerListInvariant
+proof_family: state_preservation_local_effects
+property_class: linked_list_invariant
+difficulty: hard
+category: invariant
+track: proof-only
+translation_status: translated
+proof_status: not_started
+evaluation_engine: lean_proof_generation
+implementation_files:
+  - cases/safe/owner_manager_reach/verity/Contract.lean
+  - Benchmark/Cases/Safe/OwnerManagerReach/Contract.lean
+specification_files:
+  - cases/safe/owner_manager_reach/verity/Specs.lean
+  - Benchmark/Cases/Safe/OwnerManagerReach/Specs.lean
+editable_files:
+  - Benchmark/Generated/Safe/OwnerManagerReach/Tasks/AddOwnerOwnerListInvariant.lean
+reference_solution_module: Benchmark.Cases.Safe.OwnerManagerReach.OpenProofs
+reference_solution_declaration: Benchmark.Cases.Safe.OwnerManagerReach.addOwner_ownerListInvariant
+abstraction_level: protocol_slice
+abstraction_notes: >
+  Combined ownerListInvariant preservation under addOwner. The
+  ownerListInvariant merges inListReachable and reachableInList into a
+  biconditional: membership is equivalent to reachability from SENTINEL.
+unsupported_feature_codes: []

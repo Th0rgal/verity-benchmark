@@ -149,7 +149,6 @@ theorem swapOwner_acyclicity
     (hOldNotZero : (oldOwner != zeroAddress) = true)
     (hOldNotSentinel : (oldOwner != SENTINEL) = true)
     (hPrevLink : (wordToAddress (s.storageMap 0 prevOwner) == oldOwner) = true)
-    (hOldNePrev : oldOwner ≠ prevOwner)
     (hPreAcyclic : acyclic s)
     (hFresh : freshInList s newOwner) :
     let s' := ((OwnerManager.swapOwner prevOwner oldOwner newOwner).run s).snd
