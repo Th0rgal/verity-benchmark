@@ -18,6 +18,7 @@ theorem removeOwner_acyclicity
     (hNotZero : (owner != zeroAddress) = true)
     (hNotSentinel : (owner != SENTINEL) = true)
     (hPrevLink : (wordToAddress (s.storageMap 0 prevOwner) == owner) = true)
+    (hOwnerInList : next s owner ≠ zeroAddress)
     (hPreAcyclic : acyclic s) :
     let s' := ((OwnerManager.removeOwner prevOwner owner).run s).snd
     acyclic s' := by

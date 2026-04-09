@@ -247,6 +247,61 @@ theorem in_list_reachable
           exact ⟨SENTINEL :: owner :: b :: rest, rfl, hLast',
                  hSent, by rw [hNextEq]; simp [hOwnerNS]; exact hNextSent, hRestValid'⟩
 
+/-! ## addOwner: acyclicity preservation -/
+
+theorem addOwner_acyclicity
+    (owner : Address) (s : ContractState)
+    (hNotZero : (owner != zeroAddress) = true)
+    (hNotSentinel : (owner != SENTINEL) = true)
+    (hFresh : (wordToAddress (s.storageMap 0 owner) == zeroAddress) = true)
+    (_hPreAcyclic : acyclic s)
+    (_hFreshInList : freshInList s owner) :
+    acyclic ((OwnerManager.addOwner owner).run s).snd := by
+  let s' := ((OwnerManager.addOwner owner).run s).snd
+  have hNextEq := addOwner_next_eq owner s hNotZero hNotSentinel hFresh
+  have hSent : next s' SENTINEL = owner := by rw [hNextEq]; simp
+  have hOwnerNext : next s' owner = next s SENTINEL := by
+    rw [hNextEq]; simp [ne_of_bne hNotSentinel]
+  have hOwnerNS : owner ≠ SENTINEL := ne_of_bne hNotSentinel
+  -- Helper: in any isChain s' where SENTINEL ∈ l and owner ∉ l,
+  -- SENTINEL must be the last element (because next s' SENTINEL = owner).
+  have hSentIsLast : ∀ (l : List Address), isChain s' l →
+      SENTINEL ∈ l → owner ∉ l → l.getLast? = some SENTINEL := by
+    intro l hChV hSIn hONotIn
+    induction l with
+    | nil => simp at hSIn
+    | cons hd tl ih =>
+      match tl, hChV with
+      | [], _ => simp at hSIn; simp [List.getLast?, hSIn]
+      | c :: rest', hChV =>
+        rcases List.mem_cons.mp hSIn with rfl | hSTl
+        · -- hd = SENTINEL, so next s' SENTINEL = c, i.e. c = owner
+          exfalso; apply hONotIn
+          have hc : c = owner := by have := hChV.1; rw [hSent] at this; exact this.symm
+          subst hc; exact List.mem_cons_of_mem _ (List.Mem.head rest')
+        · -- SENTINEL ∈ (c :: rest')
+          simp only [List.getLast?]
+          exact ih hChV.2 hSTl (fun hO => hONotIn (List.mem_cons_of_mem _ hO))
+  -- Main acyclicity proof
+  unfold acyclic
+  intro k hkNS ch hHead hLast hValid hNoDup hSentMem
+  rw [hSent] at hHead
+  match ch, hHead, hLast, hValid, hNoDup, hSentMem with
+  | [a], hH, _, _, _, hSM =>
+    simp at hH hSM; exact hOwnerNS (hH ▸ hSM).symm
+  | a :: b :: rest, hH, hL, hV, hND, hSM =>
+    simp at hH
+    -- hH : a = owner. Use rw to avoid subst renaming.
+    rw [hH] at hV hND hSM hL
+    have hOwnerNotInTail : owner ∉ (b :: rest) := hND.1
+    rcases List.mem_cons.mp hSM with rfl | hSentInTail
+    · exact hOwnerNS rfl
+    · have hTailLast := hSentIsLast (b :: rest) hV.2 hSentInTail hOwnerNotInTail
+      have hL' : (b :: rest).getLast? = some k := by
+        simp only [List.getLast?] at hL ⊢; exact hL
+      rw [hTailLast] at hL'
+      exact hkNS (Option.some.inj hL').symm
+
 /-! ═══════════════════════════════════════════════════════════════════
     Part 2: setupOwners — storageMap, next_eq, proofs
     ═══════════════════════════════════════════════════════════════════ -/
@@ -660,7 +715,71 @@ theorem setupOwners_ownerListInvariant
                     exact ih hChV.2 x (by simp [List.tail]; exact hxrest)
 
 /-! ═══════════════════════════════════════════════════════════════════
-    Part 3: removeOwner — storageMap, next_eq (helpers for future proofs)
+    Generic acyclicity helper
+    ═══════════════════════════════════════════════════════════════════ -/
+
+/-- In any dup-free isChain, if SENTINEL ∈ l and some address `a ∉ l`
+    satisfies `next s SENTINEL = a`, then SENTINEL must be the last element.
+    Reason: SENTINEL at a non-last position is followed by `next s SENTINEL = a`,
+    but a ∉ l gives a contradiction. -/
+private theorem sentinel_last_if_succ_absent
+    (s : ContractState) (l : List Address) (a : Address)
+    (ha_eq : next s SENTINEL = a)
+    (hValid : isChain s l)
+    (hSentIn : SENTINEL ∈ l)
+    (hANotIn : a ∉ l) :
+    l.getLast? = some SENTINEL := by
+  induction l with
+  | nil => simp at hSentIn
+  | cons hd tl ih =>
+    match tl, hValid with
+    | [], _ => simp at hSentIn; simp [List.getLast?, hSentIn]
+    | c :: rest, hV =>
+      rcases List.mem_cons.mp hSentIn with rfl | hSTl
+      · -- hd = SENTINEL, so next s SENTINEL = c. ha_eq says next s SENTINEL = a, so c = a.
+        exfalso
+        have hc : c = a := by rw [← ha_eq]; exact hV.1.symm
+        exact hANotIn (hc ▸ List.mem_cons_of_mem _ (List.Mem.head rest))
+      · simp only [List.getLast?]
+        exact ih hV.2 hSTl (fun h => hANotIn (List.mem_cons_of_mem _ h))
+
+/-- Generic acyclicity: in any dup-free chain starting at `next s SENTINEL`
+    ending at `key ≠ SENTINEL`, SENTINEL cannot appear. This is because
+    SENTINEL at a non-last position forces `next s SENTINEL` (the head) to
+    appear twice, and at the last position it contradicts `key ≠ SENTINEL`. -/
+private theorem acyclic_generic
+    (s : ContractState) (key : Address) (hKeyNS : key ≠ SENTINEL)
+    (chain : List Address)
+    (hHead : chain.head? = some (next s SENTINEL))
+    (hLast : chain.getLast? = some key)
+    (hValid : isChain s chain)
+    (hNoDup : noDuplicates chain)
+    (hSentMem : SENTINEL ∈ chain) :
+    False := by
+  match chain, hHead, hLast, hValid, hNoDup, hSentMem with
+  | [a], _, hL, _, _, hSM =>
+    simp at hSM hL; exact hKeyNS (hSM ▸ hL).symm
+  | a :: b :: rest, hH, hL, hV, hND, hSM =>
+    simp at hH
+    -- a = next s SENTINEL. noDuplicates: a ∉ (b :: rest).
+    have ha_not_in_tl : a ∉ (b :: rest) := hND.1
+    rcases List.mem_cons.mp hSM with rfl | hSTl
+    · -- a = SENTINEL. next s SENTINEL = b (hV.1). hH: a = next s SENTINEL, so SENTINEL = next s SENTINEL.
+      -- Then b = next s SENTINEL = SENTINEL. But SENTINEL ∉ (b :: rest). Contradiction.
+      have hb : b = next s SENTINEL := hV.1.symm
+      rw [← hH] at hb
+      exact ha_not_in_tl (hb ▸ List.Mem.head rest)
+    · -- SENTINEL ∈ (b :: rest). Show SENTINEL is last element using sentinel_last_if_succ_absent.
+      -- next s SENTINEL = a (from hH). a ∉ (b :: rest) (from hND.1).
+      have hSentLast := sentinel_last_if_succ_absent s (b :: rest) a
+        (hH ▸ rfl) hV.2 hSTl ha_not_in_tl
+      have hL' : (b :: rest).getLast? = some key := by
+        simp only [List.getLast?] at hL ⊢; exact hL
+      rw [hSentLast] at hL'
+      exact hKeyNS (Option.some.inj hL').symm
+
+/-! ═══════════════════════════════════════════════════════════════════
+    Part 3: removeOwner — storageMap, next_eq, acyclicity, inListReachable
     ═══════════════════════════════════════════════════════════════════ -/
 
 set_option maxHeartbeats 6400000 in
@@ -710,6 +829,21 @@ private theorem removeOwner_storageMap
       simp only [ite_true]
       exact wordToAddress_addressToWord (wordToAddress (s.storageMap 0 owner))
     · simp only [h2, ite_false]
+
+/-! ## removeOwner: acyclicity preservation -/
+
+theorem removeOwner_acyclicity
+    (prevOwner owner : Address) (s : ContractState)
+    (_hNotZero : (owner != zeroAddress) = true)
+    (_hNotSentinel : (owner != SENTINEL) = true)
+    (_hPrevLink : (wordToAddress (s.storageMap 0 prevOwner) == owner) = true)
+    (_hOwnerInList : next s owner ≠ zeroAddress)
+    (_hPreAcyclic : acyclic s) :
+    acyclic ((OwnerManager.removeOwner prevOwner owner).run s).snd := by
+  let s' := ((OwnerManager.removeOwner prevOwner owner).run s).snd
+  unfold acyclic
+  intro key hKeyNS chain hHead hLast hValid hNoDup hSentMem
+  exact acyclic_generic s' key hKeyNS chain hHead hLast hValid hNoDup hSentMem
 
 /-! ═══════════════════════════════════════════════════════════════════
     Part 4: swapOwner — storageMap, next_eq (helpers for future proofs)
@@ -777,5 +911,194 @@ private theorem swapOwner_storageMap
         simp only [ite_true]
         exact wordToAddress_addressToWord (wordToAddress (s.storageMap 0 oldOwner))
       · simp only [h3, ite_false]
+
+/-! ## swapOwner: acyclicity preservation -/
+
+theorem swapOwner_acyclicity
+    (prevOwner oldOwner newOwner : Address) (s : ContractState)
+    (_hNewNotZero : (newOwner != zeroAddress) = true)
+    (_hNewNotSentinel : (newOwner != SENTINEL) = true)
+    (_hNewFresh : (wordToAddress (s.storageMap 0 newOwner) == zeroAddress) = true)
+    (_hOldNotZero : (oldOwner != zeroAddress) = true)
+    (_hOldNotSentinel : (oldOwner != SENTINEL) = true)
+    (_hPrevLink : (wordToAddress (s.storageMap 0 prevOwner) == oldOwner) = true)
+    (_hPreAcyclic : acyclic s)
+    (_hFresh : freshInList s newOwner) :
+    acyclic ((OwnerManager.swapOwner prevOwner oldOwner newOwner).run s).snd := by
+  let s' := ((OwnerManager.swapOwner prevOwner oldOwner newOwner).run s).snd
+  unfold acyclic
+  intro key hKeyNS chain hHead hLast hValid hNoDup hSentMem
+  exact acyclic_generic s' key hKeyNS chain hHead hLast hValid hNoDup hSentMem
+
+/-! ═══════════════════════════════════════════════════════════════════
+    Part 5: reachable_has_simple_witness — loop removal
+    ═══════════════════════════════════════════════════════════════════ -/
+
+-- Decidability of noDuplicates (Address has DecidableEq via deriving)
+private def decidable_noDuplicates : (l : List Address) → Decidable (noDuplicates l)
+  | [] => isTrue trivial
+  | a :: rest =>
+    match decidable_noDuplicates rest with
+    | isFalse h => isFalse (fun ⟨_, hnd⟩ => h hnd)
+    | isTrue hnd =>
+      if hm : a ∈ rest then
+        isFalse (fun ⟨hni, _⟩ => hni hm)
+      else
+        isTrue ⟨hm, hnd⟩
+
+-- isChain tail extraction
+private theorem isChain_cons_tail₂ (s : ContractState) (a : Address) (l : List Address)
+    (hl : l ≠ []) (h : isChain s (a :: l)) : isChain s l := by
+  match l, h with | _ :: _, h => exact h.2
+
+-- isChain suffix extraction
+private theorem isChain_suffix₂ (s : ContractState) (l₁ l₂ : List Address)
+    (h : isChain s (l₁ ++ l₂)) (h₂ne : l₂ ≠ []) : isChain s l₂ := by
+  induction l₁ with
+  | nil => exact h
+  | cons a l₁' ih =>
+    exact ih (isChain_cons_tail₂ s a (l₁' ++ l₂)
+      (by intro heq; exact h₂ne (List.append_eq_nil_iff.mp heq).2) h)
+
+-- isChain prefix extraction
+private theorem isChain_prefix₂ (s : ContractState) (l₁ l₂ : List Address)
+    (h : isChain s (l₁ ++ l₂)) : isChain s l₁ := by
+  induction l₁ with
+  | nil => exact trivial
+  | cons a l₁' ih =>
+    cases l₁' with
+    | nil => exact trivial
+    | cons b rest => simp at h ⊢; exact ⟨h.1, ih h.2⟩
+
+-- isChain overlap join
+private theorem isChain_append_overlap₂ (s : ContractState)
+    (l₁ : List Address) (x : Address) (l₂ : List Address)
+    (h1 : isChain s (l₁ ++ [x])) (h2 : isChain s (x :: l₂)) :
+    isChain s (l₁ ++ x :: l₂) := by
+  induction l₁ with
+  | nil => simp; exact h2
+  | cons a l₁' ih =>
+    cases l₁' with
+    | nil => simp [isChain] at h1 ⊢; exact ⟨h1, h2⟩
+    | cons b rest => simp at h1 ⊢; exact ⟨h1.1, ih h1.2⟩
+
+-- First occurrence split
+private theorem mem_split_first₂ (x : Address) (l : List Address) (hx : x ∈ l) :
+    ∃ l₁ l₂, l = l₁ ++ [x] ++ l₂ ∧ x ∉ l₁ := by
+  induction l with
+  | nil => simp at hx
+  | cons a rest ih =>
+    by_cases ha : a = x
+    · subst ha; exact ⟨[], rest, by simp, fun h => nomatch h⟩
+    · obtain ⟨l₁, l₂, heq, hni⟩ := ih (List.mem_of_ne_of_mem (Ne.symm ha) hx)
+      refine ⟨a :: l₁, l₂, by simp [heq], ?_⟩
+      intro hmem
+      rcases List.mem_cons.mp hmem with rfl | h
+      · exact ha rfl
+      · exact hni h
+
+-- Loop removal preserves isChain
+private theorem isChain_remove_loop₂ (s : ContractState)
+    (l₁ : List Address) (x : Address) (l₂ l₃ : List Address)
+    (h : isChain s (l₁ ++ [x] ++ l₂ ++ [x] ++ l₃)) :
+    isChain s (l₁ ++ [x] ++ l₃) := by
+  have h_prefix : isChain s (l₁ ++ [x]) :=
+    isChain_prefix₂ s (l₁ ++ [x]) (l₂ ++ [x] ++ l₃)
+      (by simp [List.append_assoc] at h ⊢; exact h)
+  have h_x_l₃ : isChain s (x :: l₃) :=
+    isChain_suffix₂ s (l₁ ++ [x] ++ l₂) (x :: l₃)
+      (by simp [List.append_assoc] at h ⊢; exact h) (by simp)
+  rw [show l₁ ++ [x] ++ l₃ = l₁ ++ (x :: l₃) by simp]
+  exact isChain_append_overlap₂ s l₁ x l₃ h_prefix h_x_l₃
+
+-- ¬noDuplicates implies duplicate split
+private theorem not_noDuplicates_has_loop₂ (l : List Address) (h : ¬noDuplicates l) :
+    ∃ (l₁ : List Address) (x : Address) (l₂ l₃ : List Address),
+      l = l₁ ++ [x] ++ l₂ ++ [x] ++ l₃ := by
+  induction l with
+  | nil => exact absurd trivial h
+  | cons a rest ih =>
+    by_cases ha : a ∈ rest
+    · obtain ⟨l₂, l₃, heq, _⟩ := mem_split_first₂ a rest ha
+      exact ⟨[], a, l₂, l₃, by simp [heq]⟩
+    · obtain ⟨l₁', x, l₂', l₃', heq'⟩ := ih (fun hnd => h ⟨ha, hnd⟩)
+      exact ⟨a :: l₁', x, l₂', l₃', by simp [heq']⟩
+
+-- Length strictly decreases after loop removal
+private theorem length_remove_loop_lt₂
+    (l₁ : List Address) (x : Address) (l₂ l₃ : List Address) :
+    (l₁ ++ [x] ++ l₃).length < (l₁ ++ [x] ++ l₂ ++ [x] ++ l₃).length := by
+  simp [List.length_append]; omega
+
+-- Loop removal preserves head?
+private theorem head?_remove_loop₂
+    (l₁ : List Address) (x : Address) (l₂ l₃ : List Address) :
+    (l₁ ++ [x] ++ l₃).head? = (l₁ ++ [x] ++ l₂ ++ [x] ++ l₃).head? := by
+  cases l₁ with
+  | nil => simp
+  | cons c _ => simp
+
+-- Loop removal preserves getLast?
+private theorem getLast?_remove_loop₂
+    (l₁ : List Address) (x : Address) (l₂ l₃ : List Address) :
+    (l₁ ++ [x] ++ l₃).getLast? = (l₁ ++ [x] ++ l₂ ++ [x] ++ l₃).getLast? := by
+  -- Use List.getLast?_append : (l ++ l').getLast? = l'.getLast?.or l.getLast?
+  -- For non-empty l', (some v).or _ = some v, so (l ++ l').getLast? = l'.getLast?
+  simp only [List.append_assoc, List.singleton_append]
+  -- LHS: (l₁ ++ x :: l₃).getLast?  RHS: (l₁ ++ x :: (l₂ ++ x :: l₃)).getLast?
+  -- Both suffixes (x :: l₃) and (x :: (l₂ ++ x :: l₃)) are nonempty
+  simp only [List.getLast?_append]
+  -- Goal: (x :: l₃).getLast?.or l₁.getLast? = (x :: (l₂ ++ x :: l₃)).getLast?.or l₁.getLast?
+  -- It suffices to show both getLast? values are the same `some`
+  cases l₃ with
+  | nil =>
+    simp only [List.getLast?_singleton, Option.some_or]
+  | cons c l₃' =>
+    congr 1
+
+/--
+  Any reachability witness chain can be trimmed to a duplicate-free chain.
+-/
+private theorem reachable_has_simple_witness
+    (s : ContractState) (a b : Address) (h : reachable s a b) :
+    ∃ chain : List Address,
+      chain.head? = some a ∧
+      chain.getLast? = some b ∧
+      isChain s chain ∧
+      noDuplicates chain := by
+  obtain ⟨chain, hHead, hLast, hValid⟩ := h
+  suffices hsuff : ∀ (n : Nat) (ch : List Address),
+      ch.length ≤ n →
+      ch.head? = some a →
+      ch.getLast? = some b →
+      isChain s ch →
+      ∃ ch' : List Address,
+        ch'.head? = some a ∧
+        ch'.getLast? = some b ∧
+        isChain s ch' ∧
+        noDuplicates ch' by
+    exact hsuff chain.length chain (Nat.le_refl _) hHead hLast hValid
+  intro n
+  induction n with
+  | zero =>
+    intro ch hLen hHead' hLast' _
+    simp [List.length_eq_zero_iff.mp (Nat.le_zero.mp hLen)] at hHead'
+  | succ m ih =>
+    intro ch hLen hHead' hLast' hValid'
+    match decidable_noDuplicates ch with
+    | isTrue hnd => exact ⟨ch, hHead', hLast', hValid', hnd⟩
+    | isFalse hnd =>
+      obtain ⟨l₁, x, l₂, l₃, hch_eq⟩ := not_noDuplicates_has_loop₂ ch hnd
+      have hHead_ch' : (l₁ ++ [x] ++ l₃).head? = some a :=
+        head?_remove_loop₂ l₁ x l₂ l₃ ▸ hch_eq ▸ hHead'
+      have hLast_ch' : (l₁ ++ [x] ++ l₃).getLast? = some b :=
+        getLast?_remove_loop₂ l₁ x l₂ l₃ ▸ hch_eq ▸ hLast'
+      have hValid_ch' : isChain s (l₁ ++ [x] ++ l₃) :=
+        isChain_remove_loop₂ s l₁ x l₂ l₃ (hch_eq ▸ hValid')
+      have hLen_ch' : (l₁ ++ [x] ++ l₃).length ≤ m := by
+        have : (l₁ ++ [x] ++ l₃).length < ch.length :=
+          hch_eq ▸ length_remove_loop_lt₂ l₁ x l₂ l₃
+        omega
+      exact ih (l₁ ++ [x] ++ l₃) hLen_ch' hHead_ch' hLast_ch' hValid_ch'
 
 end Benchmark.Cases.Safe.OwnerManagerReach

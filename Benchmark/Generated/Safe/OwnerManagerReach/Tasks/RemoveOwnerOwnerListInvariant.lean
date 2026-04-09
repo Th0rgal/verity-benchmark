@@ -13,6 +13,7 @@ theorem removeOwner_ownerListInvariant
     (hNotZero : (owner != zeroAddress) = true)
     (hNotSentinel : (owner != SENTINEL) = true)
     (hPrevLink : (wordToAddress (s.storageMap 0 prevOwner) == owner) = true)
+    (hOwnerInList : next s owner ≠ zeroAddress)
     (hPreInv : ownerListInvariant s)
     (hAcyclic : acyclic s) :
     let s' := ((OwnerManager.removeOwner prevOwner owner).run s).snd

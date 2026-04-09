@@ -23,6 +23,8 @@ theorem removeOwner_inListReachable
     (hNotZero : (owner != zeroAddress) = true)
     (hNotSentinel : (owner != SENTINEL) = true)
     (hPrevLink : (wordToAddress (s.storageMap 0 prevOwner) == owner) = true)
+    -- The removed owner must have a non-zero successor (i.e. be in the list).
+    (hOwnerInList : next s owner ≠ zeroAddress)
     -- Pre-state invariant
     (hPreInv : inListReachable s)
     -- Acyclicity

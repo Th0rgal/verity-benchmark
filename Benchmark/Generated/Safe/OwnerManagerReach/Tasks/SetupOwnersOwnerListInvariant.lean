@@ -27,7 +27,8 @@ theorem setupOwners_ownerListInvariant
     (h3NS : (owner3 != SENTINEL) = true)
     (h12 : (owner1 != owner2) = true)
     (h13 : (owner1 != owner3) = true)
-    (h23 : (owner2 != owner3) = true) :
+    (h23 : (owner2 != owner3) = true)
+    (hClean : ∀ addr : Address, s.storageMap 0 addr = 0) :
     let s' := ((OwnerManager.setupOwners owner1 owner2 owner3).run s).snd
     ownerListInvariant s' := by
   -- Replace this placeholder with a complete Lean proof.
