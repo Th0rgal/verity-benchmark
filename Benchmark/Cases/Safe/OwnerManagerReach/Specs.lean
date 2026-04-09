@@ -99,22 +99,28 @@ def noDuplicates : List Address → Prop
   | a :: rest => a ∉ rest ∧ noDuplicates rest
 
 /--
-  Acyclicity: the linked list from SENTINEL has no cycles.
-  Expressed as: there exists a chain from SENTINEL back to SENTINEL
-  (the full cycle) in which no address appears twice. Since the list
-  is circular (last owner points back to SENTINEL), this means the
-  only repetition is SENTINEL at the boundaries.
+  Acyclicity: the linked list from SENTINEL has no internal cycles.
+  For any duplicate-free chain starting at SENTINEL's successor and
+  ending at a non-SENTINEL key, SENTINEL does not appear in the chain.
+
+  The `noDuplicates` condition is essential: in a circular list
+  (e.g. SENTINEL → o1 → o2 → o3 → SENTINEL), the chain
+  [o1, o2, o3, SENTINEL, o1] is a valid `isChain` that contains
+  SENTINEL and ends at o1 ≠ SENTINEL. But it has a duplicate (o1),
+  so `noDuplicates` excludes it. Without duplicates, chains ending
+  at key ≠ SENTINEL are strict prefixes that never reach SENTINEL.
 -/
 def acyclic (s : ContractState) : Prop :=
-  ∀ key : Address, ∀ chain : List Address,
+  ∀ key : Address, key ≠ SENTINEL → ∀ chain : List Address,
     chain.head? = some (next s SENTINEL) →
     chain.getLast? = some key →
     isChain s chain →
+    noDuplicates chain →
     SENTINEL ∉ chain
 
 /--
-  Freshness of a given address: it does not appear in any chain
-  starting from SENTINEL's successor. This is a consequence of
+  Freshness of a given address: it does not appear in any duplicate-free
+  chain starting from SENTINEL's successor. This is a consequence of
   acyclicity + the address having a zero mapping value.
 -/
 def freshInList (s : ContractState) (addr : Address) : Prop :=
@@ -122,6 +128,7 @@ def freshInList (s : ContractState) (addr : Address) : Prop :=
     chain.head? = some (next s SENTINEL) →
     chain.getLast? = some key →
     isChain s chain →
+    noDuplicates chain →
     addr ∉ chain
 
 /-! ## Per-function preservation specs
