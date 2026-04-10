@@ -1,4 +1,4 @@
-import Benchmark.Cases.NexusMutual.RammPriceBand.Specs
+import Benchmark.Cases.NexusMutual.RammPriceBand.Proofs
 
 namespace Benchmark.Cases.NexusMutual.RammPriceBand
 
@@ -13,7 +13,6 @@ theorem syncPriceBand_sets_book_value
     (hSupply : supply_ != 0) :
     let s' := ((RammPriceBand.syncPriceBand capital_ supply_).run s).snd
     syncPriceBand_sets_book_value_spec capital_ supply_ s s' := by
-  -- Replace this placeholder with a complete Lean proof.
-  exact ?_
+  exact syncPriceBand_sets_book_value_main capital_ supply_ s hSupply
 
 end Benchmark.Cases.NexusMutual.RammPriceBand
