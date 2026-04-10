@@ -22,10 +22,10 @@ from this file:
   - `swapOwner_acyclicity`          (Part 6)
   - `setupOwners_acyclicity`        (Part 2)
 
-The remaining stubs below are partially proven in `Proofs.lean` (forward
-direction complete, backward direction has targeted `sorry` holes). They
-require additional hypotheses beyond the original signatures, documented
-inline.
+The remaining stubs below are fully proven in `Proofs.lean` (Part 8).
+They require additional hypotheses beyond the original signatures,
+documented inline. The `sorry` stubs here are kept as agent-facing
+task templates.
 -/
 
 /-! ### removeOwner_ownerListInvariant

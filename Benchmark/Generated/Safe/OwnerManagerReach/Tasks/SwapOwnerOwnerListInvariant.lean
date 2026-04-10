@@ -19,7 +19,11 @@ theorem swapOwner_ownerListInvariant
     (hOldNePrev : oldOwner ≠ prevOwner)
     (hPreInv : ownerListInvariant s)
     (hAcyclic : acyclic s)
-    (hFresh : freshInList s newOwner) :
+    (hStrongAcyclic : stronglyAcyclic s)
+    (hFresh : freshInList s newOwner)
+    (hPrevNZ : prevOwner ≠ zeroAddress)
+    (hNoSelfLoop : next s oldOwner ≠ oldOwner)
+    (hZeroInert : next s zeroAddress = zeroAddress) :
     let s' := ((OwnerManager.swapOwner prevOwner oldOwner newOwner).run s).snd
     ownerListInvariant s' := by
   -- Replace this placeholder with a complete Lean proof.

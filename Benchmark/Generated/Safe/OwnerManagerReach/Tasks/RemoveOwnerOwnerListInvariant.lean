@@ -15,7 +15,12 @@ theorem removeOwner_ownerListInvariant
     (hPrevLink : (wordToAddress (s.storageMap 0 prevOwner) == owner) = true)
     (hOwnerInList : next s owner ≠ zeroAddress)
     (hPreInv : ownerListInvariant s)
-    (hAcyclic : acyclic s) :
+    (hAcyclic : acyclic s)
+    (hStrongAcyclic : stronglyAcyclic s)
+    (hOwnerNePrev : owner ≠ prevOwner)
+    (hPrevNZ : prevOwner ≠ zeroAddress)
+    (hNoSelfLoop : next s owner ≠ owner)
+    (hZeroInert : next s zeroAddress = zeroAddress) :
     let s' := ((OwnerManager.removeOwner prevOwner owner).run s).snd
     ownerListInvariant s' := by
   -- Replace this placeholder with a complete Lean proof.
