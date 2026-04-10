@@ -124,19 +124,24 @@ def acyclic (s : ContractState) : Prop :=
     SENTINEL ∉ chain
 
 /--
-  Strong acyclicity: the reachability relation is antisymmetric.
-  If `a` reaches `b` and `b` reaches `a`, then `a = b`.
-  This captures the Certora `reach_invariant` antisymmetry axiom from
-  OwnerReach.spec and prevents non-SENTINEL cycles in the linked list.
+  Unique predecessor: each non-zero node has at most one non-zero
+  predecessor in the linked list. That is, if `next s x = c` and
+  `next s y = c` for `x, y, c ≠ 0`, then `x = y`.
 
-  The weaker `acyclic` property only prevents SENTINEL from appearing
-  in chains starting at `next s SENTINEL`. It does not rule out cycles
-  among non-SENTINEL nodes (e.g. A → B → A). `stronglyAcyclic` closes
-  this gap, matching the Certora specification's full linear-order
-  invariant on the reach relation.
+  This captures the structural truth that the owner linked list is a
+  simple path with no branching. Unlike `stronglyAcyclic` (antisymmetry
+  of `reachable`), this property IS provable for the circular linked
+  list maintained by the Safe OwnerManager, because each mutation
+  preserves the single-predecessor invariant.
+
+  This replaces the Certora `reach_invariant` antisymmetry axiom: Certora
+  breaks the cycle by mapping SENTINEL back-edges to NULL in their abstract
+  `reach` predicate. We instead directly assert the structural consequence
+  (unique predecessors) that all the proof obligations actually require.
 -/
-def stronglyAcyclic (s : ContractState) : Prop :=
-  ∀ a b : Address, reachable s a b → reachable s b a → a = b
+def uniquePredecessor (s : ContractState) : Prop :=
+  ∀ x y c : Address, x ≠ zeroAddress → y ≠ zeroAddress → c ≠ zeroAddress →
+    next s x = c → next s y = c → x = y
 
 /--
   Freshness of a given address: it does not appear in any duplicate-free
@@ -205,7 +210,7 @@ def noSelfLoops (s : ContractState) : Prop :=
 -- Bundled invariant combining all linked-list properties.
 structure SafeOwnerInvariant (s : ContractState) : Prop where
   ownerList     : ownerListInvariant s
-  strongAcyclic : stronglyAcyclic s
+  uniquePred    : uniquePredecessor s
   zeroInert     : next s zeroAddress = zeroAddress
   selfLoopFree  : noSelfLoops s
 

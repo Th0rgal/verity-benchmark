@@ -32,7 +32,7 @@ task templates.
 
   Fully proven in `Proofs.lean` (Part 8). Additional hypotheses beyond the
   original Solidity contract requirements:
-  - `stronglyAcyclic s`: for the unique-predecessor argument
+  - `uniquePredecessor s`: each non-zero node has at most one non-zero predecessor
   - `owner ≠ prevOwner`: excludes degenerate self-removal
   - `prevOwner ≠ zeroAddress`: predecessor is a valid list node
   - `next s owner ≠ owner`: no self-loop
@@ -46,7 +46,7 @@ theorem removeOwner_ownerListInvariant
     (hOwnerInList : next s owner ≠ zeroAddress)
     (hPreInv : ownerListInvariant s)
     (hAcyclic : acyclic s)
-    (hStrongAcyclic : stronglyAcyclic s)
+    (hUniquePred : uniquePredecessor s)
     (hOwnerNePrev : owner ≠ prevOwner)
     (hPrevNZ : prevOwner ≠ zeroAddress)
     (hNoSelfLoop : next s owner ≠ owner)
@@ -58,7 +58,7 @@ theorem removeOwner_ownerListInvariant
 /-! ### swapOwner_ownerListInvariant
 
   Fully proven in `Proofs.lean` (Part 8). Additional hypotheses:
-  - `stronglyAcyclic s`: for the unique-predecessor argument
+  - `uniquePredecessor s`: each non-zero node has at most one non-zero predecessor
   - `prevOwner ≠ zeroAddress`: predecessor is a valid list node
   - `next s oldOwner ≠ oldOwner`: no self-loop at the swapped node
   - `next s zeroAddress = zeroAddress`: zero address is inert
@@ -74,7 +74,7 @@ theorem swapOwner_ownerListInvariant
     (hOldNePrev : oldOwner ≠ prevOwner)
     (hPreInv : ownerListInvariant s)
     (hAcyclic : acyclic s)
-    (hStrongAcyclic : stronglyAcyclic s)
+    (hUniquePred : uniquePredecessor s)
     (hFresh : freshInList s newOwner)
     (hPrevNZ : prevOwner ≠ zeroAddress)
     (hNoSelfLoop : next s oldOwner ≠ oldOwner)
