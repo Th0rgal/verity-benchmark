@@ -60,6 +60,12 @@ theorem syncPriceBand_sets_sell_price_main
     syncPriceBand_sets_sell_price_spec capital_ supply_ s s' := by
   simpa [syncPriceBand_sets_sell_price_spec] using (syncPriceBand_slot_write capital_ supply_ s hSupply).2.2.2
 
+-- Reference-solution aliases (names expected by task manifests)
+abbrev syncPriceBand_sets_capital := @syncPriceBand_sets_capital_main
+abbrev syncPriceBand_sets_book_value := @syncPriceBand_sets_book_value_main
+abbrev syncPriceBand_sets_buy_price := @syncPriceBand_sets_buy_price_main
+abbrev syncPriceBand_sets_sell_price := @syncPriceBand_sets_sell_price_main
+
 /--
 The sell spot price never exceeds the buy spot price,
 provided the book-value multiplication does not overflow.

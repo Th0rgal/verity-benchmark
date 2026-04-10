@@ -11,6 +11,5 @@ require verity from git
 lean_lib «Benchmark» where
   globs := #[
     .one `Benchmark,
-    .andSubmodules `Benchmark.Cases,
-    .andSubmodules `Benchmark.Generated.NexusMutual
+    .andSubmodules `Benchmark.Cases
   ]
