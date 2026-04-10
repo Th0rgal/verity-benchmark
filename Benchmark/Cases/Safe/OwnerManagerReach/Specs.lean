@@ -187,4 +187,26 @@ def setupOwners_establishes_invariant
     (s' : ContractState) : Prop :=
   ownerListInvariant s'
 
+/-! ## Bundled invariant
+
+  `SafeOwnerInvariant` combines all linked-list properties into a single
+  structure. Each function theorem proves preservation of the full bundle,
+  eliminating the need to thread individual properties through callers.
+
+  `acyclic` is omitted — it is a tautology (proven by `acyclic_generic`
+  for any state). `freshInList` is omitted — it is a per-address predicate,
+  not a pure state invariant.
+-/
+
+-- No node in the active list points to itself.
+def noSelfLoops (s : ContractState) : Prop :=
+  ∀ k : Address, next s k ≠ zeroAddress → k ≠ SENTINEL → next s k ≠ k
+
+-- Bundled invariant combining all linked-list properties.
+structure SafeOwnerInvariant (s : ContractState) : Prop where
+  ownerList     : ownerListInvariant s
+  strongAcyclic : stronglyAcyclic s
+  zeroInert     : next s zeroAddress = zeroAddress
+  selfLoopFree  : noSelfLoops s
+
 end Benchmark.Cases.Safe.OwnerManagerReach
