@@ -946,6 +946,11 @@ private def decidable_noDuplicates : (l : List Address) → Decidable (noDuplica
       else
         isTrue ⟨hm, hnd⟩
 
+-- getLast? of (pfx ++ x :: sfx) = getLast? of (x :: sfx)
+private theorem getLast?_append_cons (pfx : List Address) (x : Address) (sfx : List Address) :
+    (pfx ++ x :: sfx).getLast? = (x :: sfx).getLast? := by
+  rw [List.getLast?_append]; simp [List.getLast?_cons]
+
 -- isChain tail extraction
 private theorem isChain_cons_tail₂ (s : ContractState) (a : Address) (l : List Address)
     (hl : l ≠ []) (h : isChain s (a :: l)) : isChain s l := by
@@ -1242,16 +1247,9 @@ private theorem owner_not_in_chain_to_prevOwner
       | cons c rest =>
         -- (a :: l₁' ++ owner :: c :: rest).getLast? = (c :: rest).getLast?
         have hL : (c :: rest).getLast? = some prevOwner := by
-          -- Prove the getLast? reduction as a separate lemma
-          have key : ∀ (pfx : List Address) (x : Address) (sfx : List Address),
-              (pfx ++ x :: sfx).getLast? = (x :: sfx).getLast? := by
-            intro pfx x sfx
-            rw [List.getLast?_append]
-            simp [List.getLast?_cons]
-          -- Apply to our case: (a :: l₁') ++ (owner :: c :: rest)
           rw [show a :: l₁' ++ owner :: c :: rest =
               (a :: l₁') ++ (owner :: c :: rest) from rfl] at hLast
-          rw [key (a :: l₁') owner (c :: rest)] at hLast
+          rw [getLast?_append_cons (a :: l₁') owner (c :: rest)] at hLast
           simp at hLast; exact hLast
         have hmem := (c :: rest).getLast_mem (by simp)
         rw [show (c :: rest).getLast (by simp) = prevOwner from by
@@ -1332,6 +1330,58 @@ private theorem prevOwner_in_prefix
       hUniquePred _ prevOwner owner hPredNZ hPrevNZ hOwnerNZ hPredNext hPrevLinkN
     rw [← hPredEqPrev]; exact List.getLast_mem _
 
+-- Split a chain at `owner`, extracting the suffix `c :: rest` and proving:
+-- owner ∉ suffix, prevOwner ∈ prefix, prevOwner ∉ suffix, c = next s owner.
+private theorem split_chain_at_owner
+    (s : ContractState) (prevOwner owner key : Address)
+    (chain : List Address)
+    (hPrevLinkN : next s prevOwner = owner)
+    (hUniquePred : uniquePredecessor s)
+    (hOwnerNZ : owner ≠ zeroAddress)
+    (hPrevNZ : prevOwner ≠ zeroAddress)
+    (hZeroInert : next s zeroAddress = zeroAddress)
+    (hOwnerNS : owner ≠ SENTINEL)
+    (hKeyNO : key ≠ owner)
+    (hOC : owner ∈ chain)
+    (hHead : chain.head? = some SENTINEL)
+    (hLast : chain.getLast? = some key)
+    (hValid : isChain s chain)
+    (hND : noDuplicates chain) :
+    ∃ l₁ c rest,
+      chain = l₁ ++ owner :: c :: rest ∧
+      c = next s owner ∧
+      isChain s (owner :: c :: rest) ∧
+      owner ∉ c :: rest ∧
+      prevOwner ∈ l₁ ∧
+      prevOwner ∉ c :: rest ∧
+      noDuplicates (l₁ ++ owner :: c :: rest) ∧
+      (c :: rest).getLast? = some key := by
+  obtain ⟨l₁, l₂, hSp, _⟩ := mem_split_first₂ owner chain hOC
+  have hHeadOrig : (l₁ ++ [owner] ++ l₂).head? = some SENTINEL := by
+    rw [hSp] at hHead; exact hHead
+  rw [hSp, append_singleton_append] at hValid hND hLast
+  have hSuf : isChain s (owner :: l₂) :=
+    isChain_suffix₂ s l₁ (owner :: l₂) hValid (by simp)
+  have hl₂ne : l₂ ≠ [] := by
+    intro hempty; rw [hempty] at hLast; simp at hLast; exact hKeyNO hLast.symm
+  match l₂, hl₂ne, hSuf with
+  | c :: rest, _, hSuf' =>
+    have hceq : c = next s owner := hSuf'.1.symm
+    have hONS : owner ∉ c :: rest := by
+      rw [← append_singleton_append] at hND
+      exact noDup_owner_not_in_suffix owner l₁ (c :: rest) hND
+    have hValidAS : isChain s (l₁ ++ [owner] ++ (c :: rest)) := by
+      rw [append_singleton_append]; exact hValid
+    have hPrevInL1 : prevOwner ∈ l₁ :=
+      prevOwner_in_prefix s prevOwner owner l₁ (c :: rest) hUniquePred hPrevLinkN
+        hValidAS hOwnerNZ hPrevNZ hZeroInert hOwnerNS hHeadOrig
+    have hPNS : prevOwner ∉ c :: rest := by
+      rw [← append_singleton_append] at hND
+      exact prevOwner_not_in_suffix prevOwner owner l₁ (c :: rest) hND hPrevInL1
+    have hLS : (c :: rest).getLast? = some key := by simp at hLast ⊢; exact hLast
+    exact ⟨l₁, c, rest, by rw [← append_singleton_append, ← hSp],
+      hceq, hSuf', hONS, hPrevInL1, hPNS, hND, hLS⟩
+
 -- Proof of removeOwner_inListReachable
 theorem removeOwner_inListReachable
     (prevOwner owner : Address) (s : ContractState)
@@ -1342,7 +1392,7 @@ theorem removeOwner_inListReachable
     (hPreInv : inListReachable s)
     (_hAcyclic : acyclic s)
     (hUniquePred : uniquePredecessor s)
-    (hOwnerNePrev : owner ≠ prevOwner)
+    (_hOwnerNePrev : owner ≠ prevOwner)
     (hPrevNZ : prevOwner ≠ zeroAddress)
     (hZeroInert : next s zeroAddress = zeroAddress) :
     let s' := ((OwnerManager.removeOwner prevOwner owner).run s).snd
@@ -1410,46 +1460,24 @@ theorem removeOwner_inListReachable
       have hReachPrev : reachable s' SENTINEL prevOwner :=
         ⟨chP, hHP, hLP, hVP'⟩
       -- Split original chain at first occurrence of owner
-      obtain ⟨l₁, l₂, hSp, _⟩ := mem_split_first₂ owner chain hOC
-      have hHeadOrig : (l₁ ++ [owner] ++ l₂).head? = some SENTINEL := by
-        rw [hSp] at hHead; exact hHead
-      rw [hSp, append_singleton_append] at hValid hND hLast
-      have hSuf : isChain s (owner :: l₂) :=
-        isChain_suffix₂ s l₁ (owner :: l₂) hValid (by simp)
-      have hl₂ne : l₂ ≠ [] := by
-        intro hempty; rw [hempty] at hLast
-        simp at hLast; exact hKeyNO hLast.symm
-      match l₂, hl₂ne, hSuf with
-      | c :: rest, _, hSuf' =>
-        have hceq : c = next s owner := hSuf'.1.symm
-        have hONS : owner ∉ c :: rest := by
-          rw [← append_singleton_append] at hND
-          exact noDup_owner_not_in_suffix owner l₁ (c :: rest) hND
-        have hValidAS : isChain s (l₁ ++ [owner] ++ (c :: rest)) := by
-          rw [append_singleton_append]; exact hValid
-        have hPrevInL1 : prevOwner ∈ l₁ :=
-          prevOwner_in_prefix s prevOwner owner l₁ (c :: rest) hUniquePred hPrevLinkN
-            hValidAS hOwnerNZ hPrevNZ hZeroInert hOwnerNS hHeadOrig
-        have hPNS : prevOwner ∉ c :: rest := by
-          rw [← append_singleton_append] at hND
-          exact prevOwner_not_in_suffix prevOwner owner l₁ (c :: rest) hND hPrevInL1
-        -- Lift suffix to s'
-        have hRV' : isChain s' (c :: rest) := by
-          apply isChain_lift_generic s s' owner prevOwner
-            (fun k hk1 hk2 => by
-              show next ((OwnerManager.removeOwner prevOwner owner).run s).snd k = next s k
-              rw [hNextEq]; simp [hk1, hk2])
-            (c :: rest) hSuf'.2
-            (fun a ha h => hONS (h ▸ ha))
-            (fun a ha h => hPNS (h ▸ ha))
-        have hLS : (c :: rest).getLast? = some key := by
-          simp at hLast ⊢; exact hLast
-        have hStep : next s' prevOwner = c := by
-          show next ((OwnerManager.removeOwner prevOwner owner).run s).snd prevOwner = c
-          rw [hNextEq]; simp [Ne.symm hONP]; rw [hceq]
-        have hReachSuffix : reachable s' prevOwner key :=
-          reachable_prepend s' prevOwner c key hStep ⟨c :: rest, rfl, hLS, hRV'⟩
-        exact reachable_trans s' SENTINEL prevOwner key hReachPrev hReachSuffix
+      obtain ⟨l₁, c, rest, _, hceq, hSuf', hONS, _, hPNS, _, hLS⟩ :=
+        split_chain_at_owner s prevOwner owner key chain hPrevLinkN hUniquePred
+          hOwnerNZ hPrevNZ hZeroInert hOwnerNS hKeyNO hOC hHead hLast hValid hND
+      -- Lift suffix to s'
+      have hRV' : isChain s' (c :: rest) := by
+        apply isChain_lift_generic s s' owner prevOwner
+          (fun k hk1 hk2 => by
+            show next ((OwnerManager.removeOwner prevOwner owner).run s).snd k = next s k
+            rw [hNextEq]; simp [hk1, hk2])
+          (c :: rest) hSuf'.2
+          (fun a ha h => hONS (h ▸ ha))
+          (fun a ha h => hPNS (h ▸ ha))
+      have hStep : next s' prevOwner = c := by
+        show next ((OwnerManager.removeOwner prevOwner owner).run s).snd prevOwner = c
+        rw [hNextEq]; simp [Ne.symm hONP]; rw [hceq]
+      have hReachSuffix : reachable s' prevOwner key :=
+        reachable_prepend s' prevOwner c key hStep ⟨c :: rest, rfl, hLS, hRV'⟩
+      exact reachable_trans s' SENTINEL prevOwner key hReachPrev hReachSuffix
     · -- === owner ∉ chain: lift directly ===
       exact ⟨chain, hHead, hLast,
         isChain_lift_removeOwner prevOwner owner s hPrevLinkN hNextEq chain hValid hOC⟩
@@ -1704,60 +1732,36 @@ theorem swapOwner_inListReachable
           isChain_lift_swapOwner prevOwner oldOwner newOwner s hPrevLinkN hNextEq chP hVP hOldNotInChP hNewNotInChP
         have hReachPrev : reachable s' SENTINEL prevOwner := ⟨chP, hHP, hLP, hVP'⟩
         -- Split original chain at first occurrence of oldOwner
-        obtain ⟨l₁, l₂, hSp, _⟩ := mem_split_first₂ oldOwner chain hOC
-        have hHeadOrig : (l₁ ++ [oldOwner] ++ l₂).head? = some SENTINEL := by
-          rw [hSp] at hHead; exact hHead
-        rw [hSp, append_singleton_append] at hValid hND hLast
-        have hSuf : isChain s (oldOwner :: l₂) :=
-          isChain_suffix₂ s l₁ (oldOwner :: l₂) hValid (by simp)
-        have hl₂ne : l₂ ≠ [] := by
-          intro hempty; rw [hempty] at hLast
-          simp at hLast; exact hKeyNO hLast.symm
-        match l₂, hl₂ne, hSuf with
-        | c :: rest, _, hSuf' =>
-          have hceq : c = next s oldOwner := hSuf'.1.symm
-          -- oldOwner ∉ c :: rest (from noDuplicates)
-          have hONS : oldOwner ∉ c :: rest := by
-            rw [← append_singleton_append] at hND
-            exact noDup_owner_not_in_suffix oldOwner l₁ (c :: rest) hND
-          -- prevOwner ∉ c :: rest (by uniquePredecessor)
-          have hValidAS : isChain s (l₁ ++ [oldOwner] ++ (c :: rest)) := by
-            rw [append_singleton_append]; exact hValid
-          have hPrevInL1 : prevOwner ∈ l₁ :=
-            prevOwner_in_prefix s prevOwner oldOwner l₁ (c :: rest) hUniquePred hPrevLinkN
-              hValidAS hOldNZ hPrevNZ hZeroInert hOldNS hHeadOrig
-          have hPNS : prevOwner ∉ c :: rest := by
-            rw [← append_singleton_append] at hND
-            exact prevOwner_not_in_suffix prevOwner oldOwner l₁ (c :: rest) hND hPrevInL1
-          -- newOwner ∉ c :: rest (since newOwner ∉ chain and c :: rest ⊆ chain)
-          have hNNS : newOwner ∉ c :: rest := by
-            rw [hSp, append_singleton_append] at hNewNotIn
-            intro hm; exact hNewNotIn (List.mem_append_right _ (List.mem_cons_of_mem _ hm))
-          -- Lift suffix to s'
-          have hRV' : isChain s' (c :: rest) := by
-            apply isChain_lift_generic3 s s' oldOwner prevOwner newOwner
-              (fun k hk1 hk2 hk3 => by
-                show next ((OwnerManager.swapOwner prevOwner oldOwner newOwner).run s).snd k = next s k
-                rw [hNextEq]; simp [hk1, hk2, hk3])
-              (c :: rest) hSuf'.2
-              (fun a ha h => hONS (h ▸ ha))
-              (fun a ha h => hPNS (h ▸ ha))
-              (fun a ha h => hNNS (h ▸ ha))
-          have hLS : (c :: rest).getLast? = some key := by
-            simp at hLast ⊢; exact hLast
-          -- In s', newOwner → c (since newOwner gets next s oldOwner = c)
-          have hStepNew : next s' newOwner = c := by
-            show next ((OwnerManager.swapOwner prevOwner oldOwner newOwner).run s).snd newOwner = c
-            rw [hNextEq]; simp [hNewNeOld, hNewNePrev]; rw [hceq]
-          -- prevOwner → newOwner in s'
-          have hStepPrev : next s' prevOwner = newOwner := by
-            show next ((OwnerManager.swapOwner prevOwner oldOwner newOwner).run s).snd prevOwner = newOwner
-            rw [hNextEq]; simp [Ne.symm hOldNePrev]
-          -- Connect: SENTINEL ~> prevOwner ~> newOwner ~> c :: rest ~> key
-          have hReachSuffix : reachable s' newOwner key :=
-            reachable_prepend s' newOwner c key hStepNew ⟨c :: rest, rfl, hLS, hRV'⟩
-          exact reachable_trans s' SENTINEL prevOwner key hReachPrev
-            (reachable_prepend s' prevOwner newOwner key hStepPrev hReachSuffix)
+        obtain ⟨l₁, c, rest, hChainEq, hceq, hSuf', hONS, _, hPNS, _, hLS⟩ :=
+          split_chain_at_owner s prevOwner oldOwner key chain hPrevLinkN hUniquePred
+            hOldNZ hPrevNZ hZeroInert hOldNS hKeyNO hOC hHead hLast hValid hND
+        -- newOwner ∉ c :: rest (since newOwner ∉ chain and c :: rest ⊆ chain)
+        have hNNS : newOwner ∉ c :: rest := by
+          rw [hChainEq] at hNewNotIn
+          intro hm; exact hNewNotIn (List.mem_append_right _ (List.mem_cons_of_mem _ hm))
+        -- Lift suffix to s'
+        have hRV' : isChain s' (c :: rest) := by
+          apply isChain_lift_generic3 s s' oldOwner prevOwner newOwner
+            (fun k hk1 hk2 hk3 => by
+              show next ((OwnerManager.swapOwner prevOwner oldOwner newOwner).run s).snd k = next s k
+              rw [hNextEq]; simp [hk1, hk2, hk3])
+            (c :: rest) hSuf'.2
+            (fun a ha h => hONS (h ▸ ha))
+            (fun a ha h => hPNS (h ▸ ha))
+            (fun a ha h => hNNS (h ▸ ha))
+        -- In s', newOwner → c (since newOwner gets next s oldOwner = c)
+        have hStepNew : next s' newOwner = c := by
+          show next ((OwnerManager.swapOwner prevOwner oldOwner newOwner).run s).snd newOwner = c
+          rw [hNextEq]; simp [hNewNeOld, hNewNePrev]; rw [hceq]
+        -- prevOwner → newOwner in s'
+        have hStepPrev : next s' prevOwner = newOwner := by
+          show next ((OwnerManager.swapOwner prevOwner oldOwner newOwner).run s).snd prevOwner = newOwner
+          rw [hNextEq]; simp [Ne.symm hOldNePrev]
+        -- Connect: SENTINEL ~> prevOwner ~> newOwner ~> c :: rest ~> key
+        have hReachSuffix : reachable s' newOwner key :=
+          reachable_prepend s' newOwner c key hStepNew ⟨c :: rest, rfl, hLS, hRV'⟩
+        exact reachable_trans s' SENTINEL prevOwner key hReachPrev
+          (reachable_prepend s' prevOwner newOwner key hStepPrev hReachSuffix)
       · -- oldOwner ∉ chain: lift directly
         exact ⟨chain, hHead, hLast,
           isChain_lift_swapOwner prevOwner oldOwner newOwner s hPrevLinkN hNextEq chain hValid hOC hNewNotIn⟩
@@ -1828,7 +1832,7 @@ private theorem unique_predecessor
     (hXNext : next s x = c) (hYNext : next s y = c)
     (hXNY : x ≠ y) (_hXNC : x ≠ c) (_hYNC : y ≠ c)
     (hCNZ : c ≠ zeroAddress)
-    (hPreInv : ownerListInvariant s)
+    (_hPreInv : ownerListInvariant s)
     (hUniquePred : uniquePredecessor s)
     (hXNZ : x ≠ zeroAddress) (hYNZ : y ≠ zeroAddress) :
     False := by
@@ -2156,42 +2160,22 @@ theorem removeOwner_ownerListInvariant
         have hVP' : isChain s' chP :=
           isChain_lift_removeOwner prevOwner owner s hPrevLinkN hNextEq chP hVP hONP'
         have hReachPrev : reachable s' SENTINEL prevOwner := ⟨chP, hHP, hLP, hVP'⟩
-        obtain ⟨l₁, l₂, hSp, _⟩ := mem_split_first₂ owner chain hOC
-        have hHeadOrig : (l₁ ++ [owner] ++ l₂).head? = some SENTINEL := by
-          rw [hSp] at hHead; exact hHead
-        rw [hSp, append_singleton_append] at hValid hND hLast
-        have hSuf : isChain s (owner :: l₂) :=
-          isChain_suffix₂ s l₁ (owner :: l₂) hValid (by simp)
-        have hl₂ne : l₂ ≠ [] := by
-          intro h; rw [h] at hLast; simp at hLast; exact hKeyNO hLast.symm
-        match l₂, hl₂ne, hSuf with
-        | c :: rest, _, hSuf' =>
-          have hceq : c = next s owner := hSuf'.1.symm
-          have hONS : owner ∉ c :: rest := by
-            rw [← append_singleton_append] at hND
-            exact noDup_owner_not_in_suffix owner l₁ (c :: rest) hND
-          have hValidAS : isChain s (l₁ ++ [owner] ++ (c :: rest)) := by
-            rw [append_singleton_append]; exact hValid
-          have hPrevInL1 : prevOwner ∈ l₁ :=
-            prevOwner_in_prefix s prevOwner owner l₁ (c :: rest) hUniquePred hPrevLinkN
-              hValidAS hOwnerNZ hPrevNZ hZeroInert hOwnerNS hHeadOrig
-          have hPNS : prevOwner ∉ c :: rest := by
-            rw [← append_singleton_append] at hND
-            exact prevOwner_not_in_suffix prevOwner owner l₁ (c :: rest) hND hPrevInL1
-          have hRV' : isChain s' (c :: rest) := by
-            apply isChain_lift_generic s s' owner prevOwner
-              (fun k hk1 hk2 => by
-                show next ((OwnerManager.removeOwner prevOwner owner).run s).snd k = next s k
-                rw [hNextEq]; simp [hk1, hk2])
-              (c :: rest) hSuf'.2
-              (fun a ha h => hONS (h ▸ ha))
-              (fun a ha h => hPNS (h ▸ ha))
-          have hLS : (c :: rest).getLast? = some key := by simp at hLast ⊢; exact hLast
-          have hStep : next s' prevOwner = c := by
-            show next ((OwnerManager.removeOwner prevOwner owner).run s).snd prevOwner = c
-            rw [hNextEq]; simp [Ne.symm hOwnerNePrev]; rw [hceq]
-          exact reachable_trans s' SENTINEL prevOwner key hReachPrev
-            (reachable_prepend s' prevOwner c key hStep ⟨c :: rest, rfl, hLS, hRV'⟩)
+        obtain ⟨l₁, c, rest, _, hceq, hSuf', hONS, _, hPNS, _, hLS⟩ :=
+          split_chain_at_owner s prevOwner owner key chain hPrevLinkN hUniquePred
+            hOwnerNZ hPrevNZ hZeroInert hOwnerNS hKeyNO hOC hHead hLast hValid hND
+        have hRV' : isChain s' (c :: rest) := by
+          apply isChain_lift_generic s s' owner prevOwner
+            (fun k hk1 hk2 => by
+              show next ((OwnerManager.removeOwner prevOwner owner).run s).snd k = next s k
+              rw [hNextEq]; simp [hk1, hk2])
+            (c :: rest) hSuf'.2
+            (fun a ha h => hONS (h ▸ ha))
+            (fun a ha h => hPNS (h ▸ ha))
+        have hStep : next s' prevOwner = c := by
+          show next ((OwnerManager.removeOwner prevOwner owner).run s).snd prevOwner = c
+          rw [hNextEq]; simp [Ne.symm hOwnerNePrev]; rw [hceq]
+        exact reachable_trans s' SENTINEL prevOwner key hReachPrev
+          (reachable_prepend s' prevOwner c key hStep ⟨c :: rest, rfl, hLS, hRV'⟩)
       · exact ⟨chain, hHead, hLast,
           isChain_lift_removeOwner prevOwner owner s hPrevLinkN hNextEq chain hValid hOC⟩
     · -- (←) reachable s' SENTINEL key → next s' key ≠ 0
@@ -2424,47 +2408,27 @@ theorem swapOwner_ownerListInvariant
           have hVP' : isChain s' chP :=
             isChain_lift_swapOwner prevOwner oldOwner newOwner s hPrevLinkN hNextEq chP hVP hOldNotInChP hNewNotInChP
           have hReachPrev : reachable s' SENTINEL prevOwner := ⟨chP, hHP, hLP, hVP'⟩
-          obtain ⟨l₁, l₂, hSp, _⟩ := mem_split_first₂ oldOwner chain hOC
-          have hHeadOrig : (l₁ ++ [oldOwner] ++ l₂).head? = some SENTINEL := by
-            rw [hSp] at hHead; exact hHead
-          rw [hSp, append_singleton_append] at hValid hND hLast
-          have hSuf : isChain s (oldOwner :: l₂) :=
-            isChain_suffix₂ s l₁ (oldOwner :: l₂) hValid (by simp)
-          have hl₂ne : l₂ ≠ [] := by
-            intro h; rw [h] at hLast; simp at hLast; exact hKeyNO hLast.symm
-          match l₂, hl₂ne, hSuf with
-          | c :: rest, _, hSuf' =>
-            have hceq : c = next s oldOwner := hSuf'.1.symm
-            have hONS : oldOwner ∉ c :: rest := by
-              rw [← append_singleton_append] at hND
-              exact noDup_owner_not_in_suffix oldOwner l₁ (c :: rest) hND
-            have hValidAS : isChain s (l₁ ++ [oldOwner] ++ (c :: rest)) := by
-              rw [append_singleton_append]; exact hValid
-            have hPrevInL1 : prevOwner ∈ l₁ :=
-              prevOwner_in_prefix s prevOwner oldOwner l₁ (c :: rest) hUniquePred hPrevLinkN
-                hValidAS hOldNZ hPrevNZ hZeroInert hOldNS hHeadOrig
-            have hPNS : prevOwner ∉ c :: rest := by
-              rw [← append_singleton_append] at hND
-              exact prevOwner_not_in_suffix prevOwner oldOwner l₁ (c :: rest) hND hPrevInL1
-            have hNNS : newOwner ∉ c :: rest := by
-              rw [hSp, append_singleton_append] at hNewNotIn
-              intro hm; exact hNewNotIn (List.mem_append_right _ (List.mem_cons_of_mem _ hm))
-            have hRV' : isChain s' (c :: rest) := by
-              apply isChain_lift_generic3 s s' oldOwner prevOwner newOwner
-                (fun k hk1 hk2 hk3 => by
-                  show next ((OwnerManager.swapOwner prevOwner oldOwner newOwner).run s).snd k = next s k
-                  rw [hNextEq]; simp [hk1, hk2, hk3])
-                (c :: rest) hSuf'.2
-                (fun a ha h => hONS (h ▸ ha))
-                (fun a ha h => hPNS (h ▸ ha))
-                (fun a ha h => hNNS (h ▸ ha))
-            have hLS : (c :: rest).getLast? = some key := by simp at hLast ⊢; exact hLast
-            have hStepNew : next s' newOwner = c := by
-              show next ((OwnerManager.swapOwner prevOwner oldOwner newOwner).run s).snd newOwner = c
-              rw [hNextEq]; simp [hNewNeOld, hNewNePrev]; rw [hceq]
-            exact reachable_trans s' SENTINEL prevOwner key hReachPrev
-              (reachable_prepend s' prevOwner newOwner key hNextPrev'
-                (reachable_prepend s' newOwner c key hStepNew ⟨c :: rest, rfl, hLS, hRV'⟩))
+          obtain ⟨l₁, c, rest, hChainEq, hceq, hSuf', hONS, _, hPNS, _, hLS⟩ :=
+            split_chain_at_owner s prevOwner oldOwner key chain hPrevLinkN hUniquePred
+              hOldNZ hPrevNZ hZeroInert hOldNS hKeyNO hOC hHead hLast hValid hND
+          have hNNS : newOwner ∉ c :: rest := by
+            rw [hChainEq] at hNewNotIn
+            intro hm; exact hNewNotIn (List.mem_append_right _ (List.mem_cons_of_mem _ hm))
+          have hRV' : isChain s' (c :: rest) := by
+            apply isChain_lift_generic3 s s' oldOwner prevOwner newOwner
+              (fun k hk1 hk2 hk3 => by
+                show next ((OwnerManager.swapOwner prevOwner oldOwner newOwner).run s).snd k = next s k
+                rw [hNextEq]; simp [hk1, hk2, hk3])
+              (c :: rest) hSuf'.2
+              (fun a ha h => hONS (h ▸ ha))
+              (fun a ha h => hPNS (h ▸ ha))
+              (fun a ha h => hNNS (h ▸ ha))
+          have hStepNew : next s' newOwner = c := by
+            show next ((OwnerManager.swapOwner prevOwner oldOwner newOwner).run s).snd newOwner = c
+            rw [hNextEq]; simp [hNewNeOld, hNewNePrev]; rw [hceq]
+          exact reachable_trans s' SENTINEL prevOwner key hReachPrev
+            (reachable_prepend s' prevOwner newOwner key hNextPrev'
+              (reachable_prepend s' newOwner c key hStepNew ⟨c :: rest, rfl, hLS, hRV'⟩))
         · -- oldOwner ∉ chain: lift directly
           exact ⟨chain, hHead, hLast,
             isChain_lift_swapOwner prevOwner oldOwner newOwner s hPrevLinkN hNextEq chain hValid hOC hNewNotIn⟩
@@ -2861,7 +2825,6 @@ theorem removeOwner_noSelfLoops
       · rw [hkp, hPrev]
         intro hContra
         -- next s owner = prevOwner. Get dup-free chain from SENTINEL to prevOwner.
-        -- prevOwner ≠ SENTINEL, so chain has length ≥ 2.
         have hPNZ' : next s prevOwner ≠ zeroAddress := by rw [hPrevLinkN]; exact hOwnerNZ
         have hPrevReach := (hPreInv.2 prevOwner hPrevNZ).mp hPNZ'
         obtain ⟨ch, hH, hL, hV, hNDch⟩ := reachable_has_simple_witness s SENTINEL prevOwner hPrevReach
@@ -2870,60 +2833,17 @@ theorem removeOwner_noSelfLoops
           | [] => simp at hH
           | [x] => simp at hH hL; rw [hH] at hL; exact absurd hL.symm hPrevNS
           | _ :: _ :: _ => simp [List.length_cons]
-        -- Find predecessor of prevOwner in chain
+        -- Find predecessor of prevOwner in chain: by uniquePredecessor, it must be owner
         obtain ⟨p, hpIn, hpNext⟩ := isChain_last_step s ch prevOwner hV hL hChLen
         have hpNZ : p ≠ zeroAddress := by
           intro h; rw [h, hZeroInert] at hpNext; exact hPrevNZ hpNext.symm
-        -- By uniquePredecessor: p = owner (both point to prevOwner)
         have hOwnerInCh : owner ∈ ch := by
           have : p = owner := hUniquePred p owner prevOwner hpNZ hOwnerNZ hPrevNZ hpNext hContra
           rw [← this]; exact hpIn
-        -- Split ch at owner to find prevOwner in both prefix and suffix
-        obtain ⟨l₁, l₂, hSp, _⟩ := mem_split_first₂ owner ch hOwnerInCh
-        rw [hSp, append_singleton_append] at hV hNDch hL hH
-        match l₁, hH with
-        | [], hHd =>
-          simp at hHd; exact (ne_of_bne hNotSentinel) hHd
-        | a :: l₁', _ =>
-          have hPfx : isChain s ((a :: l₁') ++ [owner]) :=
-            isChain_prefix₂ s ((a :: l₁') ++ [owner]) l₂
-              (by simp only [List.cons_append, List.append_assoc]; exact hV)
-          have hPredNext := last_step_of_prefix s a l₁' owner hPfx
-          have hPredNZ' : (a :: l₁').getLast (by simp) ≠ zeroAddress := by
-            intro h; rw [h, hZeroInert] at hPredNext; exact hOwnerNZ hPredNext.symm
-          have hPredEqPrev : (a :: l₁').getLast (by simp) = prevOwner :=
-            hUniquePred _ prevOwner owner hPredNZ' hPrevNZ hOwnerNZ hPredNext hPrevLinkN
-          have hPrevInPfx : prevOwner ∈ a :: l₁' := by
-            rw [← hPredEqPrev]; exact List.getLast_mem _
-          have hPrevInSuffix : prevOwner ∈ l₂ := by
-            cases l₂ with
-            | nil =>
-              -- hL : (a :: l₁' ++ [owner]).getLast? = some prevOwner
-              -- getLast? of (... ++ [owner]) = some owner, so prevOwner = owner, contradiction
-              have hLC : ((a :: l₁') ++ [owner]).getLast? = some owner := List.getLast?_concat
-              have hLC' : (a :: l₁' ++ [owner]).getLast? = some owner := by
-                rwa [List.cons_append] at hLC
-              rw [hLC'] at hL; exact absurd (Option.some.inj hL) hOwnerNePrev
-            | cons c rest =>
-              have hL' : (c :: rest).getLast? = some prevOwner := by
-                have key : ∀ (pfx : List Address) (x : Address) (sfx : List Address),
-                    (pfx ++ x :: sfx).getLast? = (x :: sfx).getLast? := by
-                  intro pfx x sfx
-                  rw [List.getLast?_append]
-                  simp [List.getLast?_cons]
-                rw [show a :: l₁' ++ owner :: c :: rest =
-                    (a :: l₁') ++ (owner :: c :: rest) from rfl] at hL
-                rw [key (a :: l₁') owner (c :: rest)] at hL
-                simp at hL; exact hL
-              have hmem := (c :: rest).getLast_mem (by simp)
-              rw [show (c :: rest).getLast (by simp) = prevOwner from by
-                rw [← Option.some_inj, ← List.getLast?_eq_getLast]; exact hL'] at hmem
-              exact hmem
-          -- prevOwner ∈ prefix AND prevOwner ∈ l₂ contradicts noDuplicates
-          have hPrevNotInL2 : prevOwner ∉ l₂ := by
-            rw [← append_singleton_append] at hNDch
-            exact prevOwner_not_in_suffix prevOwner owner (a :: l₁') l₂ hNDch hPrevInPfx
-          exact absurd hPrevInSuffix hPrevNotInL2
+        -- But owner_not_in_chain_to_prevOwner says owner ∉ ch — contradiction
+        exact absurd hOwnerInCh (owner_not_in_chain_to_prevOwner s prevOwner owner ch
+          hPrevLinkN hUniquePred hH hL hV hOwnerNePrev hNDch hOwnerNZ hPrevNZ
+          (ne_of_bne hNotSentinel) hZeroInert)
     · rw [hOther k hko hkp]
       have hPreNZ : next s k ≠ zeroAddress := by
         rw [hOther k hko hkp] at hkNZ; exact hkNZ
@@ -3051,7 +2971,7 @@ theorem addOwner_uniquePredecessor
     (hNotSentinel : (owner != SENTINEL) = true)
     (hFresh : (wordToAddress (s.storageMap 0 owner) == zeroAddress) = true)
     (hPreUP : uniquePredecessor s)
-    (hZeroInert : next s zeroAddress = zeroAddress)
+    (_hZeroInert : next s zeroAddress = zeroAddress)
     (hNoPred : ∀ x : Address, x ≠ zeroAddress → next s x ≠ owner) :
     uniquePredecessor ((OwnerManager.addOwner owner).run s).snd := by
   have hNxtEq := addOwner_next_eq owner s hNotZero hNotSentinel hFresh
@@ -3102,10 +3022,10 @@ theorem removeOwner_uniquePredecessor
     (hNotZero : (owner != zeroAddress) = true)
     (hNotSentinel : (owner != SENTINEL) = true)
     (hPrevLink : (wordToAddress (s.storageMap 0 prevOwner) == owner) = true)
-    (hOwnerNePrev : owner ≠ prevOwner)
-    (hPrevNZ : prevOwner ≠ zeroAddress)
+    (_hOwnerNePrev : owner ≠ prevOwner)
+    (_hPrevNZ : prevOwner ≠ zeroAddress)
     (hPreUP : uniquePredecessor s)
-    (hZeroInert : next s zeroAddress = zeroAddress) :
+    (_hZeroInert : next s zeroAddress = zeroAddress) :
     uniquePredecessor ((OwnerManager.removeOwner prevOwner owner).run s).snd := by
   let s' := ((OwnerManager.removeOwner prevOwner owner).run s).snd
   have hNxt := removeOwner_storageMap prevOwner owner s hNotZero hNotSentinel hPrevLink
@@ -3150,12 +3070,12 @@ theorem swapOwner_uniquePredecessor
     (hOldNotZero : (oldOwner != zeroAddress) = true)
     (hOldNotSentinel : (oldOwner != SENTINEL) = true)
     (hPrevLink : (wordToAddress (s.storageMap 0 prevOwner) == oldOwner) = true)
-    (hOldNePrev : oldOwner ≠ prevOwner)
-    (hPrevNZ : prevOwner ≠ zeroAddress)
+    (_hOldNePrev : oldOwner ≠ prevOwner)
+    (_hPrevNZ : prevOwner ≠ zeroAddress)
     (hPreUP : uniquePredecessor s)
-    (hNewNeOld : newOwner ≠ oldOwner)
-    (hNewNePrev : newOwner ≠ prevOwner)
-    (hZeroInert : next s zeroAddress = zeroAddress)
+    (_hNewNeOld : newOwner ≠ oldOwner)
+    (_hNewNePrev : newOwner ≠ prevOwner)
+    (_hZeroInert : next s zeroAddress = zeroAddress)
     (hNoPredNew : ∀ x : Address, x ≠ zeroAddress → next s x ≠ newOwner) :
     uniquePredecessor ((OwnerManager.swapOwner prevOwner oldOwner newOwner).run s).snd := by
   have hNxt := swapOwner_storageMap prevOwner oldOwner newOwner s
