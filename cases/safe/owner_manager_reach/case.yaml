@@ -8,7 +8,7 @@ implementation_id: smart_account
 stage: build_green
 translation_status: translated
 spec_status: frozen
-proof_status: partial
+proof_status: complete
 upstream_repo: https://github.com/safe-global/safe-smart-account
 upstream_commit: a2e19c6aa42a45ceec68057f3fa387f169c5b321
 original_contract_path: contracts/base/OwnerManager.sol
@@ -40,6 +40,7 @@ unsupported_feature_codes: []
 notes: >
   Linked list reachability invariant preservation for the Safe OwnerManager.
   Based on the Certora OwnerReach.spec which defines the inListReachable
-  and reachableInList invariants. The addOwner inListReachable proof is
-  complete; the remaining theorem statements are scaffolded for future proof
-  work and exposed as editable benchmark tasks.
+  and reachableInList invariants. All 12 proof tasks are complete (0 sorry)
+  covering acyclicity, inListReachable, and ownerListInvariant preservation
+  for all four operations. The unprovable stronglyAcyclic axiom was replaced
+  with the provable uniquePredecessor property.

@@ -14,7 +14,7 @@ difficulty: hard
 category: invariant
 track: proof-only
 translation_status: translated
-proof_status: not_started
+proof_status: complete
 evaluation_engine: lean_proof_generation
 implementation_files:
   - cases/safe/owner_manager_reach/verity/Contract.lean
@@ -24,7 +24,7 @@ specification_files:
   - Benchmark/Cases/Safe/OwnerManagerReach/Specs.lean
 editable_files:
   - Benchmark/Generated/Safe/OwnerManagerReach/Tasks/RemoveOwnerOwnerListInvariant.lean
-reference_solution_module: Benchmark.Cases.Safe.OwnerManagerReach.OpenProofs
+reference_solution_module: Benchmark.Cases.Safe.OwnerManagerReach.Proofs
 reference_solution_declaration: Benchmark.Cases.Safe.OwnerManagerReach.removeOwner_ownerListInvariant
 abstraction_level: protocol_slice
 abstraction_notes: >

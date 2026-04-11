@@ -76,12 +76,12 @@ This report is generated from the benchmark manifests.
 ### `safe/owner_manager_reach`
 - Family / implementation: `safe` / `smart_account`
 - Stage: `build_green`
-- Status dimensions: translation=`translated`, spec=`frozen`, proof=`partial`
+- Status dimensions: translation=`translated`, spec=`frozen`, proof=`complete`
 - Lean target: `Benchmark.Cases.Safe.OwnerManagerReach.Compile`
 - Source ref: `https://github.com/safe-global/safe-smart-account@a2e19c6aa42a45ceec68057f3fa387f169c5b321:contracts/base/OwnerManager.sol`
 - Selected functions: `addOwnerWithThreshold`, `removeOwner`, `swapOwner`, `setupOwners`
 - Source artifact: `contracts/base/OwnerManager.sol`
-- Notes: Linked list reachability invariant preservation for the Safe OwnerManager. Based on the Certora OwnerReach.spec which defines the inListReachable and reachableInList invariants. The addOwner inListReachable proof is complete; the remaining theorem statements are scaffolded for future proof work and exposed as editable benchmark tasks.
+- Notes: Linked list reachability invariant preservation for the Safe OwnerManager. Based on the Certora OwnerReach.spec which defines the inListReachable and reachableInList invariants. All 12 proof tasks are complete (0 sorry) covering acyclicity, inListReachable, and ownerListInvariant preservation for all four operations. The unprovable `stronglyAcyclic` axiom was replaced with the provable `uniquePredecessor` property.
 
 ## Non-buildable active cases
 
@@ -401,13 +401,13 @@ This report is generated from the benchmark manifests.
 
 ### `safe/owner_manager_reach/add_owner_owner_list_invariant`
 - Track / property class / proof family: `proof-only` / `linked_list_invariant` / `state_preservation_local_effects`
-- Readiness: prompt_context=`ready`, editable_proof=`blocked`, reference_solution=`blocked`
+- Readiness: prompt_context=`ready`, editable_proof=`ready`, reference_solution=`ready`
 - Theorem target: `Benchmark.Cases.Safe.OwnerManagerReach.addOwner_ownerListInvariant`
 - Evaluation: engine=`lean_proof_generation`, target_kind=`proof_generation`
 - Implementation files: `cases/safe/owner_manager_reach/verity/Contract.lean`, `Benchmark/Cases/Safe/OwnerManagerReach/Contract.lean`
 - Specification files: `cases/safe/owner_manager_reach/verity/Specs.lean`, `Benchmark/Cases/Safe/OwnerManagerReach/Specs.lean`
 - Editable proof file: `Benchmark/Generated/Safe/OwnerManagerReach/Tasks/AddOwnerOwnerListInvariant.lean`
-- Hidden reference solution: `Benchmark.Cases.Safe.OwnerManagerReach.OpenProofs`
+- Hidden reference solution: `Benchmark.Cases.Safe.OwnerManagerReach.Proofs`
 
 ### `safe/owner_manager_reach/in_list_reachable`
 - Track / property class / proof family: `proof-only` / `linked_list_invariant` / `state_preservation_local_effects`
@@ -441,13 +441,13 @@ This report is generated from the benchmark manifests.
 
 ### `safe/owner_manager_reach/remove_owner_owner_list_invariant`
 - Track / property class / proof family: `proof-only` / `linked_list_invariant` / `state_preservation_local_effects`
-- Readiness: prompt_context=`ready`, editable_proof=`blocked`, reference_solution=`blocked`
+- Readiness: prompt_context=`ready`, editable_proof=`ready`, reference_solution=`ready`
 - Theorem target: `Benchmark.Cases.Safe.OwnerManagerReach.removeOwner_ownerListInvariant`
 - Evaluation: engine=`lean_proof_generation`, target_kind=`proof_generation`
 - Implementation files: `cases/safe/owner_manager_reach/verity/Contract.lean`, `Benchmark/Cases/Safe/OwnerManagerReach/Contract.lean`
 - Specification files: `cases/safe/owner_manager_reach/verity/Specs.lean`, `Benchmark/Cases/Safe/OwnerManagerReach/Specs.lean`
 - Editable proof file: `Benchmark/Generated/Safe/OwnerManagerReach/Tasks/RemoveOwnerOwnerListInvariant.lean`
-- Hidden reference solution: `Benchmark.Cases.Safe.OwnerManagerReach.OpenProofs`
+- Hidden reference solution: `Benchmark.Cases.Safe.OwnerManagerReach.Proofs`
 
 ### `safe/owner_manager_reach/setup_owners_acyclicity`
 - Track / property class / proof family: `proof-only` / `linked_list_acyclicity` / `protocol_transition_correctness`
@@ -501,13 +501,13 @@ This report is generated from the benchmark manifests.
 
 ### `safe/owner_manager_reach/swap_owner_owner_list_invariant`
 - Track / property class / proof family: `proof-only` / `linked_list_invariant` / `state_preservation_local_effects`
-- Readiness: prompt_context=`ready`, editable_proof=`blocked`, reference_solution=`blocked`
+- Readiness: prompt_context=`ready`, editable_proof=`ready`, reference_solution=`ready`
 - Theorem target: `Benchmark.Cases.Safe.OwnerManagerReach.swapOwner_ownerListInvariant`
 - Evaluation: engine=`lean_proof_generation`, target_kind=`proof_generation`
 - Implementation files: `cases/safe/owner_manager_reach/verity/Contract.lean`, `Benchmark/Cases/Safe/OwnerManagerReach/Contract.lean`
 - Specification files: `cases/safe/owner_manager_reach/verity/Specs.lean`, `Benchmark/Cases/Safe/OwnerManagerReach/Specs.lean`
 - Editable proof file: `Benchmark/Generated/Safe/OwnerManagerReach/Tasks/SwapOwnerOwnerListInvariant.lean`
-- Hidden reference solution: `Benchmark.Cases.Safe.OwnerManagerReach.OpenProofs`
+- Hidden reference solution: `Benchmark.Cases.Safe.OwnerManagerReach.Proofs`
 
 ## Backlog
 
