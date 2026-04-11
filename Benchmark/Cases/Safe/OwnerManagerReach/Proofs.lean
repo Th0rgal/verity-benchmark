@@ -182,7 +182,6 @@ theorem in_list_reachable
     (hNotZero : (owner != zeroAddress) = true)
     (hNotSentinel : (owner != SENTINEL) = true)
     (hFresh : (wordToAddress (s.storageMap 0 owner) == zeroAddress) = true)
-    (_hPreSentNZ : next s SENTINEL ≠ zeroAddress)
     (hPreReach : ∀ key : Address, next s key ≠ zeroAddress → reachable s SENTINEL key)
     -- Raw acyclicity: SENTINEL ∉ any chain from next s SENTINEL.
     -- Strictly stronger than `acyclic s` (no noDuplicates guard).
@@ -253,9 +252,7 @@ theorem addOwner_acyclicity
     (owner : Address) (s : ContractState)
     (hNotZero : (owner != zeroAddress) = true)
     (hNotSentinel : (owner != SENTINEL) = true)
-    (hFresh : (wordToAddress (s.storageMap 0 owner) == zeroAddress) = true)
-    (_hPreAcyclic : acyclic s)
-    (_hFreshInList : freshInList s owner) :
+    (hFresh : (wordToAddress (s.storageMap 0 owner) == zeroAddress) = true) :
     acyclic ((OwnerManager.addOwner owner).run s).snd := by
   let s' := ((OwnerManager.addOwner owner).run s).snd
   have hNextEq := addOwner_next_eq owner s hNotZero hNotSentinel hFresh
@@ -837,8 +834,7 @@ theorem removeOwner_acyclicity
     (_hNotZero : (owner != zeroAddress) = true)
     (_hNotSentinel : (owner != SENTINEL) = true)
     (_hPrevLink : (wordToAddress (s.storageMap 0 prevOwner) == owner) = true)
-    (_hOwnerInList : next s owner ≠ zeroAddress)
-    (_hPreAcyclic : acyclic s) :
+    (_hOwnerInList : next s owner ≠ zeroAddress) :
     acyclic ((OwnerManager.removeOwner prevOwner owner).run s).snd := by
   let s' := ((OwnerManager.removeOwner prevOwner owner).run s).snd
   unfold acyclic
@@ -921,9 +917,7 @@ theorem swapOwner_acyclicity
     (_hNewFresh : (wordToAddress (s.storageMap 0 newOwner) == zeroAddress) = true)
     (_hOldNotZero : (oldOwner != zeroAddress) = true)
     (_hOldNotSentinel : (oldOwner != SENTINEL) = true)
-    (_hPrevLink : (wordToAddress (s.storageMap 0 prevOwner) == oldOwner) = true)
-    (_hPreAcyclic : acyclic s)
-    (_hFresh : freshInList s newOwner) :
+    (_hPrevLink : (wordToAddress (s.storageMap 0 prevOwner) == oldOwner) = true) :
     acyclic ((OwnerManager.swapOwner prevOwner oldOwner newOwner).run s).snd := by
   let s' := ((OwnerManager.swapOwner prevOwner oldOwner newOwner).run s).snd
   unfold acyclic
@@ -1390,9 +1384,7 @@ theorem removeOwner_inListReachable
     (hPrevLink : (wordToAddress (s.storageMap 0 prevOwner) == owner) = true)
     (hOwnerInList : next s owner ≠ zeroAddress)
     (hPreInv : inListReachable s)
-    (_hAcyclic : acyclic s)
     (hUniquePred : uniquePredecessor s)
-    (_hOwnerNePrev : owner ≠ prevOwner)
     (hPrevNZ : prevOwner ≠ zeroAddress)
     (hZeroInert : next s zeroAddress = zeroAddress) :
     let s' := ((OwnerManager.removeOwner prevOwner owner).run s).snd
@@ -1613,7 +1605,6 @@ theorem swapOwner_inListReachable
     (hPrevLink : (wordToAddress (s.storageMap 0 prevOwner) == oldOwner) = true)
     (hOldNePrev : oldOwner ≠ prevOwner)
     (hPreInv : inListReachable s)
-    (_hAcyclic : acyclic s)
     (hUniquePred : uniquePredecessor s)
     (hFresh : freshInList s newOwner)
     (hPrevNZ : prevOwner ≠ zeroAddress)
@@ -1857,6 +1848,52 @@ private theorem isChain_last_step
       have hSubLen : (b :: c :: rest').length ≥ 2 := by simp [List.length_cons]
       obtain ⟨p, hpIn, hpNext⟩ := isChain_last_step s (b :: c :: rest') target hValid.2 hSubLast hSubLen
       exact ⟨p, List.mem_cons_of_mem _ hpIn, hpNext⟩
+
+-- Stronger version: in a noDuplicates chain, the predecessor p ≠ target.
+private theorem isChain_last_step_ne
+    (s : ContractState) (chain : List Address) (target : Address)
+    (hValid : isChain s chain)
+    (hLast : chain.getLast? = some target)
+    (hLen : chain.length ≥ 2)
+    (hND : noDuplicates chain) :
+    ∃ p, p ∈ chain ∧ next s p = target ∧ p ≠ target := by
+  match chain, hLen with
+  | a :: b :: rest, _ =>
+    match rest with
+    | [] =>
+      simp at hLast
+      have haNe : a ≠ b := by
+        intro h; subst h; exact hND.1 (List.Mem.head _)
+      exact ⟨a, List.Mem.head _, by rw [hValid.1]; exact hLast, by rw [← hLast]; exact haNe⟩
+    | c :: rest' =>
+      have hSubLast : (b :: c :: rest').getLast? = some target := by
+        simp at hLast ⊢; exact hLast
+      have hSubLen : (b :: c :: rest').length ≥ 2 := by simp [List.length_cons]
+      obtain ⟨p, hpIn, hpNext, hpNe⟩ := isChain_last_step_ne s (b :: c :: rest') target hValid.2 hSubLast hSubLen hND.2
+      exact ⟨p, List.mem_cons_of_mem _ hpIn, hpNext, hpNe⟩
+
+-- A self-loop contradicts uniquePredecessor + reachability from SENTINEL in a
+-- noDuplicates chain. Used to derive hNoSelfLoop and hOwnerNePrev inline.
+private theorem no_self_loop_of_unique_pred
+    (s : ContractState) (target : Address)
+    (hTargetNZ : target ≠ zeroAddress)
+    (hTargetNS : target ≠ SENTINEL)
+    (hZeroInert : next s zeroAddress = zeroAddress)
+    (hUniquePred : uniquePredecessor s)
+    (hReach : reachable s SENTINEL target) :
+    next s target ≠ target := by
+  intro hSelfLoop
+  obtain ⟨chain, hHead, hLast, hValid, hND⟩ :=
+    reachable_has_simple_witness s SENTINEL target hReach
+  have hLen : chain.length ≥ 2 := by
+    match chain with
+    | [] => simp at hHead
+    | [a] => simp at hHead hLast; subst hHead; exact absurd hLast.symm hTargetNS
+    | _ :: _ :: _ => simp [List.length_cons]
+  obtain ⟨p, _, hpNext, hpNe⟩ := isChain_last_step_ne s chain target hValid hLast hLen hND
+  have hpNZ : p ≠ zeroAddress := by
+    intro h; rw [h] at hpNext; rw [hZeroInert] at hpNext; exact hTargetNZ hpNext.symm
+  exact hpNe (hUniquePred p target target hpNZ hTargetNZ hTargetNZ hpNext hSelfLoop)
 
 -- Given a non-empty list and a valid chain prefix ++ [target], the last element of prefix
 -- has next = target.
@@ -2104,11 +2141,8 @@ theorem removeOwner_ownerListInvariant
     (hPrevLink : (wordToAddress (s.storageMap 0 prevOwner) == owner) = true)
     (hOwnerInList : next s owner ≠ zeroAddress)
     (hPreInv : ownerListInvariant s)
-    (_hAcyclic : acyclic s)
     (hUniquePred : uniquePredecessor s)
-    (hOwnerNePrev : owner ≠ prevOwner)
     (hPrevNZ : prevOwner ≠ zeroAddress)
-    (hNoSelfLoop : next s owner ≠ owner)
     (hZeroInert : next s zeroAddress = zeroAddress) :
     let s' := ((OwnerManager.removeOwner prevOwner owner).run s).snd
     ownerListInvariant s' := by
@@ -2118,6 +2152,12 @@ theorem removeOwner_ownerListInvariant
   have hOwnerNS : owner ≠ SENTINEL := ne_of_bne hNotSentinel
   have hPrevLinkN : next s prevOwner = owner := by
     have := hPrevLink; simp [BEq.beq, wordToAddress, next] at this ⊢; exact this
+  -- Derive no self-loop and owner ≠ prevOwner from uniquePredecessor + reachability.
+  have hNoSelfLoop : next s owner ≠ owner :=
+    no_self_loop_of_unique_pred s owner hOwnerNZ hOwnerNS hZeroInert hUniquePred
+      ((hPreInv.2 owner hOwnerNZ).mp hOwnerInList)
+  have hOwnerNePrev : owner ≠ prevOwner := by
+    intro heq; exact hNoSelfLoop (by rw [← heq] at hPrevLinkN; exact hPrevLinkN)
   have hNextOwner' : next s' owner = zeroAddress := by
     show next ((OwnerManager.removeOwner prevOwner owner).run s).snd owner = zeroAddress
     rw [hNextEq]; simp
@@ -2298,13 +2338,10 @@ theorem swapOwner_ownerListInvariant
     (hOldNotZero : (oldOwner != zeroAddress) = true)
     (hOldNotSentinel : (oldOwner != SENTINEL) = true)
     (hPrevLink : (wordToAddress (s.storageMap 0 prevOwner) == oldOwner) = true)
-    (hOldNePrev : oldOwner ≠ prevOwner)
     (hPreInv : ownerListInvariant s)
-    (_hAcyclic : acyclic s)
     (hUniquePred : uniquePredecessor s)
     (hFresh : freshInList s newOwner)
     (hPrevNZ : prevOwner ≠ zeroAddress)
-    (hNoSelfLoop : next s oldOwner ≠ oldOwner)
     (hZeroInert : next s zeroAddress = zeroAddress) :
     let s' := ((OwnerManager.swapOwner prevOwner oldOwner newOwner).run s).snd
     ownerListInvariant s' := by
@@ -2319,6 +2356,19 @@ theorem swapOwner_ownerListInvariant
     have := hPrevLink; simp [BEq.beq, wordToAddress, next] at this ⊢; exact this
   have hNewFreshN : next s newOwner = zeroAddress := by
     have := hNewFresh; simp [BEq.beq, wordToAddress, next, zeroAddress] at this ⊢; exact this
+  -- Derive hOldInList early (needed for hNoSelfLoop and hOldNePrev derivations)
+  have hOldInList : next s oldOwner ≠ zeroAddress := by
+    have hPNZ : next s prevOwner ≠ zeroAddress := by rw [hPrevLinkN]; exact hOldNZ
+    exact (hPreInv.2 oldOwner hOldNZ).mpr
+      (reachable_trans s SENTINEL prevOwner oldOwner
+        ((hPreInv.2 prevOwner hPrevNZ).mp hPNZ)
+        (reachable_step s prevOwner oldOwner hPrevLinkN))
+  -- Derive no self-loop and oldOwner ≠ prevOwner from uniquePredecessor + reachability
+  have hNoSelfLoop : next s oldOwner ≠ oldOwner :=
+    no_self_loop_of_unique_pred s oldOwner hOldNZ hOldNS hZeroInert hUniquePred
+      ((hPreInv.2 oldOwner hOldNZ).mp hOldInList)
+  have hOldNePrev : oldOwner ≠ prevOwner := by
+    intro heq; exact hNoSelfLoop (by rw [← heq] at hPrevLinkN; exact hPrevLinkN)
   have hNewNeOld : newOwner ≠ oldOwner := by
     intro heq
     have hPNZ : next s prevOwner ≠ zeroAddress := by rw [hPrevLinkN]; exact hOldNZ
@@ -2355,12 +2405,6 @@ theorem swapOwner_ownerListInvariant
     by_cases hSP : SENTINEL = prevOwner
     · rw [← hSP] at hNextPrev'; rw [hNextPrev']; exact hNewNZ
     · rw [hNextOther SENTINEL (fun h => hOldNS h.symm) hSP (fun h => hNewNS h.symm)]; exact hPreInv.1
-  have hOldInList : next s oldOwner ≠ zeroAddress := by
-    have hPNZ : next s prevOwner ≠ zeroAddress := by rw [hPrevLinkN]; exact hOldNZ
-    exact (hPreInv.2 oldOwner hOldNZ).mpr
-      (reachable_trans s SENTINEL prevOwner oldOwner
-        ((hPreInv.2 prevOwner hPrevNZ).mp hPNZ)
-        (reachable_step s prevOwner oldOwner hPrevLinkN))
   unfold ownerListInvariant
   constructor
   · exact hSentNZ
