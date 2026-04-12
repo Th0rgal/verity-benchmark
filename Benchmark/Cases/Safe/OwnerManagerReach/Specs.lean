@@ -231,6 +231,11 @@ structure SafeOwnerInvariant (s : ContractState) : Prop where
 def isOwner (s : ContractState) (addr : Address) : Prop :=
   next s addr ≠ zeroAddress ∧ addr ≠ SENTINEL
 
+-- setupOwners makes exactly the three given addresses owners and nothing else.
+def setupOwners_correctness (s' : ContractState) (owner1 owner2 owner3 : Address) : Prop :=
+  isOwner s' owner1 ∧ isOwner s' owner2 ∧ isOwner s' owner3 ∧
+  (∀ k : Address, k ≠ owner1 → k ≠ owner2 → k ≠ owner3 → ¬isOwner s' k)
+
 -- addOwner makes the new address an owner, preserving all others.
 def addOwner_correctness (s s' : ContractState) (owner : Address) : Prop :=
   isOwner s' owner ∧

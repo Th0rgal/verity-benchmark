@@ -3376,4 +3376,42 @@ theorem swapOwner_isOwnerCorrectness
         rw [hNxt k, if_neg hkO, if_neg hP, if_neg hkN]
       rw [hEq]
 
+theorem setupOwners_isOwnerCorrectness
+    (owner1 owner2 owner3 : Address) (s : ContractState)
+    (h1NZ : (owner1 != zeroAddress) = true) (h1NS : (owner1 != SENTINEL) = true)
+    (h2NZ : (owner2 != zeroAddress) = true) (h2NS : (owner2 != SENTINEL) = true)
+    (h3NZ : (owner3 != zeroAddress) = true) (h3NS : (owner3 != SENTINEL) = true)
+    (h12 : (owner1 != owner2) = true) (h13 : (owner1 != owner3) = true)
+    (h23 : (owner2 != owner3) = true)
+    (hClean : ∀ addr : Address, s.storageMap 0 addr = 0) :
+    let s' := ((OwnerManager.setupOwners owner1 owner2 owner3).run s).snd
+    setupOwners_correctness s' owner1 owner2 owner3 := by
+  intro s'
+  have hNxt := setupOwners_storageMap owner1 owner2 owner3 s h1NZ h1NS h2NZ h2NS h3NZ h3NS h12 h13 h23
+  have hNS1 : owner1 ≠ SENTINEL := ne_of_bne h1NS
+  have hNS2 : owner2 ≠ SENTINEL := ne_of_bne h2NS
+  have hNS3 : owner3 ≠ SENTINEL := ne_of_bne h3NS
+  have hNZ1 : owner1 ≠ zeroAddress := ne_of_bne h1NZ
+  have hNZ2 : owner2 ≠ zeroAddress := ne_of_bne h2NZ
+  have hNZ3 : owner3 ≠ zeroAddress := ne_of_bne h3NZ
+  have hNE12 : owner1 ≠ owner2 := ne_of_bne h12
+  have hNE13 : owner1 ≠ owner3 := ne_of_bne h13
+  have hNE23 : owner2 ≠ owner3 := ne_of_bne h23
+  -- next s' for each owner
+  have hO1 : next s' owner1 = owner2 := by rw [hNxt]; simp [hNS1]
+  have hO2 : next s' owner2 = owner3 := by
+    rw [hNxt]; simp [hNS2, Ne.symm hNE12]
+  have hO3 : next s' owner3 = SENTINEL := by
+    rw [hNxt]; simp [hNS3, Ne.symm hNE13, Ne.symm hNE23]
+  -- Clean storage: next s k = 0 for any k
+  have hClean' : ∀ a : Address, next s a = zeroAddress := by
+    intro a; simp only [next]; rw [hClean a]; rfl
+  refine ⟨⟨?_, hNS1⟩, ⟨?_, hNS2⟩, ⟨?_, hNS3⟩, ?_⟩
+  · rw [hO1]; exact hNZ2
+  · rw [hO2]; exact hNZ3
+  · rw [hO3]; decide
+  · intro k hk1 hk2 hk3 ⟨hNxt', hNS⟩
+    rw [hNxt k, if_neg hNS, if_neg hk1, if_neg hk2, if_neg hk3] at hNxt'
+    exact hNxt' (hClean' k)
+
 end Benchmark.Cases.Safe.OwnerManagerReach
