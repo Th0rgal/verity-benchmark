@@ -208,10 +208,11 @@ def noSelfLoops (s : ContractState) : Prop :=
   ∀ k : Address, next s k ≠ zeroAddress → k ≠ SENTINEL → next s k ≠ k
 
 -- Bundled invariant combining all linked-list properties.
+-- `noSelfLoops` is omitted — it is derivable from the other three fields
+-- (see `SafeOwnerInvariant.noSelfLoops` in Proofs.lean).
 structure SafeOwnerInvariant (s : ContractState) : Prop where
   ownerList     : ownerListInvariant s
   uniquePred    : uniquePredecessor s
   zeroInert     : next s zeroAddress = zeroAddress
-  selfLoopFree  : noSelfLoops s
 
 end Benchmark.Cases.Safe.OwnerManagerReach
