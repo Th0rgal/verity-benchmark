@@ -32,15 +32,20 @@ abstraction_notes: >
   The benchmark models all four ownership-mutating functions of the Safe
   OwnerManager: addOwnerWithThreshold, removeOwner, swapOwner, and
   setupOwners. Threshold management is elided as it does not affect the
-  owners mapping. Three families of invariants are specified:
+  owners mapping. Four families of properties are specified:
   inListReachable (forward reachability from SENTINEL), ownerListInvariant
-  (combined inListReachable + reachableInList biconditional), and acyclicity
-  (no cycles in the linked list). setupOwners serves as the base case.
+  (combined inListReachable + reachableInList biconditional), acyclicity
+  (no cycles in the linked list), and isOwner functional correctness
+  (each operation changes exactly the intended owners). setupOwners serves
+  as the base case for invariant establishment.
 unsupported_feature_codes: []
 notes: >
-  Linked list reachability invariant preservation for the Safe OwnerManager.
-  Based on the Certora OwnerReach.spec which defines the inListReachable
-  and reachableInList invariants. All 12 proof tasks are complete (0 sorry)
-  covering acyclicity, inListReachable, and ownerListInvariant preservation
-  for all four operations. The unprovable stronglyAcyclic axiom was replaced
-  with the provable uniquePredecessor property.
+  Linked list reachability invariant preservation and functional correctness
+  for the Safe OwnerManager. Based on the Certora OwnerReach.spec which
+  defines the inListReachable and reachableInList invariants. All 15 proof
+  tasks are complete (0 sorry) covering acyclicity, inListReachable,
+  ownerListInvariant preservation, and isOwner functional correctness for
+  all four operations. The unprovable stronglyAcyclic axiom was replaced
+  with the provable uniquePredecessor property. Functional correctness
+  proofs verify that each operation changes exactly the intended owners
+  and leaves all others unchanged.

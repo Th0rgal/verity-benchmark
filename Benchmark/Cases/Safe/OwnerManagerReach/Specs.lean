@@ -215,4 +215,35 @@ structure SafeOwnerInvariant (s : ContractState) : Prop where
   uniquePred    : uniquePredecessor s
   zeroInert     : next s zeroAddress = zeroAddress
 
+/-! ## Functional correctness
+
+  These specs state that each operation changes exactly the intended owners
+  and leaves all other owners unchanged. They correspond to the Certora
+  `addOwnerEffect`, `removeOwnerEffect`, and `swapOwnerEffect` rules.
+
+  `isOwner` matches the Solidity view function:
+    function isOwner(address owner) returns (bool) {
+      return owner != SENTINEL_OWNERS && owners[owner] != address(0);
+    }
+-/
+
+-- An address is an owner iff it has a non-zero successor and is not SENTINEL.
+def isOwner (s : ContractState) (addr : Address) : Prop :=
+  next s addr ≠ zeroAddress ∧ addr ≠ SENTINEL
+
+-- addOwner makes the new address an owner, preserving all others.
+def addOwner_correctness (s s' : ContractState) (owner : Address) : Prop :=
+  isOwner s' owner ∧
+  (∀ k : Address, k ≠ owner → (isOwner s' k ↔ isOwner s k))
+
+-- removeOwner removes the target from the owner set, preserving all others.
+def removeOwner_correctness (s s' : ContractState) (owner : Address) : Prop :=
+  ¬isOwner s' owner ∧
+  (∀ k : Address, k ≠ owner → (isOwner s' k ↔ isOwner s k))
+
+-- swapOwner atomically removes oldOwner and adds newOwner, preserving all others.
+def swapOwner_correctness (s s' : ContractState) (oldOwner newOwner : Address) : Prop :=
+  ¬isOwner s' oldOwner ∧ isOwner s' newOwner ∧
+  (∀ k : Address, k ≠ oldOwner → k ≠ newOwner → (isOwner s' k ↔ isOwner s k))
+
 end Benchmark.Cases.Safe.OwnerManagerReach

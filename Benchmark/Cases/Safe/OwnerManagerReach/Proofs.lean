@@ -3241,4 +3241,139 @@ theorem swapOwner_uniquePredecessor
             · simp [hyn'] at hyc
               exact hPreUP x y c hxnz hynz hcnz hxc hyc
 
+/-! ═══════════════════════════════════════════════════════════════════
+    Part 10: Functional correctness — isOwner effect proofs
+    ═══════════════════════════════════════════════════════════════════ -/
+
+/--
+  addOwner functional correctness: the new owner IS an owner after the call,
+  and every other address's ownership status is unchanged.
+-/
+theorem addOwner_isOwnerCorrectness
+    (owner : Address) (s : ContractState)
+    (hNotZero : (owner != zeroAddress) = true)
+    (hNotSentinel : (owner != SENTINEL) = true)
+    (hFresh : (wordToAddress (s.storageMap 0 owner) == zeroAddress) = true)
+    (hPreInv : ownerListInvariant s) :
+    let s' := ((OwnerManager.addOwner owner).run s).snd
+    addOwner_correctness s s' owner := by
+  intro s'
+  have hNxt := addOwner_next_eq owner s hNotZero hNotSentinel hFresh
+  have hOwnerNS : owner ≠ SENTINEL := ne_of_bne hNotSentinel
+  -- Helper: for k ≠ SENTINEL and k ≠ owner, next s' k = next s k
+  have hNxtOther : ∀ k, k ≠ SENTINEL → k ≠ owner → next s' k = next s k := by
+    intro k hkS hkO; rw [hNxt k]; rw [if_neg hkS, if_neg hkO]
+  constructor
+  · -- isOwner s' owner: next s' owner = next s SENTINEL ≠ 0, owner ≠ SENTINEL
+    constructor
+    · rw [hNxt owner, if_neg hOwnerNS, if_pos rfl]; exact hPreInv.1
+    · exact hOwnerNS
+  · -- ∀ k ≠ owner, isOwner s' k ↔ isOwner s k
+    intro k hk
+    simp only [isOwner]
+    constructor
+    · intro ⟨hNxt', hNS⟩
+      rw [hNxt k, if_neg hNS, if_neg hk] at hNxt'
+      exact ⟨hNxt', hNS⟩
+    · intro ⟨hNxt', hNS⟩
+      rw [hNxt k, if_neg hNS, if_neg hk]
+      exact ⟨hNxt', hNS⟩
+
+/--
+  removeOwner functional correctness: the removed owner is NOT an owner
+  after the call, and every other address's ownership status is unchanged.
+
+  The `hOwnerInList` hypothesis is a Solidity-level fact: `owner` is in the
+  list (has a non-zero successor). In the real contract this is implied by
+  `owners[prevOwner] == owner` + the list invariant, but we state it
+  explicitly to keep the proof self-contained from the list invariant.
+-/
+theorem removeOwner_isOwnerCorrectness
+    (prevOwner owner : Address) (s : ContractState)
+    (hNotZero : (owner != zeroAddress) = true)
+    (hNotSentinel : (owner != SENTINEL) = true)
+    (hPrevLink : (wordToAddress (s.storageMap 0 prevOwner) == owner) = true)
+    (hOwnerInList : next s owner ≠ zeroAddress) :
+    let s' := ((OwnerManager.removeOwner prevOwner owner).run s).snd
+    removeOwner_correctness s s' owner := by
+  intro s'
+  have hNxt := removeOwner_storageMap prevOwner owner s hNotZero hNotSentinel hPrevLink
+  have hOwnerNZ : owner ≠ zeroAddress := ne_of_bne hNotZero
+  have hOwnerNS : owner ≠ SENTINEL := ne_of_bne hNotSentinel
+  have hPrevIsOwner : next s prevOwner = owner := by
+    have := hPrevLink; simp [next, BEq.beq, wordToAddress] at this ⊢; exact this
+  constructor
+  · -- ¬isOwner s' owner: next s' owner = zeroAddress
+    intro ⟨hNxt', _⟩
+    rw [hNxt owner, if_pos rfl] at hNxt'
+    exact hNxt' rfl
+  · -- ∀ k ≠ owner, isOwner s' k ↔ isOwner s k
+    intro k hk
+    simp only [isOwner]
+    by_cases hP : k = prevOwner
+    · -- k = prevOwner: next s' prevOwner = next s owner
+      constructor
+      · intro ⟨_, hNS⟩; exact ⟨by rw [hP, hPrevIsOwner]; exact hOwnerNZ, hNS⟩
+      · intro ⟨_, hNS⟩
+        rw [hNxt k, if_neg hk, if_pos hP]
+        exact ⟨hOwnerInList, hNS⟩
+    · -- k ≠ owner, k ≠ prevOwner: next s' k = next s k
+      have hEq : next s' k = next s k := by rw [hNxt k, if_neg hk, if_neg hP]
+      rw [hEq]
+
+/--
+  swapOwner functional correctness: the old owner is removed, the new owner
+  is added, and every other address's ownership status is unchanged.
+-/
+theorem swapOwner_isOwnerCorrectness
+    (prevOwner oldOwner newOwner : Address) (s : ContractState)
+    (hNewNotZero : (newOwner != zeroAddress) = true)
+    (hNewNotSentinel : (newOwner != SENTINEL) = true)
+    (hNewFresh : (wordToAddress (s.storageMap 0 newOwner) == zeroAddress) = true)
+    (hOldNotZero : (oldOwner != zeroAddress) = true)
+    (hOldNotSentinel : (oldOwner != SENTINEL) = true)
+    (hPrevLink : (wordToAddress (s.storageMap 0 prevOwner) == oldOwner) = true)
+    (hOldInList : next s oldOwner ≠ zeroAddress) :
+    let s' := ((OwnerManager.swapOwner prevOwner oldOwner newOwner).run s).snd
+    swapOwner_correctness s s' oldOwner newOwner := by
+  intro s'
+  have hNxt := swapOwner_storageMap prevOwner oldOwner newOwner s hNewNotZero hNewNotSentinel hNewFresh hOldNotZero hOldNotSentinel hPrevLink
+  have hOldNZ : oldOwner ≠ zeroAddress := ne_of_bne hOldNotZero
+  have hOldNS : oldOwner ≠ SENTINEL := ne_of_bne hOldNotSentinel
+  have hNewNZ : newOwner ≠ zeroAddress := ne_of_bne hNewNotZero
+  have hNewNS : newOwner ≠ SENTINEL := ne_of_bne hNewNotSentinel
+  have hPrevIsOwner : next s prevOwner = oldOwner := by
+    have := hPrevLink; simp [next, BEq.beq, wordToAddress] at this ⊢; exact this
+  have hNewFreshNext : next s newOwner = zeroAddress := by
+    have := hNewFresh; simp [next, BEq.beq, wordToAddress] at this ⊢; exact this
+  refine ⟨?_, ?_, ?_⟩
+  · -- ¬isOwner s' oldOwner: next s' oldOwner = zeroAddress
+    intro ⟨hNxt', _⟩
+    rw [hNxt oldOwner, if_pos rfl] at hNxt'
+    exact hNxt' rfl
+  · -- isOwner s' newOwner: next s' newOwner = next s oldOwner ≠ 0
+    constructor
+    · rw [hNxt newOwner]
+      by_cases hNO : newOwner = oldOwner
+      · exfalso; rw [hNO] at hNewFreshNext; exact hOldInList hNewFreshNext
+      · rw [if_neg hNO]
+        by_cases hNP : newOwner = prevOwner
+        · rw [if_pos hNP]; exact hNewNZ
+        · rw [if_neg hNP, if_pos rfl]; exact hOldInList
+    · exact hNewNS
+  · -- ∀ k, k ≠ oldOwner → k ≠ newOwner → isOwner s' k ↔ isOwner s k
+    intro k hkO hkN
+    simp only [isOwner]
+    by_cases hP : k = prevOwner
+    · -- k = prevOwner: next s' prevOwner = newOwner
+      constructor
+      · intro ⟨_, hNS⟩; exact ⟨by rw [hP, hPrevIsOwner]; exact hOldNZ, hNS⟩
+      · intro ⟨_, hNS⟩
+        rw [hNxt k, if_neg hkO, if_pos hP]
+        exact ⟨hNewNZ, hNS⟩
+    · -- k ≠ oldOwner, k ≠ newOwner, k ≠ prevOwner: next s' k = next s k
+      have hEq : next s' k = next s k := by
+        rw [hNxt k, if_neg hkO, if_neg hP, if_neg hkN]
+      rw [hEq]
+
 end Benchmark.Cases.Safe.OwnerManagerReach
