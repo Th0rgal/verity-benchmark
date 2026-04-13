@@ -27,10 +27,12 @@ theorem removeOwner_inListReachable
     (hOwnerInList : next s owner ≠ zeroAddress)
     -- Pre-state invariant
     (hPreInv : inListReachable s)
-    -- Acyclicity
-    (hAcyclic : acyclic s)
-    -- Strong acyclicity: no non-SENTINEL cycles
-    (hStrongAcyclic : stronglyAcyclic s) :
+    -- Unique predecessor: each non-zero node has at most one non-zero predecessor.
+    (hUniquePred : uniquePredecessor s)
+    -- prevOwner is non-zero (a valid list node)
+    (hPrevNZ : prevOwner ≠ zeroAddress)
+    -- Zero address maps to itself
+    (hZeroInert : next s zeroAddress = zeroAddress) :
     let s' := ((OwnerManager.removeOwner prevOwner owner).run s).snd
     inListReachable s' := by
   -- Replace this placeholder with a complete Lean proof.

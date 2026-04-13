@@ -7,6 +7,10 @@ open Verity.EVM.Uint256
 
 /--
 Combined `ownerListInvariant` preservation under `swapOwner`.
+
+Properties like noSelfLoops, freshInList, and oldOwner ≠ prevOwner are
+derived internally from ownerListInvariant + uniquePredecessor, not
+required as hypotheses.
 -/
 theorem swapOwner_ownerListInvariant
     (prevOwner oldOwner newOwner : Address) (s : ContractState)
@@ -16,13 +20,9 @@ theorem swapOwner_ownerListInvariant
     (hOldNotZero : (oldOwner != zeroAddress) = true)
     (hOldNotSentinel : (oldOwner != SENTINEL) = true)
     (hPrevLink : (wordToAddress (s.storageMap 0 prevOwner) == oldOwner) = true)
-    (hOldNePrev : oldOwner ≠ prevOwner)
     (hPreInv : ownerListInvariant s)
-    (hAcyclic : acyclic s)
-    (hStrongAcyclic : stronglyAcyclic s)
-    (hFresh : freshInList s newOwner)
+    (hUniquePred : uniquePredecessor s)
     (hPrevNZ : prevOwner ≠ zeroAddress)
-    (hNoSelfLoop : next s oldOwner ≠ oldOwner)
     (hZeroInert : next s zeroAddress = zeroAddress) :
     let s' := ((OwnerManager.swapOwner prevOwner oldOwner newOwner).run s).snd
     ownerListInvariant s' := by

@@ -22,23 +22,22 @@ theorem in_list_reachable
     (hNotZero : (owner != zeroAddress) = true)
     (hNotSentinel : (owner != SENTINEL) = true)
     (hFresh : (wordToAddress (s.storageMap 0 owner) == zeroAddress) = true)
-    -- Pre-state invariant
-    (_hPreSentNZ : next s SENTINEL ≠ zeroAddress)
     (hPreReach : ∀ key : Address, next s key ≠ zeroAddress → reachable s SENTINEL key)
-    -- Acyclicity: SENTINEL does not appear in any chain from SENTINEL's successor.
+    -- Raw acyclicity: SENTINEL ∉ any chain from next s SENTINEL.
+    -- Strictly stronger than `acyclic s` (no noDuplicates guard).
     (hAcyclic : ∀ key : Address, ∀ chain : List Address,
       chain.head? = some (next s SENTINEL) →
       chain.getLast? = some key →
       isChain s chain →
       SENTINEL ∉ chain)
-    -- owner is fresh (not in the list)
+    -- Raw freshness: owner ∉ any chain from next s SENTINEL.
+    -- Strictly stronger than `freshInList s owner` (no noDuplicates guard).
     (hOwnerFresh : ∀ key : Address, ∀ chain : List Address,
       chain.head? = some (next s SENTINEL) →
       chain.getLast? = some key →
       isChain s chain →
       owner ∉ chain) :
-    let s' := ((OwnerManager.addOwner owner).run s).snd
-    in_list_reachable_spec s s' := by
+    in_list_reachable_spec s ((OwnerManager.addOwner owner).run s).snd := by
   -- Replace this placeholder with a complete Lean proof.
   exact ?_
 
