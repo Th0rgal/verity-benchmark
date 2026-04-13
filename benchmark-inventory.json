@@ -10,30 +10,30 @@
     "backlog_tasks": "backlog/*/*/tasks/*.yaml"
   },
   "summary": {
-    "family_count": 10,
-    "implementation_count": 10,
-    "active_case_count": 6,
+    "family_count": 11,
+    "implementation_count": 11,
+    "active_case_count": 7,
     "backlog_case_count": 4,
-    "active_task_count": 30,
+    "active_task_count": 31,
     "backlog_task_count": 8,
-    "buildable_case_count": 8,
-    "runnable_task_count": 38,
+    "buildable_case_count": 9,
+    "runnable_task_count": 39,
     "case_stage_counts": {
-      "build_green": 6,
+      "build_green": 7,
       "candidate": 2,
       "proof_complete": 2
     },
     "translation_status_counts": {
       "blocked": 2,
-      "translated": 8
+      "translated": 9
     },
     "proof_status_counts": {
       "blocked": 2,
-      "complete": 2,
+      "complete": 3,
       "partial": 6
     },
     "task_track_counts": {
-      "proof-only": 38
+      "proof-only": 39
     },
     "task_property_class_counts": {
       "accounting_bound": 8,
@@ -43,6 +43,7 @@
       "authorization_state": 1,
       "balance_credit_update": 2,
       "exploit_trace": 1,
+      "linked_list_invariant": 1,
       "mapping_consistency": 1,
       "monotonic_counter": 2,
       "output_range": 2,
@@ -61,10 +62,10 @@
       "functional_correctness": 11,
       "protocol_transition_correctness": 6,
       "refinement_equivalence": 6,
-      "state_preservation_local_effects": 13
+      "state_preservation_local_effects": 14
     },
     "family_split_counts": {
-      "active": 6,
+      "active": 7,
       "backlog": 4
     }
   },
@@ -187,6 +188,23 @@
         "solidity"
       ],
       "manifest_path": "families/paladin_votes/family.yaml"
+    },
+    {
+      "family_id": "safe",
+      "display_name": "Safe",
+      "split": "active",
+      "status": "active",
+      "description": "Benchmark family for Safe smart account (formerly Gnosis Safe) covering the OwnerManager linked list invariants from the Certora OwnerReach.spec.",
+      "implementation_ids": [
+        "smart_account"
+      ],
+      "case_ids": [
+        "safe/owner_manager_reach"
+      ],
+      "source_languages": [
+        "solidity"
+      ],
+      "manifest_path": "families/safe/family.yaml"
     },
     {
       "family_id": "uniswap_v2",
@@ -352,6 +370,22 @@
       ],
       "notes": "Claim accounting contract translated as a single-round slice with Merkle verification abstracted away from the benchmark.",
       "manifest_path": "families/paladin_votes/implementations/stream_recovery_claim/implementation.yaml"
+    },
+    {
+      "family_id": "safe",
+      "implementation_id": "smart_account",
+      "display_name": "Safe Smart Account",
+      "split": "active",
+      "status": "translated",
+      "upstream_repo": "https://github.com/safe-global/safe-smart-account",
+      "upstream_commit": "a2e19c6aa42a45ceec68057f3fa387f169c5b321",
+      "source_language": "solidity",
+      "source_artifact_path": "contracts/base/OwnerManager.sol",
+      "case_ids": [
+        "safe/owner_manager_reach"
+      ],
+      "notes": "Implementation entry for the Safe smart account OwnerManager module, benchmarking the linked list invariant preservation under addOwnerWithThreshold.",
+      "manifest_path": "families/safe/implementations/smart_account/implementation.yaml"
     },
     {
       "family_id": "uniswap_v2",
@@ -652,6 +686,47 @@
       "unsupported_feature_codes": [],
       "spec_target": "Benchmark.Cases.PaladinVotes.StreamRecoveryClaimUsdc.Specs",
       "proof_target": "Benchmark.Cases.PaladinVotes.StreamRecoveryClaimUsdc.Proofs"
+    },
+    {
+      "case_id": "safe/owner_manager_reach",
+      "project": "safe",
+      "case_name": "owner_manager_reach",
+      "suite": "active",
+      "schema_version": 1,
+      "manifest_path": "cases/safe/owner_manager_reach/case.yaml",
+      "split": "active",
+      "family_id": "safe",
+      "implementation_id": "smart_account",
+      "stage": "build_green",
+      "translation_status": "translated",
+      "spec_status": "frozen",
+      "proof_status": "complete",
+      "source_language": "solidity",
+      "upstream_repo": "https://github.com/safe-global/safe-smart-account",
+      "upstream_commit": "a2e19c6aa42a45ceec68057f3fa387f169c5b321",
+      "original_contract_path": "contracts/base/OwnerManager.sol",
+      "source_ref": "https://github.com/safe-global/safe-smart-account@a2e19c6aa42a45ceec68057f3fa387f169c5b321:contracts/base/OwnerManager.sol",
+      "selected_functions": [
+        "addOwnerWithThreshold"
+      ],
+      "lean_target": "Benchmark.Cases.Safe.OwnerManagerReach.Compile",
+      "failure_reason": null,
+      "notes": "Linked list reachability invariant preservation for the Safe OwnerManager. Based on the Certora OwnerReach.spec which defines the inListReachable invariant over a ghost mapping tracking the owners linked list. The proof uses explicit witness chains and chain lifting to show that pre-state reachability implies post-state reachability after insertion.",
+      "buildable": true,
+      "verity_commit": "4ebe4931d25e5a1594fcd3f43ff040ecc3c4225a",
+      "lean_toolchain": "leanprover/lean4:v4.22.0",
+      "abstraction_level": "protocol_slice",
+      "abstraction_tags": [
+        "threshold_elided",
+        "removeOwner_elided",
+        "swapOwner_elided",
+        "setupOwners_elided",
+        "linked_list_reachability_slice"
+      ],
+      "abstraction_notes": "The benchmark isolates the linked list insertion logic of addOwnerWithThreshold in the Safe OwnerManager. The threshold update is elided as it does not affect the owners mapping. Only the inListReachable invariant from the Certora OwnerReach.spec is modeled, proving that addOwner preserves reachability from the SENTINEL node for all nodes with non-zero successors.",
+      "unsupported_feature_codes": [],
+      "spec_target": "Benchmark.Cases.Safe.OwnerManagerReach.Specs",
+      "proof_target": "Benchmark.Cases.Safe.OwnerManagerReach.Proofs"
     }
   ],
   "backlog": [
@@ -2165,6 +2240,51 @@
         "editable_proof": "ready",
         "reference_solution": "ready"
       }
+    },
+    {
+      "task_ref": "safe/owner_manager_reach/in_list_reachable",
+      "task_id": "in_list_reachable",
+      "case_id": "safe/owner_manager_reach",
+      "suite": "active",
+      "schema_version": 1,
+      "manifest_path": "cases/safe/owner_manager_reach/tasks/in_list_reachable.yaml",
+      "split": "active",
+      "family_id": "safe",
+      "implementation_id": "smart_account",
+      "source_ref": "https://github.com/safe-global/safe-smart-account@a2e19c6aa42a45ceec68057f3fa387f169c5b321:contracts/base/OwnerManager.sol",
+      "task_interface_version": 2,
+      "track": "proof-only",
+      "property_class": "linked_list_invariant",
+      "category": "invariant",
+      "difficulty": "hard",
+      "theorem_name": "Benchmark.Cases.Safe.OwnerManagerReach.in_list_reachable",
+      "proof_family": "state_preservation_local_effects",
+      "translation_status": "translated",
+      "proof_status": "complete",
+      "implementation_files": [
+        "cases/safe/owner_manager_reach/verity/Contract.lean",
+        "Benchmark/Cases/Safe/OwnerManagerReach/Contract.lean"
+      ],
+      "specification_files": [
+        "cases/safe/owner_manager_reach/verity/Specs.lean",
+        "Benchmark/Cases/Safe/OwnerManagerReach/Specs.lean"
+      ],
+      "editable_files": [
+        "Benchmark/Generated/Safe/OwnerManagerReach/Tasks/InListReachable.lean"
+      ],
+      "abstraction_level": "protocol_slice",
+      "abstraction_notes": "Certora inListReachable invariant preservation under addOwnerWithThreshold. The proof requires witness-chain construction: showing that every node reachable in the pre-state remains reachable in the post-state after inserting a new owner at the head of the linked list. Requires acyclicity and freshness hypotheses to lift pre-state chains.",
+      "unsupported_feature_codes": [],
+      "reference_solution_module": "Benchmark.Cases.Safe.OwnerManagerReach.Proofs",
+      "evaluation": {
+        "engine": "lean_proof_generation",
+        "target_kind": "proof_generation"
+      },
+      "readiness": {
+        "prompt_context": "ready",
+        "editable_proof": "ready",
+        "reference_solution": "ready"
+      }
     }
   ],
   "backlog_tasks": [
@@ -2529,5 +2649,5 @@
       }
     }
   ],
-  "generated_at": "2026-03-24T16:18:15.648174+00:00"
+  "generated_at": "2026-04-10T12:32:32.361708+00:00"
 }
