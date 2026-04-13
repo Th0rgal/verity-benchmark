@@ -11,22 +11,18 @@ addOwner preserves acyclicity of the owner linked list.
 After addOwner(owner), the list becomes:
   SENTINEL → owner → old_head → ... → SENTINEL
 
-Proof strategy: owner was fresh (not in any existing chain). SENTINEL's
-new successor is owner (not SENTINEL). The tail old_head → ... is
-unchanged from the pre-state. By pre-state acyclicity, SENTINEL didn't
-appear in the old tail. Since owner ≠ SENTINEL and owner was fresh,
-SENTINEL still doesn't appear in any post-state chain starting from
-SENTINEL's successor.
+Acyclicity is a tautology — it holds for any state. The proof
+(acyclic_generic) shows that any duplicate-free chain from SENTINEL's
+successor ending at key ≠ SENTINEL cannot contain SENTINEL, purely
+by the structure of the definitions. No pre-state hypotheses are needed
+beyond the Solidity require guards.
 -/
 theorem addOwner_acyclicity
     (owner : Address) (s : ContractState)
     (hNotZero : (owner != zeroAddress) = true)
     (hNotSentinel : (owner != SENTINEL) = true)
-    (hFresh : (wordToAddress (s.storageMap 0 owner) == zeroAddress) = true)
-    (hPreAcyclic : acyclic s)
-    (hFreshInList : freshInList s owner) :
-    let s' := ((OwnerManager.addOwner owner).run s).snd
-    acyclic s' := by
+    (hFresh : (wordToAddress (s.storageMap 0 owner) == zeroAddress) = true) :
+    acyclic ((OwnerManager.addOwner owner).run s).snd := by
   -- Replace this placeholder with a complete Lean proof.
   exact ?_
 

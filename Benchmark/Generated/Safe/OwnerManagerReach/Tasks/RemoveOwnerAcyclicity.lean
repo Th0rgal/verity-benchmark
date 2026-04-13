@@ -8,20 +8,19 @@ open Verity.EVM.Uint256
 /--
 removeOwner preserves acyclicity of the owner linked list.
 
-Proof strategy: Removing a node shortens the chain by one element.
-If SENTINEL was not in any pre-state chain past the head, and removing
-a node only splices out one element (without introducing SENTINEL),
-SENTINEL remains absent from all post-state chains.
+Acyclicity is a tautology — it holds for any state. The proof
+(acyclic_generic) shows that any duplicate-free chain from SENTINEL's
+successor ending at key ≠ SENTINEL cannot contain SENTINEL, purely
+by the structure of the definitions. No pre-state acyclicity hypothesis
+is needed.
 -/
 theorem removeOwner_acyclicity
     (prevOwner owner : Address) (s : ContractState)
     (hNotZero : (owner != zeroAddress) = true)
     (hNotSentinel : (owner != SENTINEL) = true)
     (hPrevLink : (wordToAddress (s.storageMap 0 prevOwner) == owner) = true)
-    (hOwnerInList : next s owner ≠ zeroAddress)
-    (hPreAcyclic : acyclic s) :
-    let s' := ((OwnerManager.removeOwner prevOwner owner).run s).snd
-    acyclic s' := by
+    (hOwnerInList : next s owner ≠ zeroAddress) :
+    acyclic ((OwnerManager.removeOwner prevOwner owner).run s).snd := by
   -- Replace this placeholder with a complete Lean proof.
   exact ?_
 
