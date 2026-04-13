@@ -18,26 +18,34 @@ spec_target: Benchmark.Cases.Safe.OwnerManagerReach.Specs
 proof_target: Benchmark.Cases.Safe.OwnerManagerReach.Proofs
 selected_functions:
   - addOwnerWithThreshold
+  - removeOwner
+  - swapOwner
+  - setupOwners
 source_language: solidity
 verity_version: 4ebe4931d25e5a1594fcd3f43ff040ecc3c4225a
 lean_toolchain: leanprover/lean4:v4.22.0
 abstraction_level: protocol_slice
 abstraction_tags:
   - threshold_elided
-  - removeOwner_elided
-  - swapOwner_elided
-  - setupOwners_elided
   - linked_list_reachability_slice
 abstraction_notes: >
-  The benchmark isolates the linked list insertion logic of addOwnerWithThreshold
-  in the Safe OwnerManager. The threshold update is elided as it does not affect
-  the owners mapping. Only the inListReachable invariant from the Certora
-  OwnerReach.spec is modeled, proving that addOwner preserves reachability
-  from the SENTINEL node for all nodes with non-zero successors.
+  The benchmark models all four ownership-mutating functions of the Safe
+  OwnerManager: addOwnerWithThreshold, removeOwner, swapOwner, and
+  setupOwners. Threshold management is elided as it does not affect the
+  owners mapping. Four families of properties are specified:
+  inListReachable (forward reachability from SENTINEL), ownerListInvariant
+  (combined inListReachable + reachableInList biconditional), acyclicity
+  (no cycles in the linked list), and isOwner functional correctness
+  (each operation changes exactly the intended owners). setupOwners serves
+  as the base case for invariant establishment.
 unsupported_feature_codes: []
 notes: >
-  Linked list reachability invariant preservation for the Safe OwnerManager.
-  Based on the Certora OwnerReach.spec which defines the inListReachable
-  invariant over a ghost mapping tracking the owners linked list.
-  The proof uses explicit witness chains and chain lifting to show that
-  pre-state reachability implies post-state reachability after insertion.
+  Linked list reachability invariant preservation and functional correctness
+  for the Safe OwnerManager. Based on the Certora OwnerReach.spec which
+  defines the inListReachable and reachableInList invariants. All 15 proof
+  tasks are complete (0 sorry) covering acyclicity, inListReachable,
+  ownerListInvariant preservation, and isOwner functional correctness for
+  all four operations. The unprovable stronglyAcyclic axiom was replaced
+  with the provable uniquePredecessor property. Functional correctness
+  proofs verify that each operation changes exactly the intended owners
+  and leaves all others unchanged.

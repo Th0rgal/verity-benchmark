@@ -96,7 +96,15 @@ def resolve_task_manifest(task_ref: str) -> Path:
     raise SystemExit(f"task manifest not found for {task_ref}")
 
 
-def discover_task_refs(suite_filter: str = "active") -> list[str]:
+def task_is_runnable(task: dict[str, Any]) -> bool:
+    return (
+        task["stage"] in RUNNABLE_STAGES
+        and task["translation_status"] == "translated"
+        and task["proof_status"] in PROOF_READY_STATUSES
+    )
+
+
+def discover_task_refs(suite_filter: str = "active", *, runnable_only: bool = False) -> list[str]:
     refs: list[str] = []
     seen_paths: dict[str, Path] = {}
     if suite_filter == "all":
@@ -118,6 +126,10 @@ def discover_task_refs(suite_filter: str = "active") -> list[str]:
                     f"{task_ref} ({previous.relative_to(ROOT)} and {task_manifest.relative_to(ROOT)})"
                 )
             seen_paths[task_ref] = task_manifest
+            if runnable_only:
+                task = load_task_record(task_manifest)
+                if not task_is_runnable(task):
+                    continue
             refs.append(task_ref)
     return refs
 
@@ -337,7 +349,7 @@ def load_case_records_for_suite(suite: str) -> list[dict[str, Any]]:
 def aggregate_results(task_refs: list[str], suite: str) -> dict[str, Any]:
     explicit_task_refs = bool(task_refs)
     if not task_refs:
-        task_refs = discover_task_refs(suite)
+        task_refs = discover_task_refs(suite, runnable_only=True)
 
     results = []
     selected_case_ids: set[str] = set()
@@ -441,6 +453,11 @@ def main() -> int:
 
     list_parser = subparsers.add_parser("list", help="List task refs")
     list_parser.add_argument("--suite", choices=["active", "backlog", "all"], default="active")
+    list_parser.add_argument(
+        "--all-tasks",
+        action="store_true",
+        help="Include non-runnable tasks that are outside the benchmark execution policy",
+    )
 
     run_parser = subparsers.add_parser("run", help="Validate one hidden reference solution")
     run_parser.add_argument("task_ref")
@@ -452,7 +469,7 @@ def main() -> int:
     args = parser.parse_args()
 
     if args.command == "list":
-        for task_ref in discover_task_refs(args.suite):
+        for task_ref in discover_task_refs(args.suite, runnable_only=not args.all_tasks):
             print(task_ref)
         return 0
 

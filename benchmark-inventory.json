@@ -14,10 +14,10 @@
     "implementation_count": 11,
     "active_case_count": 7,
     "backlog_case_count": 4,
-    "active_task_count": 31,
+    "active_task_count": 45,
     "backlog_task_count": 8,
     "buildable_case_count": 9,
-    "runnable_task_count": 39,
+    "runnable_task_count": 53,
     "case_stage_counts": {
       "build_green": 7,
       "candidate": 2,
@@ -33,7 +33,7 @@
       "partial": 6
     },
     "task_track_counts": {
-      "proof-only": 39
+      "proof-only": 53
     },
     "task_property_class_counts": {
       "accounting_bound": 8,
@@ -43,7 +43,9 @@
       "authorization_state": 1,
       "balance_credit_update": 2,
       "exploit_trace": 1,
-      "linked_list_invariant": 1,
+      "isOwner_effect": 3,
+      "linked_list_acyclicity": 4,
+      "linked_list_invariant": 8,
       "mapping_consistency": 1,
       "monotonic_counter": 2,
       "output_range": 2,
@@ -59,10 +61,10 @@
     },
     "task_proof_family_counts": {
       "authorization_enablement": 2,
-      "functional_correctness": 11,
-      "protocol_transition_correctness": 6,
+      "functional_correctness": 14,
+      "protocol_transition_correctness": 9,
       "refinement_equivalence": 6,
-      "state_preservation_local_effects": 14
+      "state_preservation_local_effects": 22
     },
     "family_split_counts": {
       "active": 7,
@@ -384,7 +386,7 @@
       "case_ids": [
         "safe/owner_manager_reach"
       ],
-      "notes": "Implementation entry for the Safe smart account OwnerManager module, benchmarking the linked list invariant preservation under addOwnerWithThreshold.",
+      "notes": "Implementation entry for the Safe smart account OwnerManager module, benchmarking linked list invariant preservation under addOwnerWithThreshold, removeOwner, swapOwner, and setupOwners.",
       "manifest_path": "families/safe/implementations/smart_account/implementation.yaml"
     },
     {
@@ -707,23 +709,23 @@
       "original_contract_path": "contracts/base/OwnerManager.sol",
       "source_ref": "https://github.com/safe-global/safe-smart-account@a2e19c6aa42a45ceec68057f3fa387f169c5b321:contracts/base/OwnerManager.sol",
       "selected_functions": [
-        "addOwnerWithThreshold"
+        "addOwnerWithThreshold",
+        "removeOwner",
+        "swapOwner",
+        "setupOwners"
       ],
       "lean_target": "Benchmark.Cases.Safe.OwnerManagerReach.Compile",
       "failure_reason": null,
-      "notes": "Linked list reachability invariant preservation for the Safe OwnerManager. Based on the Certora OwnerReach.spec which defines the inListReachable invariant over a ghost mapping tracking the owners linked list. The proof uses explicit witness chains and chain lifting to show that pre-state reachability implies post-state reachability after insertion.",
+      "notes": "Linked list reachability invariant preservation and functional correctness for the Safe OwnerManager. Based on the Certora OwnerReach.spec which defines the inListReachable and reachableInList invariants. All 15 proof tasks are complete (0 sorry) covering acyclicity, inListReachable, ownerListInvariant preservation, and isOwner functional correctness for all four operations. The unprovable stronglyAcyclic axiom was replaced with the provable uniquePredecessor property. Functional correctness proofs verify that each operation changes exactly the intended owners and leaves all others unchanged.",
       "buildable": true,
       "verity_commit": "4ebe4931d25e5a1594fcd3f43ff040ecc3c4225a",
       "lean_toolchain": "leanprover/lean4:v4.22.0",
       "abstraction_level": "protocol_slice",
       "abstraction_tags": [
         "threshold_elided",
-        "removeOwner_elided",
-        "swapOwner_elided",
-        "setupOwners_elided",
         "linked_list_reachability_slice"
       ],
-      "abstraction_notes": "The benchmark isolates the linked list insertion logic of addOwnerWithThreshold in the Safe OwnerManager. The threshold update is elided as it does not affect the owners mapping. Only the inListReachable invariant from the Certora OwnerReach.spec is modeled, proving that addOwner preserves reachability from the SENTINEL node for all nodes with non-zero successors.",
+      "abstraction_notes": "The benchmark models all four ownership-mutating functions of the Safe OwnerManager: addOwnerWithThreshold, removeOwner, swapOwner, and setupOwners. Threshold management is elided as it does not affect the owners mapping. Four families of properties are specified: inListReachable (forward reachability from SENTINEL), ownerListInvariant (combined inListReachable + reachableInList biconditional), acyclicity (no cycles in the linked list), and isOwner functional correctness (each operation changes exactly the intended owners). setupOwners serves as the base case for invariant establishment.",
       "unsupported_feature_codes": [],
       "spec_target": "Benchmark.Cases.Safe.OwnerManagerReach.Specs",
       "proof_target": "Benchmark.Cases.Safe.OwnerManagerReach.Proofs"
@@ -2242,6 +2244,141 @@
       }
     },
     {
+      "task_ref": "safe/owner_manager_reach/add_owner_acyclicity",
+      "task_id": "add_owner_acyclicity",
+      "case_id": "safe/owner_manager_reach",
+      "suite": "active",
+      "schema_version": 1,
+      "manifest_path": "cases/safe/owner_manager_reach/tasks/add_owner_acyclicity.yaml",
+      "split": "active",
+      "family_id": "safe",
+      "implementation_id": "smart_account",
+      "source_ref": "https://github.com/safe-global/safe-smart-account@a2e19c6aa42a45ceec68057f3fa387f169c5b321:contracts/base/OwnerManager.sol",
+      "task_interface_version": 2,
+      "track": "proof-only",
+      "property_class": "linked_list_acyclicity",
+      "category": "invariant",
+      "difficulty": "hard",
+      "theorem_name": "Benchmark.Cases.Safe.OwnerManagerReach.addOwner_acyclicity",
+      "proof_family": "state_preservation_local_effects",
+      "translation_status": "translated",
+      "proof_status": "complete",
+      "implementation_files": [
+        "cases/safe/owner_manager_reach/verity/Contract.lean",
+        "Benchmark/Cases/Safe/OwnerManagerReach/Contract.lean"
+      ],
+      "specification_files": [
+        "cases/safe/owner_manager_reach/verity/Specs.lean",
+        "Benchmark/Cases/Safe/OwnerManagerReach/Specs.lean"
+      ],
+      "editable_files": [
+        "Benchmark/Generated/Safe/OwnerManagerReach/Tasks/AddOwnerAcyclicity.lean"
+      ],
+      "abstraction_level": "protocol_slice",
+      "abstraction_notes": "Proving acyclicity preservation under addOwner would eliminate the hAcyclic axiom from the existing inListReachable proof, making the overall verification stronger.",
+      "unsupported_feature_codes": [],
+      "reference_solution_module": "Benchmark.Cases.Safe.OwnerManagerReach.Proofs",
+      "evaluation": {
+        "engine": "lean_proof_generation",
+        "target_kind": "proof_generation"
+      },
+      "readiness": {
+        "prompt_context": "ready",
+        "editable_proof": "ready",
+        "reference_solution": "ready"
+      }
+    },
+    {
+      "task_ref": "safe/owner_manager_reach/add_owner_is_owner_correctness",
+      "task_id": "add_owner_is_owner_correctness",
+      "case_id": "safe/owner_manager_reach",
+      "suite": "active",
+      "schema_version": 1,
+      "manifest_path": "cases/safe/owner_manager_reach/tasks/add_owner_is_owner_correctness.yaml",
+      "split": "active",
+      "family_id": "safe",
+      "implementation_id": "smart_account",
+      "source_ref": "https://github.com/safe-global/safe-smart-account@a2e19c6aa42a45ceec68057f3fa387f169c5b321:contracts/base/OwnerManager.sol",
+      "task_interface_version": 2,
+      "track": "proof-only",
+      "property_class": "isOwner_effect",
+      "category": "correctness",
+      "difficulty": "medium",
+      "theorem_name": "Benchmark.Cases.Safe.OwnerManagerReach.addOwner_isOwnerCorrectness",
+      "proof_family": "functional_correctness",
+      "translation_status": "translated",
+      "proof_status": "complete",
+      "implementation_files": [
+        "cases/safe/owner_manager_reach/verity/Contract.lean",
+        "Benchmark/Cases/Safe/OwnerManagerReach/Contract.lean"
+      ],
+      "specification_files": [
+        "cases/safe/owner_manager_reach/verity/Specs.lean",
+        "Benchmark/Cases/Safe/OwnerManagerReach/Specs.lean"
+      ],
+      "editable_files": [
+        "Benchmark/Generated/Safe/OwnerManagerReach/Tasks/AddOwnerIsOwnerCorrectness.lean"
+      ],
+      "abstraction_level": "protocol_slice",
+      "abstraction_notes": "Functional correctness of addOwner: the new address becomes an owner (isOwner s' owner) and all other addresses' ownership is unchanged. This corresponds to Certora's addOwnerEffect rule.",
+      "unsupported_feature_codes": [],
+      "reference_solution_module": "Benchmark.Cases.Safe.OwnerManagerReach.Proofs",
+      "evaluation": {
+        "engine": "lean_proof_generation",
+        "target_kind": "proof_generation"
+      },
+      "readiness": {
+        "prompt_context": "ready",
+        "editable_proof": "ready",
+        "reference_solution": "ready"
+      }
+    },
+    {
+      "task_ref": "safe/owner_manager_reach/add_owner_owner_list_invariant",
+      "task_id": "add_owner_owner_list_invariant",
+      "case_id": "safe/owner_manager_reach",
+      "suite": "active",
+      "schema_version": 1,
+      "manifest_path": "cases/safe/owner_manager_reach/tasks/add_owner_owner_list_invariant.yaml",
+      "split": "active",
+      "family_id": "safe",
+      "implementation_id": "smart_account",
+      "source_ref": "https://github.com/safe-global/safe-smart-account@a2e19c6aa42a45ceec68057f3fa387f169c5b321:contracts/base/OwnerManager.sol",
+      "task_interface_version": 2,
+      "track": "proof-only",
+      "property_class": "linked_list_invariant",
+      "category": "invariant",
+      "difficulty": "hard",
+      "theorem_name": "Benchmark.Cases.Safe.OwnerManagerReach.addOwner_ownerListInvariant",
+      "proof_family": "state_preservation_local_effects",
+      "translation_status": "translated",
+      "proof_status": "complete",
+      "implementation_files": [
+        "cases/safe/owner_manager_reach/verity/Contract.lean",
+        "Benchmark/Cases/Safe/OwnerManagerReach/Contract.lean"
+      ],
+      "specification_files": [
+        "cases/safe/owner_manager_reach/verity/Specs.lean",
+        "Benchmark/Cases/Safe/OwnerManagerReach/Specs.lean"
+      ],
+      "editable_files": [
+        "Benchmark/Generated/Safe/OwnerManagerReach/Tasks/AddOwnerOwnerListInvariant.lean"
+      ],
+      "abstraction_level": "protocol_slice",
+      "abstraction_notes": "Combined ownerListInvariant preservation under addOwner. The ownerListInvariant merges inListReachable and reachableInList into a biconditional: membership is equivalent to reachability from SENTINEL.",
+      "unsupported_feature_codes": [],
+      "reference_solution_module": "Benchmark.Cases.Safe.OwnerManagerReach.Proofs",
+      "evaluation": {
+        "engine": "lean_proof_generation",
+        "target_kind": "proof_generation"
+      },
+      "readiness": {
+        "prompt_context": "ready",
+        "editable_proof": "ready",
+        "reference_solution": "ready"
+      }
+    },
+    {
       "task_ref": "safe/owner_manager_reach/in_list_reachable",
       "task_id": "in_list_reachable",
       "case_id": "safe/owner_manager_reach",
@@ -2274,6 +2411,501 @@
       ],
       "abstraction_level": "protocol_slice",
       "abstraction_notes": "Certora inListReachable invariant preservation under addOwnerWithThreshold. The proof requires witness-chain construction: showing that every node reachable in the pre-state remains reachable in the post-state after inserting a new owner at the head of the linked list. Requires acyclicity and freshness hypotheses to lift pre-state chains.",
+      "unsupported_feature_codes": [],
+      "reference_solution_module": "Benchmark.Cases.Safe.OwnerManagerReach.Proofs",
+      "evaluation": {
+        "engine": "lean_proof_generation",
+        "target_kind": "proof_generation"
+      },
+      "readiness": {
+        "prompt_context": "ready",
+        "editable_proof": "ready",
+        "reference_solution": "ready"
+      }
+    },
+    {
+      "task_ref": "safe/owner_manager_reach/remove_owner_acyclicity",
+      "task_id": "remove_owner_acyclicity",
+      "case_id": "safe/owner_manager_reach",
+      "suite": "active",
+      "schema_version": 1,
+      "manifest_path": "cases/safe/owner_manager_reach/tasks/remove_owner_acyclicity.yaml",
+      "split": "active",
+      "family_id": "safe",
+      "implementation_id": "smart_account",
+      "source_ref": "https://github.com/safe-global/safe-smart-account@a2e19c6aa42a45ceec68057f3fa387f169c5b321:contracts/base/OwnerManager.sol",
+      "task_interface_version": 2,
+      "track": "proof-only",
+      "property_class": "linked_list_acyclicity",
+      "category": "invariant",
+      "difficulty": "hard",
+      "theorem_name": "Benchmark.Cases.Safe.OwnerManagerReach.removeOwner_acyclicity",
+      "proof_family": "state_preservation_local_effects",
+      "translation_status": "translated",
+      "proof_status": "complete",
+      "implementation_files": [
+        "cases/safe/owner_manager_reach/verity/Contract.lean",
+        "Benchmark/Cases/Safe/OwnerManagerReach/Contract.lean"
+      ],
+      "specification_files": [
+        "cases/safe/owner_manager_reach/verity/Specs.lean",
+        "Benchmark/Cases/Safe/OwnerManagerReach/Specs.lean"
+      ],
+      "editable_files": [
+        "Benchmark/Generated/Safe/OwnerManagerReach/Tasks/RemoveOwnerAcyclicity.lean"
+      ],
+      "abstraction_level": "protocol_slice",
+      "abstraction_notes": "Acyclicity preservation under removeOwner. Removing a node shortens the chain by one element without introducing SENTINEL into any chain.",
+      "unsupported_feature_codes": [],
+      "reference_solution_module": "Benchmark.Cases.Safe.OwnerManagerReach.Proofs",
+      "evaluation": {
+        "engine": "lean_proof_generation",
+        "target_kind": "proof_generation"
+      },
+      "readiness": {
+        "prompt_context": "ready",
+        "editable_proof": "ready",
+        "reference_solution": "ready"
+      }
+    },
+    {
+      "task_ref": "safe/owner_manager_reach/remove_owner_in_list_reachable",
+      "task_id": "remove_owner_in_list_reachable",
+      "case_id": "safe/owner_manager_reach",
+      "suite": "active",
+      "schema_version": 1,
+      "manifest_path": "cases/safe/owner_manager_reach/tasks/remove_owner_in_list_reachable.yaml",
+      "split": "active",
+      "family_id": "safe",
+      "implementation_id": "smart_account",
+      "source_ref": "https://github.com/safe-global/safe-smart-account@a2e19c6aa42a45ceec68057f3fa387f169c5b321:contracts/base/OwnerManager.sol",
+      "task_interface_version": 2,
+      "track": "proof-only",
+      "property_class": "linked_list_invariant",
+      "category": "invariant",
+      "difficulty": "hard",
+      "theorem_name": "Benchmark.Cases.Safe.OwnerManagerReach.removeOwner_inListReachable",
+      "proof_family": "state_preservation_local_effects",
+      "translation_status": "translated",
+      "proof_status": "complete",
+      "implementation_files": [
+        "cases/safe/owner_manager_reach/verity/Contract.lean",
+        "Benchmark/Cases/Safe/OwnerManagerReach/Contract.lean"
+      ],
+      "specification_files": [
+        "cases/safe/owner_manager_reach/verity/Specs.lean",
+        "Benchmark/Cases/Safe/OwnerManagerReach/Specs.lean"
+      ],
+      "editable_files": [
+        "Benchmark/Generated/Safe/OwnerManagerReach/Tasks/RemoveOwnerInListReachable.lean"
+      ],
+      "abstraction_level": "protocol_slice",
+      "abstraction_notes": "Certora inListReachable invariant preservation under removeOwner. The proof requires showing that unlinking a node from the list preserves reachability for all remaining nodes. Chains through the removed node must be adapted by splicing it out.",
+      "unsupported_feature_codes": [],
+      "reference_solution_module": "Benchmark.Cases.Safe.OwnerManagerReach.Proofs",
+      "evaluation": {
+        "engine": "lean_proof_generation",
+        "target_kind": "proof_generation"
+      },
+      "readiness": {
+        "prompt_context": "ready",
+        "editable_proof": "ready",
+        "reference_solution": "ready"
+      }
+    },
+    {
+      "task_ref": "safe/owner_manager_reach/remove_owner_is_owner_correctness",
+      "task_id": "remove_owner_is_owner_correctness",
+      "case_id": "safe/owner_manager_reach",
+      "suite": "active",
+      "schema_version": 1,
+      "manifest_path": "cases/safe/owner_manager_reach/tasks/remove_owner_is_owner_correctness.yaml",
+      "split": "active",
+      "family_id": "safe",
+      "implementation_id": "smart_account",
+      "source_ref": "https://github.com/safe-global/safe-smart-account@a2e19c6aa42a45ceec68057f3fa387f169c5b321:contracts/base/OwnerManager.sol",
+      "task_interface_version": 2,
+      "track": "proof-only",
+      "property_class": "isOwner_effect",
+      "category": "correctness",
+      "difficulty": "medium",
+      "theorem_name": "Benchmark.Cases.Safe.OwnerManagerReach.removeOwner_isOwnerCorrectness",
+      "proof_family": "functional_correctness",
+      "translation_status": "translated",
+      "proof_status": "complete",
+      "implementation_files": [
+        "cases/safe/owner_manager_reach/verity/Contract.lean",
+        "Benchmark/Cases/Safe/OwnerManagerReach/Contract.lean"
+      ],
+      "specification_files": [
+        "cases/safe/owner_manager_reach/verity/Specs.lean",
+        "Benchmark/Cases/Safe/OwnerManagerReach/Specs.lean"
+      ],
+      "editable_files": [
+        "Benchmark/Generated/Safe/OwnerManagerReach/Tasks/RemoveOwnerIsOwnerCorrectness.lean"
+      ],
+      "abstraction_level": "protocol_slice",
+      "abstraction_notes": "Functional correctness of removeOwner: the removed address is no longer an owner (\u00acisOwner s' owner) and all other addresses' ownership is unchanged. This corresponds to Certora's removeOwnerEffect rule.",
+      "unsupported_feature_codes": [],
+      "reference_solution_module": "Benchmark.Cases.Safe.OwnerManagerReach.Proofs",
+      "evaluation": {
+        "engine": "lean_proof_generation",
+        "target_kind": "proof_generation"
+      },
+      "readiness": {
+        "prompt_context": "ready",
+        "editable_proof": "ready",
+        "reference_solution": "ready"
+      }
+    },
+    {
+      "task_ref": "safe/owner_manager_reach/remove_owner_owner_list_invariant",
+      "task_id": "remove_owner_owner_list_invariant",
+      "case_id": "safe/owner_manager_reach",
+      "suite": "active",
+      "schema_version": 1,
+      "manifest_path": "cases/safe/owner_manager_reach/tasks/remove_owner_owner_list_invariant.yaml",
+      "split": "active",
+      "family_id": "safe",
+      "implementation_id": "smart_account",
+      "source_ref": "https://github.com/safe-global/safe-smart-account@a2e19c6aa42a45ceec68057f3fa387f169c5b321:contracts/base/OwnerManager.sol",
+      "task_interface_version": 2,
+      "track": "proof-only",
+      "property_class": "linked_list_invariant",
+      "category": "invariant",
+      "difficulty": "hard",
+      "theorem_name": "Benchmark.Cases.Safe.OwnerManagerReach.removeOwner_ownerListInvariant",
+      "proof_family": "state_preservation_local_effects",
+      "translation_status": "translated",
+      "proof_status": "complete",
+      "implementation_files": [
+        "cases/safe/owner_manager_reach/verity/Contract.lean",
+        "Benchmark/Cases/Safe/OwnerManagerReach/Contract.lean"
+      ],
+      "specification_files": [
+        "cases/safe/owner_manager_reach/verity/Specs.lean",
+        "Benchmark/Cases/Safe/OwnerManagerReach/Specs.lean"
+      ],
+      "editable_files": [
+        "Benchmark/Generated/Safe/OwnerManagerReach/Tasks/RemoveOwnerOwnerListInvariant.lean"
+      ],
+      "abstraction_level": "protocol_slice",
+      "abstraction_notes": "Combined ownerListInvariant preservation under removeOwner. Requires showing that unlinking one node preserves the biconditional between membership and reachability from SENTINEL.",
+      "unsupported_feature_codes": [],
+      "reference_solution_module": "Benchmark.Cases.Safe.OwnerManagerReach.Proofs",
+      "evaluation": {
+        "engine": "lean_proof_generation",
+        "target_kind": "proof_generation"
+      },
+      "readiness": {
+        "prompt_context": "ready",
+        "editable_proof": "ready",
+        "reference_solution": "ready"
+      }
+    },
+    {
+      "task_ref": "safe/owner_manager_reach/setup_owners_acyclicity",
+      "task_id": "setup_owners_acyclicity",
+      "case_id": "safe/owner_manager_reach",
+      "suite": "active",
+      "schema_version": 1,
+      "manifest_path": "cases/safe/owner_manager_reach/tasks/setup_owners_acyclicity.yaml",
+      "split": "active",
+      "family_id": "safe",
+      "implementation_id": "smart_account",
+      "source_ref": "https://github.com/safe-global/safe-smart-account@a2e19c6aa42a45ceec68057f3fa387f169c5b321:contracts/base/OwnerManager.sol",
+      "task_interface_version": 2,
+      "track": "proof-only",
+      "property_class": "linked_list_acyclicity",
+      "category": "invariant",
+      "difficulty": "medium",
+      "theorem_name": "Benchmark.Cases.Safe.OwnerManagerReach.setupOwners_acyclicity",
+      "proof_family": "protocol_transition_correctness",
+      "translation_status": "translated",
+      "proof_status": "complete",
+      "implementation_files": [
+        "cases/safe/owner_manager_reach/verity/Contract.lean",
+        "Benchmark/Cases/Safe/OwnerManagerReach/Contract.lean"
+      ],
+      "specification_files": [
+        "cases/safe/owner_manager_reach/verity/Specs.lean",
+        "Benchmark/Cases/Safe/OwnerManagerReach/Specs.lean"
+      ],
+      "editable_files": [
+        "Benchmark/Generated/Safe/OwnerManagerReach/Tasks/SetupOwnersAcyclicity.lean"
+      ],
+      "abstraction_level": "protocol_slice",
+      "abstraction_notes": "Base case: setupOwners establishes acyclicity of the owner linked list. The constructed list has no internal cycles by construction.",
+      "unsupported_feature_codes": [],
+      "reference_solution_module": "Benchmark.Cases.Safe.OwnerManagerReach.Proofs",
+      "evaluation": {
+        "engine": "lean_proof_generation",
+        "target_kind": "proof_generation"
+      },
+      "readiness": {
+        "prompt_context": "ready",
+        "editable_proof": "ready",
+        "reference_solution": "ready"
+      }
+    },
+    {
+      "task_ref": "safe/owner_manager_reach/setup_owners_in_list_reachable",
+      "task_id": "setup_owners_in_list_reachable",
+      "case_id": "safe/owner_manager_reach",
+      "suite": "active",
+      "schema_version": 1,
+      "manifest_path": "cases/safe/owner_manager_reach/tasks/setup_owners_in_list_reachable.yaml",
+      "split": "active",
+      "family_id": "safe",
+      "implementation_id": "smart_account",
+      "source_ref": "https://github.com/safe-global/safe-smart-account@a2e19c6aa42a45ceec68057f3fa387f169c5b321:contracts/base/OwnerManager.sol",
+      "task_interface_version": 2,
+      "track": "proof-only",
+      "property_class": "linked_list_invariant",
+      "category": "invariant",
+      "difficulty": "medium",
+      "theorem_name": "Benchmark.Cases.Safe.OwnerManagerReach.setupOwners_inListReachable",
+      "proof_family": "protocol_transition_correctness",
+      "translation_status": "translated",
+      "proof_status": "complete",
+      "implementation_files": [
+        "cases/safe/owner_manager_reach/verity/Contract.lean",
+        "Benchmark/Cases/Safe/OwnerManagerReach/Contract.lean"
+      ],
+      "specification_files": [
+        "cases/safe/owner_manager_reach/verity/Specs.lean",
+        "Benchmark/Cases/Safe/OwnerManagerReach/Specs.lean"
+      ],
+      "editable_files": [
+        "Benchmark/Generated/Safe/OwnerManagerReach/Tasks/SetupOwnersInListReachable.lean"
+      ],
+      "abstraction_level": "protocol_slice",
+      "abstraction_notes": "Base case: setupOwners establishes the inListReachable invariant. No pre-state invariant required. The proof constructs explicit witness chains for the known list structure SENTINEL \u2192 o1 \u2192 o2 \u2192 o3 \u2192 SENTINEL.",
+      "unsupported_feature_codes": [],
+      "reference_solution_module": "Benchmark.Cases.Safe.OwnerManagerReach.Proofs",
+      "evaluation": {
+        "engine": "lean_proof_generation",
+        "target_kind": "proof_generation"
+      },
+      "readiness": {
+        "prompt_context": "ready",
+        "editable_proof": "ready",
+        "reference_solution": "ready"
+      }
+    },
+    {
+      "task_ref": "safe/owner_manager_reach/setup_owners_owner_list_invariant",
+      "task_id": "setup_owners_owner_list_invariant",
+      "case_id": "safe/owner_manager_reach",
+      "suite": "active",
+      "schema_version": 1,
+      "manifest_path": "cases/safe/owner_manager_reach/tasks/setup_owners_owner_list_invariant.yaml",
+      "split": "active",
+      "family_id": "safe",
+      "implementation_id": "smart_account",
+      "source_ref": "https://github.com/safe-global/safe-smart-account@a2e19c6aa42a45ceec68057f3fa387f169c5b321:contracts/base/OwnerManager.sol",
+      "task_interface_version": 2,
+      "track": "proof-only",
+      "property_class": "linked_list_invariant",
+      "category": "invariant",
+      "difficulty": "hard",
+      "theorem_name": "Benchmark.Cases.Safe.OwnerManagerReach.setupOwners_ownerListInvariant",
+      "proof_family": "protocol_transition_correctness",
+      "translation_status": "translated",
+      "proof_status": "complete",
+      "implementation_files": [
+        "cases/safe/owner_manager_reach/verity/Contract.lean",
+        "Benchmark/Cases/Safe/OwnerManagerReach/Contract.lean"
+      ],
+      "specification_files": [
+        "cases/safe/owner_manager_reach/verity/Specs.lean",
+        "Benchmark/Cases/Safe/OwnerManagerReach/Specs.lean"
+      ],
+      "editable_files": [
+        "Benchmark/Generated/Safe/OwnerManagerReach/Tasks/SetupOwnersOwnerListInvariant.lean"
+      ],
+      "abstraction_level": "protocol_slice",
+      "abstraction_notes": "setupOwners establishes the combined ownerListInvariant (base case). After initialization, the linked list SENTINEL -> o1 -> o2 -> o3 -> SENTINEL satisfies both directions of the biconditional.",
+      "unsupported_feature_codes": [],
+      "reference_solution_module": "Benchmark.Cases.Safe.OwnerManagerReach.Proofs",
+      "evaluation": {
+        "engine": "lean_proof_generation",
+        "target_kind": "proof_generation"
+      },
+      "readiness": {
+        "prompt_context": "ready",
+        "editable_proof": "ready",
+        "reference_solution": "ready"
+      }
+    },
+    {
+      "task_ref": "safe/owner_manager_reach/swap_owner_acyclicity",
+      "task_id": "swap_owner_acyclicity",
+      "case_id": "safe/owner_manager_reach",
+      "suite": "active",
+      "schema_version": 1,
+      "manifest_path": "cases/safe/owner_manager_reach/tasks/swap_owner_acyclicity.yaml",
+      "split": "active",
+      "family_id": "safe",
+      "implementation_id": "smart_account",
+      "source_ref": "https://github.com/safe-global/safe-smart-account@a2e19c6aa42a45ceec68057f3fa387f169c5b321:contracts/base/OwnerManager.sol",
+      "task_interface_version": 2,
+      "track": "proof-only",
+      "property_class": "linked_list_acyclicity",
+      "category": "invariant",
+      "difficulty": "hard",
+      "theorem_name": "Benchmark.Cases.Safe.OwnerManagerReach.swapOwner_acyclicity",
+      "proof_family": "state_preservation_local_effects",
+      "translation_status": "translated",
+      "proof_status": "complete",
+      "implementation_files": [
+        "cases/safe/owner_manager_reach/verity/Contract.lean",
+        "Benchmark/Cases/Safe/OwnerManagerReach/Contract.lean"
+      ],
+      "specification_files": [
+        "cases/safe/owner_manager_reach/verity/Specs.lean",
+        "Benchmark/Cases/Safe/OwnerManagerReach/Specs.lean"
+      ],
+      "editable_files": [
+        "Benchmark/Generated/Safe/OwnerManagerReach/Tasks/SwapOwnerAcyclicity.lean"
+      ],
+      "abstraction_level": "protocol_slice",
+      "abstraction_notes": "Acyclicity preservation under swapOwner. The acyclic property is proven state-independently via acyclic_generic, so swapOwner cannot break it.",
+      "unsupported_feature_codes": [],
+      "reference_solution_module": "Benchmark.Cases.Safe.OwnerManagerReach.Proofs",
+      "evaluation": {
+        "engine": "lean_proof_generation",
+        "target_kind": "proof_generation"
+      },
+      "readiness": {
+        "prompt_context": "ready",
+        "editable_proof": "ready",
+        "reference_solution": "ready"
+      }
+    },
+    {
+      "task_ref": "safe/owner_manager_reach/swap_owner_in_list_reachable",
+      "task_id": "swap_owner_in_list_reachable",
+      "case_id": "safe/owner_manager_reach",
+      "suite": "active",
+      "schema_version": 1,
+      "manifest_path": "cases/safe/owner_manager_reach/tasks/swap_owner_in_list_reachable.yaml",
+      "split": "active",
+      "family_id": "safe",
+      "implementation_id": "smart_account",
+      "source_ref": "https://github.com/safe-global/safe-smart-account@a2e19c6aa42a45ceec68057f3fa387f169c5b321:contracts/base/OwnerManager.sol",
+      "task_interface_version": 2,
+      "track": "proof-only",
+      "property_class": "linked_list_invariant",
+      "category": "invariant",
+      "difficulty": "hard",
+      "theorem_name": "Benchmark.Cases.Safe.OwnerManagerReach.swapOwner_inListReachable",
+      "proof_family": "state_preservation_local_effects",
+      "translation_status": "translated",
+      "proof_status": "complete",
+      "implementation_files": [
+        "cases/safe/owner_manager_reach/verity/Contract.lean",
+        "Benchmark/Cases/Safe/OwnerManagerReach/Contract.lean"
+      ],
+      "specification_files": [
+        "cases/safe/owner_manager_reach/verity/Specs.lean",
+        "Benchmark/Cases/Safe/OwnerManagerReach/Specs.lean"
+      ],
+      "editable_files": [
+        "Benchmark/Generated/Safe/OwnerManagerReach/Tasks/SwapOwnerInListReachable.lean"
+      ],
+      "abstraction_level": "protocol_slice",
+      "abstraction_notes": "Certora inListReachable invariant preservation under swapOwner. The proof requires showing that atomically replacing one node with another preserves reachability. The new node inherits the old node's successor, so chains are re-spliced in place.",
+      "unsupported_feature_codes": [],
+      "reference_solution_module": "Benchmark.Cases.Safe.OwnerManagerReach.Proofs",
+      "evaluation": {
+        "engine": "lean_proof_generation",
+        "target_kind": "proof_generation"
+      },
+      "readiness": {
+        "prompt_context": "ready",
+        "editable_proof": "ready",
+        "reference_solution": "ready"
+      }
+    },
+    {
+      "task_ref": "safe/owner_manager_reach/swap_owner_is_owner_correctness",
+      "task_id": "swap_owner_is_owner_correctness",
+      "case_id": "safe/owner_manager_reach",
+      "suite": "active",
+      "schema_version": 1,
+      "manifest_path": "cases/safe/owner_manager_reach/tasks/swap_owner_is_owner_correctness.yaml",
+      "split": "active",
+      "family_id": "safe",
+      "implementation_id": "smart_account",
+      "source_ref": "https://github.com/safe-global/safe-smart-account@a2e19c6aa42a45ceec68057f3fa387f169c5b321:contracts/base/OwnerManager.sol",
+      "task_interface_version": 2,
+      "track": "proof-only",
+      "property_class": "isOwner_effect",
+      "category": "correctness",
+      "difficulty": "medium",
+      "theorem_name": "Benchmark.Cases.Safe.OwnerManagerReach.swapOwner_isOwnerCorrectness",
+      "proof_family": "functional_correctness",
+      "translation_status": "translated",
+      "proof_status": "complete",
+      "implementation_files": [
+        "cases/safe/owner_manager_reach/verity/Contract.lean",
+        "Benchmark/Cases/Safe/OwnerManagerReach/Contract.lean"
+      ],
+      "specification_files": [
+        "cases/safe/owner_manager_reach/verity/Specs.lean",
+        "Benchmark/Cases/Safe/OwnerManagerReach/Specs.lean"
+      ],
+      "editable_files": [
+        "Benchmark/Generated/Safe/OwnerManagerReach/Tasks/SwapOwnerIsOwnerCorrectness.lean"
+      ],
+      "abstraction_level": "protocol_slice",
+      "abstraction_notes": "Functional correctness of swapOwner: the old owner is removed (\u00acisOwner s' oldOwner), the new owner is added (isOwner s' newOwner), and all other addresses' ownership is unchanged. This corresponds to Certora's swapOwnerEffect rule.",
+      "unsupported_feature_codes": [],
+      "reference_solution_module": "Benchmark.Cases.Safe.OwnerManagerReach.Proofs",
+      "evaluation": {
+        "engine": "lean_proof_generation",
+        "target_kind": "proof_generation"
+      },
+      "readiness": {
+        "prompt_context": "ready",
+        "editable_proof": "ready",
+        "reference_solution": "ready"
+      }
+    },
+    {
+      "task_ref": "safe/owner_manager_reach/swap_owner_owner_list_invariant",
+      "task_id": "swap_owner_owner_list_invariant",
+      "case_id": "safe/owner_manager_reach",
+      "suite": "active",
+      "schema_version": 1,
+      "manifest_path": "cases/safe/owner_manager_reach/tasks/swap_owner_owner_list_invariant.yaml",
+      "split": "active",
+      "family_id": "safe",
+      "implementation_id": "smart_account",
+      "source_ref": "https://github.com/safe-global/safe-smart-account@a2e19c6aa42a45ceec68057f3fa387f169c5b321:contracts/base/OwnerManager.sol",
+      "task_interface_version": 2,
+      "track": "proof-only",
+      "property_class": "linked_list_invariant",
+      "category": "invariant",
+      "difficulty": "hard",
+      "theorem_name": "Benchmark.Cases.Safe.OwnerManagerReach.swapOwner_ownerListInvariant",
+      "proof_family": "state_preservation_local_effects",
+      "translation_status": "translated",
+      "proof_status": "complete",
+      "implementation_files": [
+        "cases/safe/owner_manager_reach/verity/Contract.lean",
+        "Benchmark/Cases/Safe/OwnerManagerReach/Contract.lean"
+      ],
+      "specification_files": [
+        "cases/safe/owner_manager_reach/verity/Specs.lean",
+        "Benchmark/Cases/Safe/OwnerManagerReach/Specs.lean"
+      ],
+      "editable_files": [
+        "Benchmark/Generated/Safe/OwnerManagerReach/Tasks/SwapOwnerOwnerListInvariant.lean"
+      ],
+      "abstraction_level": "protocol_slice",
+      "abstraction_notes": "Combined ownerListInvariant preservation under swapOwner. Requires showing that atomically replacing one owner with another preserves the biconditional between membership and reachability from SENTINEL.",
       "unsupported_feature_codes": [],
       "reference_solution_module": "Benchmark.Cases.Safe.OwnerManagerReach.Proofs",
       "evaluation": {
@@ -2649,5 +3281,5 @@
       }
     }
   ],
-  "generated_at": "2026-04-10T12:32:32.361708+00:00"
+  "generated_at": "2026-04-12T07:37:47.094355+00:00"
 }

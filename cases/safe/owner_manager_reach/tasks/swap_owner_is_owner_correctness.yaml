@@ -1,0 +1,35 @@
+manifest_kind: task
+schema_version: 1
+task_id: swap_owner_is_owner_correctness
+case_id: safe/owner_manager_reach
+split: active
+family_id: safe
+implementation_id: smart_account
+source_ref: https://github.com/safe-global/safe-smart-account@a2e19c6aa42a45ceec68057f3fa387f169c5b321:contracts/base/OwnerManager.sol
+task_interface_version: 2
+theorem_name: Benchmark.Cases.Safe.OwnerManagerReach.swapOwner_isOwnerCorrectness
+proof_family: functional_correctness
+property_class: isOwner_effect
+difficulty: medium
+category: correctness
+track: proof-only
+translation_status: translated
+proof_status: complete
+evaluation_engine: lean_proof_generation
+implementation_files:
+  - cases/safe/owner_manager_reach/verity/Contract.lean
+  - Benchmark/Cases/Safe/OwnerManagerReach/Contract.lean
+specification_files:
+  - cases/safe/owner_manager_reach/verity/Specs.lean
+  - Benchmark/Cases/Safe/OwnerManagerReach/Specs.lean
+editable_files:
+  - Benchmark/Generated/Safe/OwnerManagerReach/Tasks/SwapOwnerIsOwnerCorrectness.lean
+reference_solution_module: Benchmark.Cases.Safe.OwnerManagerReach.Proofs
+reference_solution_declaration: Benchmark.Cases.Safe.OwnerManagerReach.swapOwner_isOwnerCorrectness
+abstraction_level: protocol_slice
+abstraction_notes: >
+  Functional correctness of swapOwner: the old owner is removed
+  (¬isOwner s' oldOwner), the new owner is added (isOwner s' newOwner),
+  and all other addresses' ownership is unchanged. This corresponds to
+  Certora's swapOwnerEffect rule.
+unsupported_feature_codes: []

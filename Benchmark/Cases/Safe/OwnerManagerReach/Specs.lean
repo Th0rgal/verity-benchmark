@@ -19,6 +19,8 @@ open Verity.EVM.Uint256
     slot 1: ownerCount
 -/
 
+/-! ## Core definitions -/
+
 -- Linked list next-pointer accessor (reads storageMap slot 0 as Address).
 def next (s : ContractState) (a : Address) : Address :=
   wordToAddress (s.storageMap 0 a)
@@ -38,17 +40,215 @@ def reachable (s : ContractState) (a b : Address) : Prop :=
     chain.getLast? = some b ∧
     isChain s chain
 
+/-! ## Invariant: well-formed owner list
+
+  The `ownerListInvariant` combines the Certora `inListReachable` and
+  `reachableInList` invariants into a single biconditional property.
+  Together they state that the set of nodes with non-zero successors
+  is exactly the set of nodes reachable from SENTINEL.
+
+  Certora originals:
+    inListReachable:
+      ghostOwners[SENTINEL] != 0 ∧
+      (∀ key. ghostOwners[key] != 0 → reach(SENTINEL, key))
+    reachableInList:
+      (∀ X Y. reach(X, Y) → X = Y ∨ Y = 0 ∨ ghostOwners[Y] != 0)
+-/
+
 /--
   Certora `inListReachable` invariant:
-    ghostOwners[SENTINEL] != 0 &&
-    (forall address key. ghostOwners[key] != 0 => reach(SENTINEL, key))
-
-  After executing `addOwner`, every node with a non-zero successor in the
-  post-state is reachable from SENTINEL via the owners mapping.
+  The list is non-empty (SENTINEL has a successor) and every node with a
+  non-zero successor is reachable from SENTINEL.
 -/
+def inListReachable (s : ContractState) : Prop :=
+  next s SENTINEL ≠ zeroAddress ∧
+  ∀ key : Address, next s key ≠ zeroAddress → reachable s SENTINEL key
+
+/--
+  Certora `reachableInList` invariant:
+  Every address reachable from any node is either the source itself,
+  the zero address, or has a non-zero successor (i.e. is in the list).
+
+  Intuitively: reachability doesn't "leak" to addresses outside the list.
+-/
+def reachableInList (s : ContractState) : Prop :=
+  ∀ x y : Address, reachable s x y → x = y ∨ y = zeroAddress ∨ next s y ≠ zeroAddress
+
+/--
+  Combined owner list invariant: the list is non-empty, and membership
+  (having a non-zero successor) is equivalent to reachability from SENTINEL.
+  This merges inListReachable and reachableInList into a single property.
+
+  The `key ≠ zeroAddress` guard matches Solidity semantics: address(0) is
+  never a valid owner (`require(owner != address(0))`), and in the Safe
+  contract `owners[address(0)]` is always 0. This guard excludes the zero
+  address from the biconditional since it is outside the owner domain.
+-/
+def ownerListInvariant (s : ContractState) : Prop :=
+  next s SENTINEL ≠ zeroAddress ∧
+  (∀ key : Address, key ≠ zeroAddress →
+    (next s key ≠ zeroAddress ↔ reachable s SENTINEL key))
+
+/-! ## Acyclicity and termination
+
+  These definitions support proving that the linked list is acyclic
+  (SENTINEL appears only at the boundaries, no internal loops) and
+  that every path terminates. Proving these as theorems rather than
+  assuming them would eliminate the hAcyclic and hOwnerFresh axioms
+  from the current proofs.
+-/
+
+-- A chain has no duplicate addresses.
+def noDuplicates : List Address → Prop
+  | [] => True
+  | a :: rest => a ∉ rest ∧ noDuplicates rest
+
+/--
+  Acyclicity: the linked list from SENTINEL has no internal cycles.
+  For any duplicate-free chain starting at SENTINEL's successor and
+  ending at a non-SENTINEL key, SENTINEL does not appear in the chain.
+
+  The `noDuplicates` condition is essential: in a circular list
+  (e.g. SENTINEL → o1 → o2 → o3 → SENTINEL), the chain
+  [o1, o2, o3, SENTINEL, o1] is a valid `isChain` that contains
+  SENTINEL and ends at o1 ≠ SENTINEL. But it has a duplicate (o1),
+  so `noDuplicates` excludes it. Without duplicates, chains ending
+  at key ≠ SENTINEL are strict prefixes that never reach SENTINEL.
+-/
+def acyclic (s : ContractState) : Prop :=
+  ∀ key : Address, key ≠ SENTINEL → ∀ chain : List Address,
+    chain.head? = some (next s SENTINEL) →
+    chain.getLast? = some key →
+    isChain s chain →
+    noDuplicates chain →
+    SENTINEL ∉ chain
+
+/--
+  Unique predecessor: each non-zero node has at most one non-zero
+  predecessor in the linked list. That is, if `next s x = c` and
+  `next s y = c` for `x, y, c ≠ 0`, then `x = y`.
+
+  This captures the structural truth that the owner linked list is a
+  simple path with no branching. Unlike `stronglyAcyclic` (antisymmetry
+  of `reachable`), this property IS provable for the circular linked
+  list maintained by the Safe OwnerManager, because each mutation
+  preserves the single-predecessor invariant.
+
+  This replaces the Certora `reach_invariant` antisymmetry axiom: Certora
+  breaks the cycle by mapping SENTINEL back-edges to NULL in their abstract
+  `reach` predicate. We instead directly assert the structural consequence
+  (unique predecessors) that all the proof obligations actually require.
+-/
+def uniquePredecessor (s : ContractState) : Prop :=
+  ∀ x y c : Address, x ≠ zeroAddress → y ≠ zeroAddress → c ≠ zeroAddress →
+    next s x = c → next s y = c → x = y
+
+/--
+  Freshness of a given address: it does not appear in any duplicate-free
+  chain starting from SENTINEL's successor. This is a consequence of
+  acyclicity + the address having a zero mapping value.
+-/
+def freshInList (s : ContractState) (addr : Address) : Prop :=
+  ∀ key : Address, ∀ chain : List Address,
+    chain.head? = some (next s SENTINEL) →
+    chain.getLast? = some key →
+    isChain s chain →
+    noDuplicates chain →
+    addr ∉ chain
+
+/-! ## Per-function preservation specs
+
+  Each theorem states: given the invariant holds on the pre-state,
+  it holds on the post-state after the function executes.
+  The legacy `in_list_reachable_spec` is kept for backward compatibility
+  with the existing addOwner proof.
+-/
+
+-- Legacy spec for backward compatibility with the existing proof.
 def in_list_reachable_spec
     (_s s' : ContractState) : Prop :=
   next s' SENTINEL ≠ zeroAddress ∧
   ∀ key : Address, next s' key ≠ zeroAddress → reachable s' SENTINEL key
+
+-- Preservation of ownerListInvariant under addOwner.
+def addOwner_preserves_invariant
+    (s s' : ContractState) : Prop :=
+  ownerListInvariant s → ownerListInvariant s'
+
+-- Preservation of ownerListInvariant under removeOwner.
+def removeOwner_preserves_invariant
+    (s s' : ContractState) : Prop :=
+  ownerListInvariant s → ownerListInvariant s'
+
+-- Preservation of ownerListInvariant under swapOwner.
+def swapOwner_preserves_invariant
+    (s s' : ContractState) : Prop :=
+  ownerListInvariant s → ownerListInvariant s'
+
+-- Establishment of ownerListInvariant by setupOwners.
+-- Unlike the other specs, this does not require a pre-state invariant:
+-- it is the base case.
+def setupOwners_establishes_invariant
+    (s' : ContractState) : Prop :=
+  ownerListInvariant s'
+
+/-! ## Bundled invariant
+
+  `SafeOwnerInvariant` combines all linked-list properties into a single
+  structure. Each function theorem proves preservation of the full bundle,
+  eliminating the need to thread individual properties through callers.
+
+  `acyclic` is omitted — it is a tautology (proven by `acyclic_generic`
+  for any state). `freshInList` is omitted — it is a per-address predicate,
+  not a pure state invariant.
+-/
+
+-- No node in the active list points to itself.
+def noSelfLoops (s : ContractState) : Prop :=
+  ∀ k : Address, next s k ≠ zeroAddress → k ≠ SENTINEL → next s k ≠ k
+
+-- Bundled invariant combining all linked-list properties.
+-- `noSelfLoops` is omitted — it is derivable from the other three fields
+-- (see `SafeOwnerInvariant.noSelfLoops` in Proofs.lean).
+structure SafeOwnerInvariant (s : ContractState) : Prop where
+  ownerList     : ownerListInvariant s
+  uniquePred    : uniquePredecessor s
+  zeroInert     : next s zeroAddress = zeroAddress
+
+/-! ## Functional correctness
+
+  These specs state that each operation changes exactly the intended owners
+  and leaves all other owners unchanged. They correspond to the Certora
+  `addOwnerEffect`, `removeOwnerEffect`, and `swapOwnerEffect` rules.
+
+  `isOwner` matches the Solidity view function:
+    function isOwner(address owner) returns (bool) {
+      return owner != SENTINEL_OWNERS && owners[owner] != address(0);
+    }
+-/
+
+-- An address is an owner iff it has a non-zero successor and is not SENTINEL.
+def isOwner (s : ContractState) (addr : Address) : Prop :=
+  next s addr ≠ zeroAddress ∧ addr ≠ SENTINEL
+
+-- setupOwners makes exactly the three given addresses owners and nothing else.
+def setupOwners_correctness (s' : ContractState) (owner1 owner2 owner3 : Address) : Prop :=
+  isOwner s' owner1 ∧ isOwner s' owner2 ∧ isOwner s' owner3 ∧
+  (∀ k : Address, k ≠ owner1 → k ≠ owner2 → k ≠ owner3 → ¬isOwner s' k)
+
+-- addOwner makes the new address an owner, preserving all others.
+def addOwner_correctness (s s' : ContractState) (owner : Address) : Prop :=
+  isOwner s' owner ∧
+  (∀ k : Address, k ≠ owner → (isOwner s' k ↔ isOwner s k))
+
+-- removeOwner removes the target from the owner set, preserving all others.
+def removeOwner_correctness (s s' : ContractState) (owner : Address) : Prop :=
+  ¬isOwner s' owner ∧
+  (∀ k : Address, k ≠ owner → (isOwner s' k ↔ isOwner s k))
+
+-- swapOwner atomically removes oldOwner and adds newOwner, preserving all others.
+def swapOwner_correctness (s s' : ContractState) (oldOwner newOwner : Address) : Prop :=
+  ¬isOwner s' oldOwner ∧ isOwner s' newOwner ∧
+  (∀ k : Address, k ≠ oldOwner → k ≠ newOwner → (isOwner s' k ↔ isOwner s k))
 
 end Benchmark.Cases.Safe.OwnerManagerReach

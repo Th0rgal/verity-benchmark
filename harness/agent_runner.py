@@ -27,7 +27,11 @@ def resolve_case_task_refs(case_ref: str, suite: str) -> list[str]:
     if len(parts) != 2:
         raise SystemExit("usage: <project/case_id>")
     prefix = f"{case_ref}/"
-    task_refs = [task_ref for task_ref in discover_task_refs(suite) if task_ref.startswith(prefix)]
+    task_refs = [
+        task_ref
+        for task_ref in discover_task_refs(suite, runnable_only=True)
+        if task_ref.startswith(prefix)
+    ]
     if not task_refs:
         raise SystemExit(f"no task manifests found for {case_ref} in suite {suite}")
     return task_refs
@@ -120,7 +124,7 @@ def main() -> int:
     args = parser.parse_args()
 
     if args.command == "list":
-        for task_ref in discover_task_refs(args.suite):
+        for task_ref in discover_task_refs(args.suite, runnable_only=True):
             print(task_ref)
         return 0
 
@@ -132,7 +136,7 @@ def main() -> int:
         task_refs = resolve_case_task_refs(args.case_ref, args.suite)
         return run_many(task_refs, config_path, args.dry_run, profile=args.profile, scope=f"case:{args.case_ref}")
 
-    task_refs = discover_task_refs(args.suite)
+    task_refs = discover_task_refs(args.suite, runnable_only=True)
     return run_many(task_refs, config_path, args.dry_run, profile=args.profile, scope=f"suite:{args.suite}")
 
 

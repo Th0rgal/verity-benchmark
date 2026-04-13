@@ -13,4 +13,5 @@ case_ids:
   - safe/owner_manager_reach
 notes: >
   Implementation entry for the Safe smart account OwnerManager module,
-  benchmarking the linked list invariant preservation under addOwnerWithThreshold.
+  benchmarking linked list invariant preservation under addOwnerWithThreshold,
+  removeOwner, swapOwner, and setupOwners.

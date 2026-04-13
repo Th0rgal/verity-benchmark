@@ -20,6 +20,7 @@ from manifest_utils import load_manifest_data
 ROOT = Path(__file__).resolve().parent.parent
 
 TASK_DIRS = [ROOT / "cases", ROOT / "backlog"]
+PROOF_READY_STATUSES = {"partial", "complete"}
 
 # Tokens that indicate an incomplete proof.
 PLACEHOLDER_TOKENS = ("sorry", "admit")
@@ -70,11 +71,14 @@ def main() -> None:
     manifests = discover_task_manifests()
 
     checked = 0
-    failures: list[tuple[str, Path, list[tuple[int, str]]]] = []
+    failures: dict[Path, dict[str, object]] = {}
     missing: list[tuple[str, str]] = []
+    checked_cache: dict[Path, list[tuple[int, str]]] = {}
 
     for manifest_path in manifests:
         task = load_manifest_data(manifest_path)
+        if task.get("proof_status") not in PROOF_READY_STATUSES:
+            continue
         ref_module = task.get("reference_solution_module")
         if not ref_module:
             continue
@@ -84,10 +88,15 @@ def main() -> None:
             missing.append((str(task.get("task_id", "?")), str(ref_module)))
             continue
 
-        checked += 1
-        hits = check_file(path)
+        hits = checked_cache.get(path)
+        if hits is None:
+            checked += 1
+            hits = check_file(path)
+            checked_cache[path] = hits
         if hits:
-            failures.append((str(task.get("task_id", "?")), path, hits))
+            task_ids = failures.setdefault(path, {"task_ids": [], "hits": hits})["task_ids"]
+            assert isinstance(task_ids, list)
+            task_ids.append(str(task.get("task_id", "?")))
 
     print(f"Reference solution audit: {checked} files checked.")
 
@@ -98,12 +107,15 @@ def main() -> None:
 
     if failures:
         print(
-            f"\nERROR: {len(failures)} reference solution(s) contain placeholder tokens:",
+            f"\nERROR: {len(failures)} reference solution file(s) contain placeholder tokens:",
             file=sys.stderr,
         )
-        for task_id, path, hits in failures:
+        for path, failure in failures.items():
             rel = path.relative_to(ROOT)
-            print(f"\n  {task_id} ({rel}):", file=sys.stderr)
+            task_ids = ", ".join(sorted(set(failure["task_ids"])))
+            print(f"\n  {rel} (tasks: {task_ids}):", file=sys.stderr)
+            hits = failure["hits"]
+            assert isinstance(hits, list)
             for lineno, line in hits:
                 print(f"    line {lineno}: {line}", file=sys.stderr)
         sys.exit(1)
