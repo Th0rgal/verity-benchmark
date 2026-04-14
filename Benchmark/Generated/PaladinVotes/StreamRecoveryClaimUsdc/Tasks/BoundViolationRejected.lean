@@ -1,0 +1,23 @@
+import Benchmark.Cases.PaladinVotes.StreamRecoveryClaimUsdc.Specs
+
+namespace Benchmark.Cases.PaladinVotes.StreamRecoveryClaimUsdc
+
+open Verity
+open Verity.EVM.Uint256
+
+/--
+Executing `claimUsdc` when the computed payout would exceed the round total
+reverts before any state writes, leaving the contract state unchanged.
+-/
+theorem claimUsdc_reverts_if_exceeds_total
+    (shareWad : Uint256) (s : ContractState)
+    (hWaiver : s.storageMap 4 s.sender != 0)
+    (hActive : s.storage 3 != 0)
+    (hFresh : s.storageMap 5 s.sender = 0)
+    (hExceeds : add (s.storage 1) (computedClaimAmount shareWad s) > s.storage 0) :
+    let s' := ((StreamRecoveryClaimUsdc.claimUsdc shareWad true).run s).snd
+    claimUsdc_reverts_if_exceeds_total_spec s s' := by
+  -- Replace this placeholder with a complete Lean proof.
+  exact ?_
+
+end Benchmark.Cases.PaladinVotes.StreamRecoveryClaimUsdc

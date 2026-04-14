@@ -14,7 +14,7 @@ difficulty: medium
 category: accounting
 track: proof-only
 translation_status: translated
-proof_status: partial
+proof_status: complete
 evaluation_engine: lean_proof_generation
 implementation_files:
   - cases/paladin_votes/stream_recovery_claim_usdc/verity/Contract.lean
