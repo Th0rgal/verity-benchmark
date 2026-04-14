@@ -1,17 +1,17 @@
 manifest_kind: task
 schema_version: 1
-task_id: claim_marks_user
+task_id: weth_preserves_usdc_state
 case_id: paladin_votes/stream_recovery_claim_usdc
 split: active
 family_id: paladin_votes
 implementation_id: stream_recovery_claim
 source_ref: https://github.com/Figu3/sonic-earn-recovery-system@699cbbc79def374cab9739e451acbbf866293d12:src/StreamRecoveryClaim.sol
 task_interface_version: 2
-theorem_name: Benchmark.Cases.PaladinVotes.StreamRecoveryClaimUsdc.claimUsdc_marks_user_claimed
-proof_family: authorization_enablement
-property_class: authorization_state
+theorem_name: Benchmark.Cases.PaladinVotes.StreamRecoveryClaimUsdc.claimWeth_preserves_usdc_state
+proof_family: state_preservation_local_effects
+property_class: frame_property
 difficulty: easy
-category: state-transition
+category: isolation
 track: proof-only
 translation_status: translated
 proof_status: complete
@@ -23,10 +23,11 @@ specification_files:
   - cases/paladin_votes/stream_recovery_claim_usdc/verity/Specs.lean
   - Benchmark/Cases/PaladinVotes/StreamRecoveryClaimUsdc/Specs.lean
 editable_files:
-  - Benchmark/Generated/PaladinVotes/StreamRecoveryClaimUsdc/Tasks/ClaimMarksUser.lean
+  - Benchmark/Generated/PaladinVotes/StreamRecoveryClaimUsdc/Tasks/WethPreservesUsdcState.lean
 reference_solution_module: Benchmark.Cases.PaladinVotes.StreamRecoveryClaimUsdc.Proofs
-reference_solution_declaration: Benchmark.Cases.PaladinVotes.StreamRecoveryClaimUsdc.claimUsdc_marks_user_claimed
+reference_solution_declaration: Benchmark.Cases.PaladinVotes.StreamRecoveryClaimUsdc.claimWeth_preserves_usdc_state
 abstraction_level: protocol_slice
 abstraction_notes: >
-  The task checks the claimed flag update in isolation from Merkle validation and ERC20 transfer side effects.
+  This task isolates the frame condition for the WETH claim path and shows that
+  the USDC accounting slice remains untouched.
 unsupported_feature_codes: []

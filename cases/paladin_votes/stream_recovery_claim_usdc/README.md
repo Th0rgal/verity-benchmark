@@ -8,10 +8,12 @@ Source:
 Focus:
 - `claimUsdc`
 - `_claimUsdc`
-- claim accounting and round bounds
+- `claimWeth`
+- `_claimWeth`
+- `claimBoth`
+- per-token claim accounting, revert safety, and cross-token non-interference
 
 Out of scope:
 - multi-round batching
-- WETH flow
 - Merkle proof details
 - ERC20 transfer semantics
