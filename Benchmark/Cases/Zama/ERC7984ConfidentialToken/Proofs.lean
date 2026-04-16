@@ -1,0 +1,15 @@
+import Benchmark.Cases.Zama.ERC7984ConfidentialToken.Specs
+import Benchmark.Generated.Zama.ERC7984ConfidentialToken.Tasks.BurnDecreasesSupply
+import Benchmark.Generated.Zama.ERC7984ConfidentialToken.Tasks.MintIncreasesSupply
+import Benchmark.Generated.Zama.ERC7984ConfidentialToken.Tasks.MintOverflowProtection
+import Benchmark.Generated.Zama.ERC7984ConfidentialToken.Tasks.TransferConservation
+import Benchmark.Generated.Zama.ERC7984ConfidentialToken.Tasks.TransferInsufficient
+import Benchmark.Generated.Zama.ERC7984ConfidentialToken.Tasks.TransferNoBalanceRevert
+import Benchmark.Generated.Zama.ERC7984ConfidentialToken.Tasks.TransferPreservesSupply
+import Benchmark.Generated.Zama.ERC7984ConfidentialToken.Tasks.TransferSufficient
+
+namespace Benchmark.Cases.Zama.ERC7984ConfidentialToken
+
+-- Reference solution exports generated task proofs for the benchmark runner.
+
+end Benchmark.Cases.Zama.ERC7984ConfidentialToken

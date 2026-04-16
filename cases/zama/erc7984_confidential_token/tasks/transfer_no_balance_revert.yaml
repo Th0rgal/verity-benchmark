@@ -1,0 +1,38 @@
+manifest_kind: task
+schema_version: 1
+task_id: transfer_no_balance_revert
+case_id: zama/erc7984_confidential_token
+split: active
+family_id: zama
+implementation_id: confidential_contracts
+source_ref: https://github.com/OpenZeppelin/openzeppelin-confidential-contracts@master:contracts/token/ERC7984/ERC7984.sol
+task_interface_version: 2
+theorem_name: Benchmark.Cases.Zama.ERC7984ConfidentialToken.transfer_no_balance_revert
+proof_family: protocol_transition_correctness
+property_class: non_leakage
+difficulty: medium
+category: invariant
+track: proof-only
+translation_status: translated
+proof_status: partial
+evaluation_engine: lean_proof_generation
+implementation_files:
+  - cases/zama/erc7984_confidential_token/verity/Contract.lean
+  - Benchmark/Cases/Zama/ERC7984ConfidentialToken/Contract.lean
+specification_files:
+  - cases/zama/erc7984_confidential_token/verity/Specs.lean
+  - Benchmark/Cases/Zama/ERC7984ConfidentialToken/Specs.lean
+editable_files:
+  - Benchmark/Generated/Zama/ERC7984ConfidentialToken/Tasks/TransferNoBalanceRevert.lean
+reference_solution_module: Benchmark.Cases.Zama.ERC7984ConfidentialToken.Proofs
+reference_solution_declaration: Benchmark.Cases.Zama.ERC7984ConfidentialToken.transfer_no_balance_revert
+abstraction_level: protocol_slice
+abstraction_notes: >
+  Contract-level non-leakage: the transfer function never reverts based
+  on the encrypted balance comparison. Only plaintext checks (zero address,
+  uninitialized balance) can cause reverts. This ensures an on-chain
+  observer cannot distinguish sufficient from insufficient transfers by
+  observing transaction success/failure. Combined with FHE encryption of
+  the return value and emitted events, this provides confidentiality of
+  transfer outcomes.
+unsupported_feature_codes: []
