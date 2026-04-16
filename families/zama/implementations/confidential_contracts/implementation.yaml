@@ -1,0 +1,17 @@
+manifest_kind: implementation
+schema_version: 1
+family_id: zama
+implementation_id: confidential_contracts
+display_name: OpenZeppelin Confidential Contracts (ERC-7984)
+split: active
+status: translated
+upstream_repo: https://github.com/OpenZeppelin/openzeppelin-confidential-contracts
+upstream_commit: master
+source_language: solidity
+source_artifact_path: contracts/token/ERC7984/ERC7984.sol
+case_ids:
+  - zama/erc7984_confidential_token
+notes: >
+  OpenZeppelin's reference implementation of ERC-7984, the confidential fungible
+  token standard for Zama's fhEVM. Uses FHESafeMath for overflow-safe encrypted
+  arithmetic and the FHE.select pattern for branchless conditional transfers.

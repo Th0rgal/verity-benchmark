@@ -1,0 +1,62 @@
+manifest_kind: case
+project: zama
+case_id: erc7984_confidential_token
+schema_version: 1
+split: active
+family_id: zama
+implementation_id: confidential_contracts
+stage: build_green
+translation_status: translated
+spec_status: frozen
+proof_status: partial
+upstream_repo: https://github.com/OpenZeppelin/openzeppelin-confidential-contracts
+upstream_commit: master
+original_contract_path: contracts/token/ERC7984/ERC7984.sol
+source_ref: https://github.com/OpenZeppelin/openzeppelin-confidential-contracts@master:contracts/token/ERC7984/ERC7984.sol
+lean_target: Benchmark.Cases.Zama.ERC7984ConfidentialToken.Compile
+spec_target: Benchmark.Cases.Zama.ERC7984ConfidentialToken.Specs
+proof_target: Benchmark.Cases.Zama.ERC7984ConfidentialToken.Proofs
+selected_functions:
+  - _update
+  - _transfer
+  - _mint
+  - _burn
+  - confidentialTransferFrom
+  - setOperator
+source_language: solidity
+verity_version: 4ebe4931d25e5a1594fcd3f43ff040ecc3c4225a
+lean_toolchain: leanprover/lean4:v4.22.0
+abstraction_level: protocol_slice
+abstraction_tags:
+  - fhe_homomorphic_plaintext_equivalence
+  - acl_elided
+  - disclosure_elided
+  - callbacks_elided
+  - nested_mapping_parameterized
+abstraction_notes: >
+  The benchmark models the core accounting logic of ERC-7984: transfer,
+  mint, burn, and operator-gated transferFrom. FHE operations are modeled
+  as plaintext equivalents justified by homomorphism (FHE.add → add64,
+  FHE.select → if/then/else, FHESafeMath.tryDecrease/tryIncrease →
+  pure functions). The ACL system (FHE.allow/allowThis), cryptographic
+  proof verification (fromExternal + inputProof), async disclosure/decryption
+  via the off-chain gateway, and ERC1363-style receiver callbacks are
+  omitted as they cannot be modeled in Verity. The nested operator mapping
+  (address → address → uint48) is passed as a function parameter since
+  Verity storageMap does not support nested mappings. FHE.isInitialized is
+  modeled via a separate boolean mapping. All arithmetic uses explicit
+  mod 2^64 to faithfully capture euint64 wrapping semantics.
+unsupported_feature_codes:
+  - nested_mapping
+  - external_contract_call
+  - off_chain_interaction
+  - fhe_cryptographic_layer
+notes: >
+  ERC-7984 is the confidential fungible token standard co-developed by
+  Zama and OpenZeppelin for the fhEVM. The key verification targets are
+  balance conservation (no tokens created/destroyed by transfers),
+  correctness of the FHE.select pattern (insufficient balance → silent
+  0-transfer instead of revert), mint/burn accounting, and overflow
+  protection via FHESafeMath.tryIncrease. Seven proof tasks cover transfer
+  conservation, sufficient/insufficient balance paths, supply preservation,
+  mint with overflow protection, and burn accounting.
