@@ -24,17 +24,22 @@ lean_toolchain: leanprover/lean4:v4.22.0
 abstraction_level: protocol_slice
 abstraction_tags:
   - fixed_arity_slice
-  - four_leaf_specialization
+  - eight_leaf_specialization
+  - three_level_binary_tree
   - bytes32_id_elided_to_uint
   - hash_randomness_elided_to_ticket
 abstraction_notes: >
   The benchmark specializes the dynamic K-ary sortition tree to a balanced
-  four-leaf binary slice. It preserves the parent-update and draw-interval logic
-  while abstracting dynamic arrays, bytes32 stake-path packing, and the hash used
-  to derive the draw ticket.
+  binary tree with eight leaves (three levels). It preserves multi-level
+  parent-update propagation and draw-interval traversal logic while
+  abstracting dynamic arrays, bytes32 stake-path packing, and the hash used
+  to derive the draw ticket. Compared to the previous four-leaf version,
+  this exercises intermediate-node propagation and deeper draw traversal.
+  A removeLeaf function is also modeled.
 unsupported_feature_codes: []
 spec_target: Benchmark.Cases.Kleros.SortitionTrees.Specs
 proof_target: Benchmark.Cases.Kleros.SortitionTrees.Proofs
 notes: >
-  Sortition-tree slice focused on additive parent invariants, root conservation,
-  interval-based draws, and ID/index correspondence.
+  Sortition-tree slice focused on multi-level parent invariants, root
+  conservation, interval-based draws, ID/index correspondence, overflow
+  safety, removal semantics, and sequential operation invariants.

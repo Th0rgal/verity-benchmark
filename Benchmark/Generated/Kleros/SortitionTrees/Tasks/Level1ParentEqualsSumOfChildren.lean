@@ -6,14 +6,14 @@ open Verity
 open Verity.EVM.Uint256
 
 /--
-After `setLeaf`, the root equals the sum of all eight leaf weights.
+After `setLeaf`, each level-1 node equals the sum of its two level-2 children.
 -/
-theorem root_equals_sum_of_leaves
+theorem level1_parent_equals_sum_of_children
     (nodeIndex stakePathID weight : Uint256) (s : ContractState)
     (hLow : nodeIndex >= 7)
     (hHigh : nodeIndex <= 14) :
     let s' := ((SortitionTrees.setLeaf nodeIndex stakePathID weight).run s).snd
-    root_equals_sum_of_leaves_spec s' := by
+    level1_parent_equals_sum_of_children_spec s' := by
   -- Replace this placeholder with a complete Lean proof.
   exact ?_
 

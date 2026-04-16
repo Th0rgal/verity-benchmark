@@ -28,5 +28,6 @@ reference_solution_module: Benchmark.Cases.Kleros.SortitionTrees.Proofs
 reference_solution_declaration: Benchmark.Cases.Kleros.SortitionTrees.root_equals_sum_of_leaves
 abstraction_level: protocol_slice
 abstraction_notes: >
-  This task checks that the root always equals the total stake stored in the leaves of the benchmarked tree slice.
+  This task checks that the root always equals the total stake stored in
+  all eight leaves of the benchmarked tree slice.
 unsupported_feature_codes: []

@@ -1,17 +1,17 @@
 manifest_kind: task
 schema_version: 1
-task_id: draw_interval_matches_weights
+task_id: sequential_setleaf_root_conservation
 case_id: kleros/sortition_trees
 split: active
 family_id: kleros
 implementation_id: kleros_v2
 source_ref: https://github.com/kleros/kleros-v2@75125dfa54eee723cac239f20e5746d15786196b:contracts/src/libraries/SortitionTrees.sol
 task_interface_version: 2
-theorem_name: Benchmark.Cases.Kleros.SortitionTrees.draw_interval_matches_weights
-proof_family: functional_correctness
-property_class: weighted_selection
-difficulty: hard
-category: probabilistic-encoding
+theorem_name: Benchmark.Cases.Kleros.SortitionTrees.sequential_setLeaf_root_conservation
+proof_family: state_preservation_composition
+property_class: tree_conservation
+difficulty: medium
+category: state-transition
 track: proof-only
 translation_status: translated
 proof_status: partial
@@ -23,12 +23,11 @@ specification_files:
   - cases/kleros/sortition_trees/verity/Specs.lean
   - Benchmark/Cases/Kleros/SortitionTrees/Specs.lean
 editable_files:
-  - Benchmark/Generated/Kleros/SortitionTrees/Tasks/DrawIntervalMatchesWeights.lean
+  - Benchmark/Generated/Kleros/SortitionTrees/Tasks/SequentialSetLeafRootConservation.lean
 reference_solution_module: Benchmark.Cases.Kleros.SortitionTrees.Proofs
-reference_solution_declaration: Benchmark.Cases.Kleros.SortitionTrees.draw_interval_matches_weights
+reference_solution_declaration: Benchmark.Cases.Kleros.SortitionTrees.sequential_setLeaf_root_conservation
 abstraction_level: protocol_slice
 abstraction_notes: >
-  The probabilistic claim is encoded as interval preservation across all
-  three tree levels: each of the eight leaves owns a contiguous ticket
-  interval whose width equals its weight.
+  This task proves the root conservation invariant is inductive: after two
+  consecutive setLeaf calls, the root still equals the sum of all leaves.
 unsupported_feature_codes: []

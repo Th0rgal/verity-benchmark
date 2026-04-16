@@ -6,7 +6,7 @@ open Verity
 open Verity.EVM.Uint256
 
 /--
-Any successful `draw` resolves to one of the four leaf node indices.
+Any successful `draw` resolves to one of the eight leaf node indices (7..14).
 -/
 theorem draw_selects_valid_leaf
     (ticket : Uint256) (s : ContractState)

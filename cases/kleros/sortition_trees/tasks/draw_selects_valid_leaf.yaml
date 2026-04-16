@@ -28,5 +28,6 @@ reference_solution_module: Benchmark.Cases.Kleros.SortitionTrees.Proofs
 reference_solution_declaration: Benchmark.Cases.Kleros.SortitionTrees.draw_selects_valid_leaf
 abstraction_level: protocol_slice
 abstraction_notes: >
-  This task turns the interval-based draw semantics into a concrete range guarantee: every in-range draw must resolve to one of the four leaf indices in the fixed benchmark tree.
+  This task verifies that every in-range draw resolves to one of the eight
+  leaf indices (7..14) in the 3-level benchmark tree.
 unsupported_feature_codes: []

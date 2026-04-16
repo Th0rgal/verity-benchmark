@@ -28,5 +28,6 @@ reference_solution_module: Benchmark.Cases.Kleros.SortitionTrees.Proofs
 reference_solution_declaration: Benchmark.Cases.Kleros.SortitionTrees.root_minus_left_equals_right_subtree
 abstraction_level: protocol_slice
 abstraction_notes: >
-  This task turns the tree conservation slice into a partition theorem: once the root and parent sums are established, subtracting the left subtree mass from the root must leave exactly the right subtree mass.
+  This task turns the 8-leaf tree conservation into a partition theorem:
+  root minus left subtree equals right subtree.
 unsupported_feature_codes: []

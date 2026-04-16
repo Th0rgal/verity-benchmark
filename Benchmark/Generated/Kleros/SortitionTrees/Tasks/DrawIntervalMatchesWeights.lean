@@ -6,8 +6,7 @@ open Verity
 open Verity.EVM.Uint256
 
 /--
-Executing `draw` follows the encoded ticket intervals used by the
-implementation.
+Draw follows the encoded ticket intervals in the 3-level tree.
 -/
 theorem draw_interval_matches_weights
     (ticket : Uint256) (s : ContractState)

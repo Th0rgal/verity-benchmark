@@ -28,5 +28,6 @@ reference_solution_module: Benchmark.Cases.Kleros.SortitionTrees.Proofs
 reference_solution_declaration: Benchmark.Cases.Kleros.SortitionTrees.node_id_bijection
 abstraction_level: protocol_slice
 abstraction_notes: >
-  This task checks the explicit two-way correspondence between node indexes and stake-path IDs in the fixed tree slice.
+  This task checks the explicit two-way correspondence between node indexes
+  (7..14) and stake-path IDs in the 8-leaf tree slice.
 unsupported_feature_codes: []
