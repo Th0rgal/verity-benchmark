@@ -1,0 +1,35 @@
+manifest_kind: task
+schema_version: 1
+task_id: burn_insufficient
+case_id: zama/erc7984_confidential_token
+split: active
+family_id: zama
+implementation_id: confidential_contracts
+source_ref: https://github.com/OpenZeppelin/openzeppelin-confidential-contracts@master:contracts/token/ERC7984/ERC7984.sol
+task_interface_version: 2
+theorem_name: Benchmark.Cases.Zama.ERC7984ConfidentialToken.burn_insufficient
+proof_family: functional_correctness
+property_class: silent_failure
+difficulty: medium
+category: state-transition
+track: proof-only
+translation_status: translated
+proof_status: partial
+evaluation_engine: lean_proof_generation
+implementation_files:
+  - cases/zama/erc7984_confidential_token/verity/Contract.lean
+  - Benchmark/Cases/Zama/ERC7984ConfidentialToken/Contract.lean
+specification_files:
+  - cases/zama/erc7984_confidential_token/verity/Specs.lean
+  - Benchmark/Cases/Zama/ERC7984ConfidentialToken/Specs.lean
+editable_files:
+  - Benchmark/Generated/Zama/ERC7984ConfidentialToken/Tasks/BurnInsufficient.lean
+reference_solution_module: Benchmark.Cases.Zama.ERC7984ConfidentialToken.Proofs
+reference_solution_declaration: Benchmark.Cases.Zama.ERC7984ConfidentialToken.burn_insufficient
+abstraction_level: protocol_slice
+abstraction_notes: >
+  When the holder has insufficient balance, burn silently burns 0 tokens
+  instead of reverting. Both holder balance and totalSupply remain unchanged.
+  Same FHE.select mechanism as transfer — the balance comparison cannot leak
+  information through the control flow.
+unsupported_feature_codes: []

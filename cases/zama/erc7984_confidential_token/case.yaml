@@ -32,22 +32,24 @@ abstraction_tags:
   - acl_elided
   - disclosure_elided
   - callbacks_elided
-  - nested_mapping_parameterized
+  - block_timestamp_as_parameter
 abstraction_notes: >
   The benchmark models the core accounting logic of ERC-7984: transfer,
-  mint, burn, and operator-gated transferFrom. FHE operations are modeled
-  as plaintext equivalents justified by homomorphism (FHE.add → add64,
-  FHE.select → if/then/else, FHESafeMath.tryDecrease/tryIncrease →
-  pure functions). The ACL system (FHE.allow/allowThis), cryptographic
-  proof verification (fromExternal + inputProof), async disclosure/decryption
-  via the off-chain gateway, and ERC1363-style receiver callbacks are
-  omitted as they cannot be modeled in Verity. The nested operator mapping
-  (address → address → uint48) is passed as a function parameter since
-  Verity storageMap does not support nested mappings. FHE.isInitialized is
-  modeled via a separate boolean mapping. All arithmetic uses explicit
-  mod 2^64 to faithfully capture euint64 wrapping semantics.
+  transferFrom, setOperator, mint, and burn. FHE operations are modeled
+  as plaintext equivalents justified by homomorphism (FHE.add → mod-2^64
+  addition, FHE.select → if/then/else, FHESafeMath.tryDecrease/tryIncrease →
+  inlined conditional arithmetic). The ACL system (FHE.allow/allowThis),
+  cryptographic proof verification (fromExternal + inputProof), async
+  disclosure/decryption via the off-chain gateway, and ERC1363-style
+  receiver callbacks are omitted as they cannot be modeled in Verity.
+  The nested operator mapping (address → address → uint48) is modeled
+  faithfully using Verity's storageMap2 / getMapping2 / setMapping2.
+  block.timestamp is passed as a parameter to transferFrom because the
+  verity_contract DSL macro does not currently expose blockTimestamp as
+  a bind source. FHE.isInitialized is modeled via a separate boolean
+  mapping. All arithmetic uses explicit mod 2^64 to faithfully capture
+  euint64 wrapping semantics.
 unsupported_feature_codes:
-  - nested_mapping
   - external_contract_call
   - off_chain_interaction
   - fhe_cryptographic_layer
@@ -56,7 +58,7 @@ notes: >
   Zama and OpenZeppelin for the fhEVM. The key verification targets are
   balance conservation (no tokens created/destroyed by transfers),
   correctness of the FHE.select pattern (insufficient balance → silent
-  0-transfer instead of revert), mint/burn accounting, and overflow
-  protection via FHESafeMath.tryIncrease. Seven proof tasks cover transfer
-  conservation, sufficient/insufficient balance paths, supply preservation,
-  mint with overflow protection, and burn accounting.
+  0-transfer instead of revert), mint/burn accounting, overflow protection
+  via FHESafeMath.tryIncrease, operator-gated transferFrom, and functional
+  correctness of setOperator. Eleven proof tasks cover the 5 modeled
+  functions.

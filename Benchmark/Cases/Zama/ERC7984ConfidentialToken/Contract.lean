@@ -36,10 +36,6 @@ open Verity.Stdlib.Math
   - Disclosure/decryption flow omitted — requires off-chain gateway interaction
   - ERC1363-style callbacks (AndCall variants) omitted — external contract calls
   - Events omitted — not modeled in Verity
-  - Nested operator mapping (Address → Address → Uint256) cannot be represented
-    in Verity's single-level storageMap. Operator expiry is passed as a function
-    parameter to transferFrom, modeling the value that would be read from
-    _operators[holder][spender] in the real contract.
   - FHE.isInitialized modeled via a separate boolean mapping (balanceInitialized)
     since uninitialized euint64 (zero handle) is distinct from an explicit zero value
 -/
@@ -97,6 +93,8 @@ verity_contract ERC7984 where
     -- Tracks FHE.isInitialized for each balance handle
     -- 0 = uninitialized (handle never written), nonzero = initialized
     balanceInitialized : Address → Uint256 := slot 2
+    -- Nested operator mapping: mapping(holder => mapping(spender => uint48 expiry))
+    operators : Address → Address → Uint256 := slot 3
 
   /-
     Models the transfer path: _transfer(from, to, amount) → _update(from, to, amount)
@@ -136,21 +134,22 @@ verity_contract ERC7984 where
   /-
     Models confidentialTransferFrom: operator check + _transfer + _update.
 
-    The operator expiry is passed as a parameter because Verity storageMap
-    does not support nested mappings. In the real contract this value is read
-    from _operators[from][msg.sender].
+    The operator expiry is read from the nested operator mapping using
+    the current block timestamp, matching the Solidity isOperator view:
+      function isOperator(address holder, address spender) public view returns (bool) {
+          return holder == spender || block.timestamp <= _operators[holder][spender];
+      }
 
     Solidity:
       require(isOperator(from, msg.sender), ERC7984UnauthorizedSpender(from, msg.sender));
-      // where isOperator(holder, spender) = holder == spender || block.timestamp <= _operators[holder][spender]
       transferred = _transfer(from, to, amount);
   -/
   function transferFrom
-      (holder : Address, recipient : Address, amount : Uint256,
-       operatorExpiry : Uint256, blockTimestamp : Uint256) : Uint256 := do
+      (holder : Address, recipient : Address, amount : Uint256, blockTimestamp : Uint256) : Uint256 := do
     let spender ← msgSender
+    let expiry ← getMapping2 operators holder spender
     -- isOperator: holder == spender || block.timestamp <= _operators[holder][spender]
-    require (holder == spender || blockTimestamp <= operatorExpiry) "ERC7984UnauthorizedSpender"
+    require (holder == spender || blockTimestamp <= expiry) "ERC7984UnauthorizedSpender"
 
     require (holder != zeroAddress) "ERC7984InvalidSender"
     require (recipient != zeroAddress) "ERC7984InvalidReceiver"
@@ -172,6 +171,21 @@ verity_contract ERC7984 where
     setMapping balanceInitialized recipient 1
 
     return transferred
+
+  /-
+    Models setOperator(operator, until).
+
+    Solidity:
+      function setOperator(address operator, uint48 until) public virtual {
+          _setOperator(msg.sender, operator, until);
+      }
+      function _setOperator(address holder, address operator, uint48 until) internal {
+          _operators[holder][operator] = until;
+      }
+  -/
+  function setOperator (operator : Address, expiry : Uint256) : Unit := do
+    let holder ← msgSender
+    setMapping2 operators holder operator expiry
 
   /-
     Models the mint path: _mint(to, amount) → _update(address(0), to, amount).

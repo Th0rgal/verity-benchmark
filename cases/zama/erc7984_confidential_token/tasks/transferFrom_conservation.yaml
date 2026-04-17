@@ -1,0 +1,37 @@
+manifest_kind: task
+schema_version: 1
+task_id: transferFrom_conservation
+case_id: zama/erc7984_confidential_token
+split: active
+family_id: zama
+implementation_id: confidential_contracts
+source_ref: https://github.com/OpenZeppelin/openzeppelin-confidential-contracts@master:contracts/token/ERC7984/ERC7984.sol
+task_interface_version: 2
+theorem_name: Benchmark.Cases.Zama.ERC7984ConfidentialToken.transferFrom_conservation
+proof_family: state_preservation_local_effects
+property_class: balance_conservation
+difficulty: medium
+category: invariant
+track: proof-only
+translation_status: translated
+proof_status: partial
+evaluation_engine: lean_proof_generation
+implementation_files:
+  - cases/zama/erc7984_confidential_token/verity/Contract.lean
+  - Benchmark/Cases/Zama/ERC7984ConfidentialToken/Contract.lean
+specification_files:
+  - cases/zama/erc7984_confidential_token/verity/Specs.lean
+  - Benchmark/Cases/Zama/ERC7984ConfidentialToken/Specs.lean
+editable_files:
+  - Benchmark/Generated/Zama/ERC7984ConfidentialToken/Tasks/TransferFromConservation.lean
+reference_solution_module: Benchmark.Cases.Zama.ERC7984ConfidentialToken.Proofs
+reference_solution_declaration: Benchmark.Cases.Zama.ERC7984ConfidentialToken.transferFrom_conservation
+abstraction_level: protocol_slice
+abstraction_notes: >
+  Operator-gated transferFrom preserves the sum balances[holder] +
+  balances[recipient]. The operator expiry is read from the nested mapping
+  _operators[holder][msg.sender] using getMapping2. Authorization is
+  granted if holder == msg.sender or block.timestamp <= expiry (passed as
+  a parameter since Verity's verity_contract DSL does not expose
+  blockTimestamp as a bind source).
+unsupported_feature_codes: []
