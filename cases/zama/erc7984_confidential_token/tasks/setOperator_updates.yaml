@@ -14,7 +14,7 @@ difficulty: easy
 category: state-transition
 track: proof-only
 translation_status: translated
-proof_status: unsolved
+proof_status: partial
 evaluation_engine: lean_proof_generation
 implementation_files:
   - cases/zama/erc7984_confidential_token/verity/Contract.lean
