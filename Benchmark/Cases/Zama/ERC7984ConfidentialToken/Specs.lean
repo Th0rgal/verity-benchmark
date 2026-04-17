@@ -143,19 +143,31 @@ def transfer_no_balance_revert_spec
     (sender recipient : Address) (amount : Uint256) (s : ContractState) : Prop :=
   ((ERC7984.transfer sender recipient amount).run s).isSuccess = true
 
-/-! ## Operator specification -/
+/-! ## transferFrom / operator specifications -/
+
+-- Read the operator mapping (slot 3, nested) at (holder, spender).
+def operatorExpiry (s : ContractState) (holder spender : Address) : Uint256 :=
+  s.storageMap2 3 holder spender
 
 /--
-  Operator authorization: transferFrom with a valid operator (either the
-  holder themselves, or an operator whose expiry >= block.timestamp)
-  behaves identically to a direct transfer. The returned transferred
-  amount is the same.
+  Operator-gated transferFrom preserves balance conservation.
+  When the operator check passes (holder is caller, or caller has a
+  non-expired operator entry), transferFrom behaves like transfer:
+  the sum balances[holder] + balances[recipient] is preserved.
 -/
-def transferFrom_authorized_spec
-    (holder recipient : Address) (amount : Uint256)
-    (s s'_direct s'_from : ContractState) : Prop :=
-  balanceOf s'_from holder = balanceOf s'_direct holder ∧
-  balanceOf s'_from recipient = balanceOf s'_direct recipient ∧
-  supply s'_from = supply s'_direct
+def transferFrom_conservation_spec
+    (holder recipient : Address) (s s' : ContractState) : Prop :=
+  add (balanceOf s' holder) (balanceOf s' recipient) =
+  add (balanceOf s holder) (balanceOf s recipient)
+
+/--
+  setOperator(operator, expiry) writes `expiry` into `_operators[msg.sender][operator]`
+  and leaves all other operator entries unchanged.
+-/
+def setOperator_updates_spec
+    (caller operator : Address) (expiry : Uint256) (s s' : ContractState) : Prop :=
+  operatorExpiry s' caller operator = expiry ∧
+  (∀ (h sp : Address), (h, sp) ≠ (caller, operator) →
+    operatorExpiry s' h sp = operatorExpiry s h sp)
 
 end Benchmark.Cases.Zama.ERC7984ConfidentialToken

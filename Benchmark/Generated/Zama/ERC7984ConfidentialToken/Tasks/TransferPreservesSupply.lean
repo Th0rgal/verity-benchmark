@@ -22,22 +22,7 @@ theorem transfer_preserves_supply
     (hToBal64 : s.storageMap 1 recipient < UINT64_MOD) :
     let s' := ((ERC7984.transfer sender recipient amount).run s).snd
     transfer_preserves_supply_spec s s' := by
-  have hSenderNe : sender ≠ zeroAddress := by
-    intro hEq
-    subst hEq
-    simp at hFrom
-  have hSenderNZ : sender ≠ (0 : Address) := by
-    simpa [zeroAddress] using hSenderNe
-  have hRecipientNe : recipient ≠ zeroAddress := by
-    intro hEq
-    subst hEq
-    simp at hTo
-  have hRecipientNZ : recipient ≠ (0 : Address) := by
-    simpa [zeroAddress] using hRecipientNe
-  unfold transfer_preserves_supply_spec supply
-  simp [ERC7984.transfer, ERC7984.totalSupply, ERC7984.balances, ERC7984.balanceInitialized,
-    add64, UINT64_MOD, getStorage, setStorage, getMapping, setMapping,
-    Verity.require, Verity.bind, Bind.bind, Verity.pure, Pure.pure,
-    Contract.run, ContractResult.snd, hSenderNZ, hRecipientNZ, hInit]
+  -- Replace this placeholder with a complete Lean proof.
+  exact ?_
 
 end Benchmark.Cases.Zama.ERC7984ConfidentialToken
