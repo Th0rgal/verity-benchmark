@@ -1190,9 +1190,16 @@ def send_chat_completion(
     payload["max_tokens"] = max_tokens_override or config.max_completion_tokens
     # Allow configuring a fallback chain via extra_body.fallback_models (list of model ids).
     # This lets a rate-limited primary (e.g. "opus") degrade gracefully instead of failing the run.
+    # Normalize fallback_models: accept a list of strings (standard) or a
+    # single string (common operator shorthand). A bare string must not be
+    # iterated character-by-character, which would produce single-letter
+    # "models" like "g", "p", "t".
+    raw_fallback = config.extra_body.get("fallback_models") or []
+    if isinstance(raw_fallback, str):
+        raw_fallback = [raw_fallback]
     fallback_models = [
         str(item)
-        for item in (config.extra_body.get("fallback_models") or [])
+        for item in raw_fallback
         if isinstance(item, str) and item.strip()
     ]
     payload.pop("fallback_models", None)
@@ -1791,9 +1798,13 @@ def execute_interactive_agent_task(
     # default to `max_completion_tokens` so models with a hard cap at that value
     # don't get HTTP 400 when the bump kicks in. Stripped from the request
     # payload in `send_chat_completion` so it never leaks to the provider.
-    length_retry_token_cap = int(
-        config.extra_body.get("length_retry_token_cap", config.max_completion_tokens)
-    )
+    _cap_raw = config.extra_body.get("length_retry_token_cap", config.max_completion_tokens)
+    try:
+        length_retry_token_cap = int(_cap_raw)
+    except (TypeError, ValueError):
+        # Invalid operator-edited value (e.g. null, "12k", nested object).
+        # Fall back silently rather than aborting the run.
+        length_retry_token_cap = config.max_completion_tokens
     if length_retry_token_cap < config.max_completion_tokens:
         length_retry_token_cap = config.max_completion_tokens
     # Temperature schedule: escalate after repeated same-class failures to break out
