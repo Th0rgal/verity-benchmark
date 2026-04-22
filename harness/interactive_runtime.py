@@ -1272,6 +1272,11 @@ def _build_check_hints(failure_class: str, details: str) -> list[str]:
     if failure_class == "unknown_identifier":
         unknown_names = _UNKNOWN_IDENT_RE.findall(details)
         tactic_hits = [n for n in unknown_names if n in _LEAN_TACTIC_NAMES]
+        var_hits = [
+            n for n in unknown_names
+            if n not in _LEAN_TACTIC_NAMES and "." not in n
+            and n and n[0].islower() and "_" not in n
+        ]
         if tactic_hits:
             name = tactic_hits[0]
             hints.append(
@@ -1281,11 +1286,22 @@ def _build_check_hints(failure_class: str, details: str) -> list[str]:
                 f"`exact by {name} ...` or `:= by {name} ...`. If the goal is already in tactic "
                 f"mode, remove the `exact`/`refine` prefix and call `{name}` directly."
             )
+        elif var_hits:
+            name = var_hits[0]
+            hints.append(
+                f"`{name}` looks like a LOCAL VARIABLE name, not a definition. "
+                f"`unknown identifier '{name}'` means `{name}` is not in scope at that point — "
+                f"it may have been introduced in a different branch, shadowed, or never bound. "
+                f"Use `inspect_lean_goals` to see the exact binders in scope at each `?_`, and "
+                f"re-check the theorem signature for the actual parameter names. Do NOT call "
+                f"search_public_defs for a local-variable-shaped name — it searches definitions, "
+                f"not binders."
+            )
         elif "decide_True" in details or "decide_False" in details:
             hints.append("CRITICAL: `decide_True` and `decide_False` do not exist. Remove them. Instead, pass precondition hypotheses directly to `simp` - it handles `decide` reduction automatically.")
         else:
             hints.append("Use search_public_defs to find correct names from spec/impl files.")
-        if not tactic_hits:
+        if not tactic_hits and not var_hits:
             hints.append("Check imports. Standard names: Nat.lt_of_not_ge, Nat.not_le_of_lt.")
     elif failure_class == "unsolved_goals":
         hints.append("Use inspect_lean_goals with a ?_ hole to see exact goal state.")
