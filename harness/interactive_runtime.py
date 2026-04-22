@@ -408,7 +408,7 @@ class TaskProofRuntime:
                 "type": "function",
                 "function": {
                     "name": "try_tactic_at_hole",
-                    "description": "Try replacing all `?_` holes in the current proof with a specific tactic and check if it compiles. Preserves the original proof if it fails. Useful for testing tactics like `simp_all [...]`, `omega`, `decide`, or `duper [...]`.",
+                    "description": "Try replacing all `?_` holes in the current proof with a specific tactic and check if it compiles. Pass a raw tactic (e.g. `omega`, `simp_all [foo]`, `decide`, `exact h`); substitution auto-wraps as `(by tac)` when the hole is at a term position like `exact ?_`. Preserves the original proof if it fails.",
                     "parameters": {
                         "type": "object",
                         "additionalProperties": False,

@@ -476,17 +476,18 @@ def _synthesized_interactive_tools_prompt() -> str:
     # so we enumerate generic names here instead of calling tool_specs() directly.
     surface = [
         ("read_public_file(path)", "Read one of the task's public Lean files (impl/spec/editable)."),
-        ("write_editable_proof(content)", "Replace the editable proof file. Returns immediate warnings for placeholders, theorem-signature changes, hidden imports, or unfilled `?_` holes. Does NOT run Lean."),
-        ("run_lean_check()", "Run `lake env lean` on the editable proof. Returns pass/fail with error details, failure_class, and repair_hints. Auto-retries once on environment errors (missing .olean)."),
+        ("write_editable_proof(content)", "Replace the editable proof file AND automatically run the Lean check. Response reports status (passed/failed), failure_mode, details, failure_class, and repair_hints. A separate run_lean_check call is not needed after this."),
+        ("run_lean_check()", "Re-run `lake env lean` without changing the file (redundant immediately after write_editable_proof)."),
         ("inspect_lean_goals()", "Inspect goal state at explicit `?_` holes. Unsupported if no hole present."),
-        ("try_tactic_at_hole(tactic)", "Replace all `?_` holes with a tactic and check. Preserves original proof on failure."),
+        ("try_tactic_at_hole(tactic)", "Replace all `?_` holes with a tactic and check. Pass a raw tactic (e.g. `omega`, `simp_all`, `decide`); substitution auto-wraps as `(by tac)` at term positions like `exact ?_`. Preserves original proof on failure."),
         ("search_public_defs(query)", "Search the task's public impl/spec files for def/theorem/lemma names."),
     ]
     for name, desc in surface:
         lines.append(f"- `{name}` — {desc}")
     lines.extend([
         "",
-        "Typical loop: write_editable_proof → run_lean_check → read repair_hints → iterate.",
+        "Typical loop: write_editable_proof (which runs Lean) → read repair_hints → iterate.",
+        "`?_` is a PROBE for `inspect_lean_goals` / `try_tactic_at_hole`, never a final proof — Lean rejects every submission containing `?_`.",
         "Do NOT emit `lake build` or `scripts/...`; there is no shell tool.",
     ])
     return "\n".join(lines)
