@@ -1100,8 +1100,11 @@ def _backoff_delay(attempt: int, retry_after: float | None) -> float:
         # Honour the provider-requested wait. Clamp only at a safety ceiling
         # (10 minutes) so a pathological header cannot stall the run
         # indefinitely; the previous 60s clamp was too aggressive and caused
-        # retries to fire while the rate limit was still in force.
-        return min(retry_after, 600.0)
+        # retries to fire while the rate limit was still in force. Add a
+        # small additive jitter (up to 1s) so concurrent workers hitting the
+        # same Retry-After do not thunder back in lockstep.
+        clamped = min(retry_after, 600.0)
+        return clamped + random.random()
     # Exponential backoff with jitter, capped at 30s.
     base = min(30.0, 2.0 ** attempt)
     return base * (0.5 + random.random() * 0.5)
@@ -1207,6 +1210,10 @@ def send_chat_completion(
     raw_fallback = config.extra_body.get("fallback_models") or []
     if isinstance(raw_fallback, str):
         raw_fallback = [raw_fallback]
+    elif not isinstance(raw_fallback, (list, tuple)):
+        # extra_body is schema-free operator input; a truthy non-iterable
+        # (bool, int, dict, ...) must not blow up the iteration below.
+        raw_fallback = []
     fallback_models = [
         str(item)
         for item in raw_fallback
