@@ -1,0 +1,15 @@
+manifest_kind: family
+schema_version: 1
+family_id: termmax
+display_name: TermMax
+split: active
+status: active
+description: >
+  Active benchmark family for TermMax protocol slices centered on proving AMM
+  pricing-state transitions and fee-consistent reserve updates.
+implementation_ids:
+  - contracts_v2
+case_ids:
+  - termmax/order_v2_buy_xt_single_segment
+source_languages:
+  - solidity
