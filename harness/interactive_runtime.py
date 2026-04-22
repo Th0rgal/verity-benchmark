@@ -792,10 +792,8 @@ class TaskProofRuntime:
         # persistent warning post-dedup. The hint is keyed to the concrete
         # error-text state (which tactic is being misused), not the generic
         # hint corpus, so it is not a "noise" dedup candidate.
-        _tactic_in_term = [
-            n for n in _UNKNOWN_IDENT_RE.findall(details)
-            if n in _LEAN_TACTIC_NAMES
-        ]
+        _unknown_names = _UNKNOWN_IDENT_RE.findall(details)
+        _tactic_in_term = [n for n in _unknown_names if n in _LEAN_TACTIC_NAMES]
         if _tactic_in_term:
             _tactic_name = _tactic_in_term[0]
             hints.insert(0, (
@@ -811,6 +809,52 @@ class TaskProofRuntime:
                 f"— it is not a definition, it is a tactic, and the only fix "
                 f"is the `by` wrapper."
             ))
+
+        # Third safety-critical, state-conditional warning: local-variable
+        # out-of-scope names. Corpus analysis of 29 failed runs: 6 tasks
+        # (21%) emit `unknown identifier '<camelCase name>'` for names that
+        # are clearly binder-shaped (no dots, lowercase first char, no
+        # underscores) — up to 110 occurrences in a single run
+        # (safe/swap_owner_is_owner_correctness: 91×prevOwner, 19×oldOwner).
+        # The existing local-variable hint in `_build_check_hints`
+        # (~line 1475) is actionable ("call inspect_lean_goals / re-check
+        # the signature") but is suppressed by dedup after first emission.
+        # Same failure mode as tactic-in-term and unfilled-hole: state
+        # persists across re-submissions, warning must repeat. The hint
+        # is keyed to the specific out-of-scope name from the error text,
+        # not the generic corpus, so it is not a "noise" dedup candidate.
+        # Only fire when no tactic-hit is present so we never spam both
+        # warnings for the same line range — Lean reports tactic names
+        # the same way as local vars, and if a tactic mistake is present
+        # that's almost always the upstream cause.
+        if not _tactic_in_term:
+            _var_hits = [
+                n for n in _unknown_names
+                if n not in _LEAN_TACTIC_NAMES
+                and "." not in n
+                and n
+                and n[0].islower()
+                and "_" not in n
+            ]
+            if _var_hits:
+                _var_name = _var_hits[0]
+                hints.insert(0, (
+                    f"LOCAL VARIABLE OUT OF SCOPE: Lean reports `unknown "
+                    f"identifier '{_var_name}'` for a name that looks like "
+                    f"a local binder, not a definition. `{_var_name}` is "
+                    f"not in scope at the point it is used — common causes: "
+                    f"(a) it was introduced inside a different `by_cases` / "
+                    f"`rcases` / `·` branch and is not visible in the "
+                    f"current branch; (b) the theorem signature uses a "
+                    f"different parameter name (check the editable file "
+                    f"header via `read_public_file`); (c) it was shadowed "
+                    f"by a later `intro` / `rintro` / `obtain`. Fix: call "
+                    f"`inspect_lean_goals` on a `?_` hole at this exact "
+                    f"location to see the binders ACTUALLY in scope, then "
+                    f"reference those names. Do NOT call search_public_defs "
+                    f"for `{_var_name}` — it is a binder, not a definition, "
+                    f"and search_public_defs cannot find binders."
+                ))
         if not hints and same_class_count >= 3:
             # All the standing advice has already been seen and isn't working.
             # Issue a one-shot pivot directive rather than sending an empty list,
