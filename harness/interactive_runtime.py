@@ -109,6 +109,15 @@ class TaskProofRuntime:
         # plus a `cached: true` marker telling the model the call was
         # redundant, saving a full Lean invocation and a round.
         self._last_eval_cache: tuple[str, dict[str, Any]] | None = None
+        # Cache of prior search_public_defs calls keyed by (query, limit).
+        # Corpus analysis of 83 runs found failed runs averaged 41.9
+        # search_public_defs calls vs 1.5 on passing runs; 94% of those
+        # calls in failed runs were byte-identical re-queries (e.g. the same
+        # `"removeOwner_ownerListInvariant"` query 26 times in one run). The
+        # index is read-only within a session, so a cached hit with a
+        # `cached: true` + note tells the model the query yielded nothing
+        # new and it should pivot instead of re-asking.
+        self._search_cache: dict[tuple[str, int], dict[str, Any]] = {}
         self.paths = RuntimePaths(
             editable_rel_path=editable_rel_path,
             theorem_name=str(task["theorem_name"]),
@@ -207,6 +216,24 @@ class TaskProofRuntime:
         query_text = query.strip()
         if not query_text:
             return {"status": "rejected", "reason": "query_must_not_be_empty"}
+        # The set of public impl/spec files does not change within a session,
+        # so the same (query, limit) will always return the same matches.
+        # Short-circuit repeat queries with a cached response + explicit note
+        # so the agent stops looping on an identical search.
+        cache_key = (query_text.lower(), limit)
+        cached = self._search_cache.get(cache_key)
+        if cached is not None:
+            reused = copy.deepcopy(cached)
+            reused["cached"] = True
+            reused["note"] = (
+                "You already ran search_public_defs with this exact query "
+                "earlier in the session; the public impl/spec files are "
+                "static, so the result is identical. Try a different query "
+                "(e.g. a substring, a related concept, or a parameter name) "
+                "or switch to inspect_lean_goals / try_tactic_at_hole — "
+                "do not resubmit the same query."
+            )
+            return reused
         lowered = query_text.lower()
         matches: list[dict[str, Any]] = []
         for rel_path in self.paths.implementation_files + self.paths.specification_files:
@@ -229,7 +256,9 @@ class TaskProofRuntime:
                     }
                 )
                 if len(matches) >= limit:
-                    return {"status": "ok", "query": query_text, "matches": matches, "truncated": True}
+                    result = {"status": "ok", "query": query_text, "matches": matches, "truncated": True}
+                    self._search_cache[cache_key] = copy.deepcopy(result)
+                    return result
         if not matches:
             # Corpus analysis (83 runs) found 55/75 (73%) of search_public_defs
             # calls returned empty — overwhelmingly because agents searched for
@@ -238,7 +267,7 @@ class TaskProofRuntime:
             # public impl/spec files, not the standard library. Surface that
             # scope limit explicitly so the agent stops burning rounds on
             # library searches.
-            return {
+            result = {
                 "status": "ok",
                 "query": query_text,
                 "matches": matches,
@@ -256,7 +285,11 @@ class TaskProofRuntime:
                     "expect to be defined in the current task's spec/impl."
                 ),
             }
-        return {"status": "ok", "query": query_text, "matches": matches, "truncated": False}
+            self._search_cache[cache_key] = copy.deepcopy(result)
+            return result
+        result = {"status": "ok", "query": query_text, "matches": matches, "truncated": False}
+        self._search_cache[cache_key] = copy.deepcopy(result)
+        return result
 
     def inspect_goals(self) -> dict[str, Any]:
         holes = sorted(set(HOLE_PATTERN.findall(self.current_proof_text)))
