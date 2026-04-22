@@ -605,21 +605,19 @@ _LAKE_BUILD_CACHE: dict[str, bool] = {}
 def _attempt_lake_build(module_name: str | None) -> bool:
     """Best-effort `lake build` for a module. Returns True on success.
 
-    Only successful builds are cached; failures are retried on subsequent calls
-    so that transient build errors can be recovered from when the runtime is
-    reused across tasks (e.g. batch / suite runs in a single process).
+    Always invokes `lake build` — this is the self-heal path, called when the
+    runtime observed a missing .olean at check time, so the previously cached
+    "success" entry is stale and cannot be trusted. The cache is refreshed
+    with the latest result so subsequent prebuild calls can short-circuit
+    correctly.
     """
     if not module_name:
         return False
     if not module_name.startswith("Benchmark."):
         return False
-    if _LAKE_BUILD_CACHE.get(module_name):
-        # Already built successfully in this process; skip.
-        return False
     code, _output = lean_run_command(["lake", "build", module_name], cwd=ROOT)
     success = code == 0
-    if success:
-        _LAKE_BUILD_CACHE[module_name] = True
+    _LAKE_BUILD_CACHE[module_name] = success
     return success
 
 
