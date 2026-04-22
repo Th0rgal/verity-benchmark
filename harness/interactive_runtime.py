@@ -776,6 +776,32 @@ class TaskProofRuntime:
             full_set = ""
 
         if failure_class in ("simp_no_progress", "unsolved_goals", "rfl_failed", "unfold_failed"):
+            # If the stuck goal carries a `case <label>` marker, the agent has
+            # ALREADY case-split and is stalling on an open branch. Telling it
+            # to "Start with unfold … then by_cases" would undo the split and
+            # regress. Escalate with branch-closing advice instead.
+            case_labels = re.findall(r"\ncase ([a-zA-Z_][a-zA-Z0-9_.]*)\n", details or "")
+            if case_labels:
+                seen_lbls: list[str] = []
+                for lbl in case_labels:
+                    if lbl not in seen_lbls:
+                        seen_lbls.append(lbl)
+                lbl_list = ", ".join(f"`{l}`" for l in seen_lbls[:4])
+                simp_fragment = f"simp_all [{full_set}]" if full_set else "simp_all"
+                return (
+                    f"ESCALATION: You are stuck inside an open case branch ({lbl_list}). "
+                    f"Do NOT restart the proof or re-split — your previous case-split is "
+                    f"correct. Instead, close ONLY the open branch:\n"
+                    f"1. Call inspect_lean_goals with a `?_` at the branch's current "
+                    f"position to read the exact hypotheses (they include the branch "
+                    f"condition as `h✝` or a named hypothesis).\n"
+                    f"2. Try `{simp_fragment}` — it rewrites hypotheses into each other "
+                    f"and closes branches where the branch hypothesis contradicts another.\n"
+                    f"3. If two hypotheses literally contradict (e.g. `h1 : x = 0` and "
+                    f"`h2 : x ≠ 0`), close with `exact absurd h1 h2`.\n"
+                    f"4. If the goal is a linear (in)equality over `.val`, use `omega` "
+                    f"after `simp only [...]` has exposed the `.val` form."
+                )
             if full_set:
                 return (
                     f"ESCALATION: You are stuck. Do NOT use `unfold` on contract functions. "
