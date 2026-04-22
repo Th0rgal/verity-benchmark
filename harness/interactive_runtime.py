@@ -1554,6 +1554,48 @@ def _build_check_hints(failure_class: str, details: str) -> list[str]:
             "variables multiplicatively, or uses `/` or `%`, is outside omega's reach."
         )
         nonlinear_hints: list[str] = []
+        # Verity-specific: when the counterexample's `where:` section binds a
+        # variable to `↑(mul …)`, `↑(add …)`, or `↑(sub …)`, omega is seeing
+        # the Uint256 operation as an OPAQUE Nat — not as `a.val * b.val`,
+        # `a.val + b.val`, or `a.val - b.val`. That masks what is often
+        # actually a LINEAR goal once the `.val` coercion is rewritten under
+        # the no-overflow hypothesis already in scope. Corpus analysis of 29
+        # failed interactive runs found 38 omega_failed incidents carrying
+        # 96 opaque-op occurrences (mul: 45, add: 34, sub: 17), yet ZERO
+        # proofs (failed OR passed) used the canonical conversion lemmas —
+        # the agent searched for related terms like "val_mul", "Uint256
+        # mul add sub ge theorem lemma val", "div_mul_le" but never found
+        # the right names. Give it the specific lemma + hypothesis shape.
+        opaque_ops = set(re.findall(r"↑\((mul|add|sub)\s", details))
+        if opaque_ops:
+            op_lemmas = []
+            if "mul" in opaque_ops:
+                op_lemmas.append(
+                    "`Uint256.mul_eq_of_lt (h : a.val * b.val < modulus) : "
+                    "(a * b).val = a.val * b.val`"
+                )
+            if "add" in opaque_ops:
+                op_lemmas.append(
+                    "`Uint256.add_eq_of_lt (h : a.val + b.val < modulus) : "
+                    "(a + b).val = a.val + b.val`"
+                )
+            if "sub" in opaque_ops:
+                op_lemmas.append(
+                    "`Uint256.sub_eq_of_le (h : b.val ≤ a.val) : "
+                    "(a - b).val = a.val - b.val`"
+                )
+            ops_shown = "/".join(sorted(opaque_ops))
+            nonlinear_hints.append(
+                f"The counterexample shows `↑({ops_shown} …)` opaque terms — "
+                f"omega cannot see inside a Uint256 `mul` / `add` / `sub` "
+                f"application. Rewrite the `.val` coercion FIRST using: "
+                + "; ".join(op_lemmas)
+                + ". The required bound (typically the spec's `hNoOverflow` "
+                "premise) is already in scope — pass it as the argument. "
+                "After `rw [Uint256.mul_eq_of_lt hNoOverflow]` (or similar) "
+                "the goal becomes a plain `Nat` (in)equality and omega will "
+                "close it."
+            )
         if "/" in details or "% " in details or " mod " in details:
             nonlinear_hints.append(
                 "For division/modulus: first rewrite `a / b` and `a % b` via "
