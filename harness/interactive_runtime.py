@@ -182,6 +182,32 @@ class TaskProofRuntime:
                 )
                 if len(matches) >= limit:
                     return {"status": "ok", "query": query_text, "matches": matches, "truncated": True}
+        if not matches:
+            # Corpus analysis (83 runs) found 55/75 (73%) of search_public_defs
+            # calls returned empty — overwhelmingly because agents searched for
+            # Mathlib / core Lean library names like `Nat.div_mul_le`,
+            # `add_zero`, `div_pos`, etc. This tool only searches the task's
+            # public impl/spec files, not the standard library. Surface that
+            # scope limit explicitly so the agent stops burning rounds on
+            # library searches.
+            return {
+                "status": "ok",
+                "query": query_text,
+                "matches": matches,
+                "truncated": False,
+                "hint": (
+                    "No match in the task's public impl/spec files. "
+                    "`search_public_defs` only indexes definitions inside "
+                    "implementation_files and specification_files for this "
+                    "task — it does NOT search Lean core, Batteries, or "
+                    "Mathlib (Mathlib is not a dependency of this project). "
+                    "For standard-library lemmas use `exact?` / `apply?` / "
+                    "`rw?` via `try_tactic_at_hole`, or rely on `simp` / "
+                    "`omega` / `decide` which already know common arithmetic "
+                    "and boolean facts. Retry this tool only with names you "
+                    "expect to be defined in the current task's spec/impl."
+                ),
+            }
         return {"status": "ok", "query": query_text, "matches": matches, "truncated": False}
 
     def inspect_goals(self) -> dict[str, Any]:
