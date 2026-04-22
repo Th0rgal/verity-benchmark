@@ -1276,6 +1276,19 @@ def classify_failure(details: str) -> str:
         return "module_not_found"
     if "don't know how to synthesize placeholder" in lower:
         return "synthesis_failed"
+    # Parse errors (`unexpected token '…'`, `unexpected identifier`, or the
+    # "expected '{' or indented tactic sequence" shape) indicate malformed
+    # Lean syntax rather than a semantic proof failure. Corpus analysis of
+    # 83 runs: 21 failed-run events across 14 tasks contain a parse error
+    # as one of the error lines, and 2 tasks surface it with no other
+    # classifiable signal (collapsing to "other"). Giving those cases an
+    # explicit class unlocks a targeted syntax hint.
+    if (
+        "error: unexpected token" in lower
+        or "error: unexpected identifier" in lower
+        or "expected '{' or indented tactic sequence" in lower
+    ):
+        return "parse_error"
     return "other"
 
 
@@ -1477,6 +1490,18 @@ def _build_check_hints(failure_class: str, details: str) -> list[str]:
             "replace `_` with an explicit term, (b) add a `show <goal type>` line above "
             "the tactic so Lean knows the expected type, or (c) use `?_` (named hole) "
             "with `inspect_lean_goals` to see what Lean expected there before filling it."
+        )
+    elif failure_class == "parse_error":
+        hints.append(
+            "Lean rejected the proof before type-checking — the candidate contains "
+            "invalid Lean 4 syntax. Common causes: (a) a tactic written in term "
+            "position (e.g. `exact simp [...]` instead of `exact by simp [...]`), "
+            "(b) a `by` block without an indented tactic on the next line, (c) stray "
+            "`;`, `|`, or `using` tokens outside a `have`/`simpa` context, (d) a "
+            "`· simp [...]` branch indented less than the bullet. Re-read the "
+            "editable file via read_public_file to see the exact character positions "
+            "in the error, and rewrite the proof body as a clean `:= by <tactics>` "
+            "block — do not try to patch token-by-token."
         )
 
     # Pattern-based hints that cut across failure classes. These used to live in
