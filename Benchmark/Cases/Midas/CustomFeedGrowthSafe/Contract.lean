@@ -110,164 +110,166 @@ def candidateLivePrice
 
 def nextRoundIdOf (s : ContractState) : Uint256 := add (latestRoundOf s) 1
 
-verity_contract CustomFeedGrowthSafe where
-  storage
-    maxAnswerDeviation : Uint256 := slot 0
-    minAnswer : Uint256 := slot 1
-    maxAnswer : Uint256 := slot 2
-    minGrowthApr : Uint256 := slot 3
-    maxGrowthApr : Uint256 := slot 4
-    latestRound : Uint256 := slot 5
-    onlyUp : Uint256 := slot 6
-    roundAnswer : Uint256 → Uint256 := slot 7
-    roundStartedAt : Uint256 → Uint256 := slot 8
-    roundUpdatedAt : Uint256 → Uint256 := slot 9
-    roundGrowthApr : Uint256 → Uint256 := slot 10
+namespace CustomFeedGrowthSafe
 
-  function applyGrowthAt
-      (answer : Uint256, growthApr : Uint256, timestampFrom : Uint256, timestampTo : Uint256) :
-      Uint256 := do
-    require (timestampFrom <= timestampTo) "CAG: timestampTo < timestampFrom"
-    let passedSeconds := sub timestampTo timestampFrom
-    let interest := sdiv (mul (mul answer passedSeconds) growthApr) 315360000000000000
-    return (add answer interest)
+def maxAnswerDeviation : StorageSlot Uint256 := ⟨0⟩
 
-  function applyGrowth
-      (answer : Uint256, growthApr : Uint256, timestampFrom : Uint256, blockTimestamp : Uint256) :
-      Uint256 := do
-    require (timestampFrom <= blockTimestamp) "CAG: timestampTo < timestampFrom"
-    let passedSeconds := sub blockTimestamp timestampFrom
-    let interest := sdiv (mul (mul answer passedSeconds) growthApr) 315360000000000000
-    return (add answer interest)
+def minAnswer : StorageSlot Uint256 := ⟨1⟩
 
-  function _getDeviation
-      (lastPrice : Uint256, newPrice : Uint256, validateOnlyUp : Bool) : Uint256 := do
-    if newPrice == 0 then
-      return 10000000000
-    else
-      require (lastPrice != 0) "CAG: last price is zero"
-      let deviation := sdiv (mul (mul (sub newPrice lastPrice) 100000000) 100) lastPrice
-      if validateOnlyUp then
-        if slt deviation 0 then
-          require false "CAG: deviation is negative"
-        else
-          pure ()
-      else
-        pure ()
+def maxAnswer : StorageSlot Uint256 := ⟨2⟩
+
+def minGrowthApr : StorageSlot Uint256 := ⟨3⟩
+
+def maxGrowthApr : StorageSlot Uint256 := ⟨4⟩
+
+def latestRound : StorageSlot Uint256 := ⟨5⟩
+
+def onlyUp : StorageSlot Uint256 := ⟨6⟩
+
+def roundAnswer : StorageSlot (Uint256 → Uint256) := ⟨7⟩
+
+def roundStartedAt : StorageSlot (Uint256 → Uint256) := ⟨8⟩
+
+def roundUpdatedAt : StorageSlot (Uint256 → Uint256) := ⟨9⟩
+
+def roundGrowthApr : StorageSlot (Uint256 → Uint256) := ⟨10⟩
+
+def applyGrowthAt
+    (answer : Uint256) (growthApr : Uint256) (timestampFrom : Uint256) (timestampTo : Uint256) :
+    Contract Uint256 := do
+  require (timestampFrom <= timestampTo) "CAG: timestampTo < timestampFrom"
+  let passedSeconds := sub timestampTo timestampFrom
+  let interest := sdiv (mul (mul answer passedSeconds) growthApr) GROWTH_DENOMINATOR
+  return (add answer interest)
+
+attribute [simp] applyGrowthAt
+
+def applyGrowth
+    (answer : Uint256) (growthApr : Uint256) (timestampFrom : Uint256) (blockTimestamp : Uint256) :
+    Contract Uint256 := do
+  applyGrowthAt answer growthApr timestampFrom blockTimestamp
+
+attribute [simp] applyGrowth
+
+def _getDeviation
+    (lastPrice : Uint256) (newPrice : Uint256) (validateOnlyUp : Bool) : Contract Uint256 := do
+  if newPrice == 0 then
+    return HUNDRED_ONE
+  else
+    require (lastPrice != 0) "CAG: last price is zero"
+    let deviation := sdiv (mul (mul (sub newPrice lastPrice) ONE) 100) lastPrice
+    if validateOnlyUp then
       if slt deviation 0 then
-        return (sub 0 deviation)
+        require false "CAG: deviation is negative"
       else
-        return deviation
+        pure ()
+    else
+      pure ()
+    if slt deviation 0 then
+      return (sub 0 deviation)
+    else
+      return deviation
 
-  function setRoundData
-      (data : Uint256, dataTimestamp : Uint256, growthApr : Uint256, blockTimestamp : Uint256) :
-      Unit := do
-    let minAnswer_ ← getStorage minAnswer
-    let maxAnswer_ ← getStorage maxAnswer
-    let minGrowthApr_ ← getStorage minGrowthApr
-    let maxGrowthApr_ ← getStorage maxGrowthApr
-    let latestRound_ ← getStorage latestRound
+attribute [simp] _getDeviation
 
-    if slt data minAnswer_ then
+def lastGrowthApr : Contract Uint256 := do
+  let roundId ← getStorage latestRound
+  getMappingUint roundGrowthApr roundId
+
+attribute [simp] lastGrowthApr
+
+def lastTimestamp : Contract Uint256 := do
+  let roundId ← getStorage latestRound
+  getMappingUint roundUpdatedAt roundId
+
+attribute [simp] lastTimestamp
+
+def lastStartedAt : Contract Uint256 := do
+  let roundId ← getStorage latestRound
+  getMappingUint roundStartedAt roundId
+
+attribute [simp] lastStartedAt
+
+def lastRawAnswer : Contract Uint256 := do
+  let roundId ← getStorage latestRound
+  getMappingUint roundAnswer roundId
+
+attribute [simp] lastRawAnswer
+
+def lastAnswer (blockTimestamp : Uint256) : Contract Uint256 := do
+  let _lastRawAnswer ← lastRawAnswer
+  let _lastGrowthApr ← lastGrowthApr
+  let _lastStartedAt ← lastStartedAt
+  applyGrowth _lastRawAnswer _lastGrowthApr _lastStartedAt blockTimestamp
+
+attribute [simp] lastAnswer
+
+def setRoundData
+    (data : Uint256) (dataTimestamp : Uint256) (growthApr : Uint256) (blockTimestamp : Uint256) :
+    Contract Unit := do
+  let minAnswer_ ← getStorage minAnswer
+  let maxAnswer_ ← getStorage maxAnswer
+  let minGrowthApr_ ← getStorage minGrowthApr
+  let maxGrowthApr_ ← getStorage maxGrowthApr
+  let latestRound_ ← getStorage latestRound
+
+  if slt data minAnswer_ then
+    require false "CAG: out of [min;max]"
+  else
+    if sgt data maxAnswer_ then
       require false "CAG: out of [min;max]"
     else
-      if sgt data maxAnswer_ then
-        require false "CAG: out of [min;max]"
-      else
-        pure ()
-    if slt growthApr minGrowthApr_ then
+      pure ()
+
+  if slt growthApr minGrowthApr_ then
+    require false "CAG: out of [min;max] growth"
+  else
+    if sgt growthApr maxGrowthApr_ then
       require false "CAG: out of [min;max] growth"
     else
-      if sgt growthApr maxGrowthApr_ then
-        require false "CAG: out of [min;max] growth"
-      else
-        pure ()
-    require (dataTimestamp < blockTimestamp) "CAG: timestamp >= now"
+      pure ()
 
-    let roundId := add latestRound_ 1
-    setMappingUint roundAnswer roundId data
-    setMappingUint roundStartedAt roundId dataTimestamp
-    setMappingUint roundUpdatedAt roundId blockTimestamp
-    setMappingUint roundGrowthApr roundId growthApr
-    setStorage latestRound roundId
+  require (dataTimestamp < blockTimestamp) "CAG: timestamp >= now"
 
-  function setRoundDataSafe
-      (data : Uint256, dataTimestamp : Uint256, growthApr : Uint256, blockTimestamp : Uint256) :
-      Unit := do
-    let onlyUp_ ← getStorage onlyUp
-    let latestRound_ ← getStorage latestRound
-    let lastUpdatedAt ← getMappingUint roundUpdatedAt latestRound_
-    let lastStartedAt ← getMappingUint roundStartedAt latestRound_
-    let lastRawAnswer ← getMappingUint roundAnswer latestRound_
-    let lastGrowthApr ← getMappingUint roundGrowthApr latestRound_
+  let roundId := add latestRound_ 1
+  setMappingUint roundAnswer roundId data
+  setMappingUint roundStartedAt roundId dataTimestamp
+  setMappingUint roundUpdatedAt roundId blockTimestamp
+  setMappingUint roundGrowthApr roundId growthApr
+  setStorage latestRound roundId
+
+attribute [simp] setRoundData
+
+def setRoundDataSafe
+    (data : Uint256) (dataTimestamp : Uint256) (growthApr : Uint256) (blockTimestamp : Uint256) :
+    Contract Unit := do
+  let _onlyUp ← getStorage onlyUp
+  let _lastUpdatedAt ← lastTimestamp
+
+  if _lastUpdatedAt != 0 then
+    let deviation ← _getDeviation
+      (← lastAnswer blockTimestamp)
+      (← applyGrowth data growthApr dataTimestamp blockTimestamp)
+      (_onlyUp != 0)
     let maxAnswerDeviation_ ← getStorage maxAnswerDeviation
-    let minAnswer_ ← getStorage minAnswer
-    let maxAnswer_ ← getStorage maxAnswer
-    let minGrowthApr_ ← getStorage minGrowthApr
-    let maxGrowthApr_ ← getStorage maxGrowthApr
+    require (deviation <= maxAnswerDeviation_) "CAG: !deviation"
+  else
+    pure ()
 
-    if lastUpdatedAt != 0 then
-      require (lastStartedAt <= blockTimestamp) "CAG: timestampTo < timestampFrom"
-      let lastPassedSeconds := sub blockTimestamp lastStartedAt
-      let lastInterest := sdiv (mul (mul lastRawAnswer lastPassedSeconds) lastGrowthApr) 315360000000000000
-      let lastAnswer_ := add lastRawAnswer lastInterest
-
-      require (dataTimestamp <= blockTimestamp) "CAG: timestampTo < timestampFrom"
-      let passedSeconds := sub blockTimestamp dataTimestamp
-      let interest := sdiv (mul (mul data passedSeconds) growthApr) 315360000000000000
-      let newLivePrice := add data interest
-      let signedDeviation := sdiv (mul (mul (sub newLivePrice lastAnswer_) 100000000) 100) lastAnswer_
-
-      if newLivePrice == 0 then
-        require (10000000000 <= maxAnswerDeviation_) "CAG: !deviation"
-      else
-        require (lastAnswer_ != 0) "CAG: last price is zero"
-        if onlyUp_ != 0 then
-          if slt signedDeviation 0 then
-            require false "CAG: deviation is negative"
-          else
-            pure ()
-        else
-          pure ()
-        if slt signedDeviation 0 then
-          require (sub 0 signedDeviation <= maxAnswerDeviation_) "CAG: !deviation"
-        else
-          require (signedDeviation <= maxAnswerDeviation_) "CAG: !deviation"
+  if _onlyUp != 0 then
+    if slt growthApr 0 then
+      require false "CAG: negative apr"
     else
       pure ()
+  else
+    pure ()
 
-    if onlyUp_ != 0 then
-      if slt growthApr 0 then
-        require false "CAG: negative apr"
-      else
-        pure ()
-    else
-      pure ()
+  require (_lastUpdatedAt <= blockTimestamp) "CAG: timestamp underflow"
+  require (sub blockTimestamp _lastUpdatedAt > 3600) "CAG: not enough time passed"
+  require (dataTimestamp > (← lastStartedAt)) "CAG: timestamp <= last startedAt"
 
-    require (lastUpdatedAt <= blockTimestamp) "CAG: timestamp underflow"
-    require (sub blockTimestamp lastUpdatedAt > 3600) "CAG: not enough time passed"
-    require (dataTimestamp > lastStartedAt) "CAG: timestamp <= last startedAt"
-    if slt data minAnswer_ then
-      require false "CAG: out of [min;max]"
-    else
-      if sgt data maxAnswer_ then
-        require false "CAG: out of [min;max]"
-      else
-        pure ()
-    if slt growthApr minGrowthApr_ then
-      require false "CAG: out of [min;max] growth"
-    else
-      if sgt growthApr maxGrowthApr_ then
-        require false "CAG: out of [min;max] growth"
-      else
-        pure ()
-    require (dataTimestamp < blockTimestamp) "CAG: timestamp >= now"
+  setRoundData data dataTimestamp growthApr blockTimestamp
 
-    let roundId := add latestRound_ 1
-    setMappingUint roundAnswer roundId data
-    setMappingUint roundStartedAt roundId dataTimestamp
-    setMappingUint roundUpdatedAt roundId blockTimestamp
-    setMappingUint roundGrowthApr roundId growthApr
-    setStorage latestRound roundId
+end CustomFeedGrowthSafe
 
 end Benchmark.Cases.Midas.CustomFeedGrowthSafe
