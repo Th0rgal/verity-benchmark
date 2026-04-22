@@ -797,6 +797,34 @@ class TaskProofRuntime:
                     f"inside `⟨ ⟩`). Either wrap with `by` (e.g. `exact by {name} ...`) or drop the "
                     f"`exact`/`refine` prefix so `{name}` runs in tactic mode."
                 )
+            var_hits = [
+                n for n in unknown_names
+                if n not in _LEAN_TACTIC_NAMES and "." not in n
+                and n and n[0].islower() and "_" not in n
+            ]
+            if var_hits:
+                name = var_hits[0]
+                return (
+                    f"ESCALATION: `{name}` is a LOCAL VARIABLE shape, not a definition. "
+                    f"search_public_defs cannot find binders — it only searches public "
+                    f"definitions. Call `inspect_lean_goals` on a `?_` hole to see which "
+                    f"binders are in scope, then match the actual parameter names from the "
+                    f"theorem signature."
+                )
+            mathlib_hits = [
+                n for n in unknown_names
+                if n not in _LEAN_TACTIC_NAMES and _is_mathlib_shaped(n)
+            ]
+            if mathlib_hits:
+                name = mathlib_hits[0]
+                return (
+                    f"ESCALATION: `{name}` is a Mathlib lemma name, but this workspace has "
+                    f"NO Mathlib dependency. Stop searching for `add_*` / `sub_*` / `Nat.*` "
+                    f"lemmas — they do not exist here. Close arithmetic goals with `omega` "
+                    f"(linear Nat/Int), `ring` (commutative rings), or `simp arith`. For "
+                    f"project helpers call search_public_defs with a KEYWORD, not a guessed "
+                    f"lemma name."
+                )
             return (
                 "ESCALATION: Stop guessing identifier names. Use the search_public_defs tool "
                 "to find the exact names from the implementation and specification files."
