@@ -107,7 +107,7 @@ class TaskProofRuntime:
         if PLACEHOLDER_PATTERN.search(self.current_proof_text):
             warnings.append({
                 "kind": "placeholder_detected",
-                "detail": "contains `sorry`/`admit`/`axiom`; replace before run_lean_check.",
+                "detail": "contains `sorry`/`admit`/`axiom`; Lean rejects these — replace with a real tactic or a `?_` hole.",
             })
         if HIDDEN_PROOF_IMPORT_PATTERN.search(self.current_proof_text):
             warnings.append({
