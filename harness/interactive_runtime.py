@@ -40,6 +40,35 @@ _LEAN_TACTIC_NAMES = frozenset({
 })
 _UNKNOWN_IDENT_RE = re.compile(r"unknown (?:identifier|constant) '([^']+)'")
 
+# Names that look like Mathlib lemmas (e.g. `add_sub_add_right_eq_sub`,
+# `lt_of_add_lt_add_right`, `Nat.div_mul_le`). Corpus analysis of 83 runs
+# found 5 of 29 failed tasks (17%) stagnating on such guesses —
+# `add_sub_add_right_eq_sub`, `sub_eq_sub_right`, `add_assoc`, `add_comm`,
+# `sub_eq_add_neg`, `lt_of_add_lt_add_right`, `Nat.div_mul_le`,
+# `Nat.le_div_mul`, `Nat.div_def`, `Nat.cast_mk`, `Nat.not_ge.mp`, …
+# This workspace has NO Mathlib dependency, so these searches can never
+# succeed; the agent should be pointed at `omega`/`ring`/`simp` instead.
+_MATHLIB_SHAPE_PREFIX_RE = re.compile(
+    r"^(add_|sub_|mul_|div_|mod_|le_|lt_|ge_|gt_|eq_|ne_|not_|neg_|pos_|zero_|one_)"
+)
+_MATHLIB_SHAPE_EXACT = frozenset({
+    "add_assoc", "add_comm", "add_left_comm",
+    "mul_comm", "mul_assoc", "mul_left_comm",
+    "sub_zero", "zero_add", "add_zero", "mul_one", "one_mul",
+    "not_eq",
+})
+
+
+def _is_mathlib_shaped(name: str) -> bool:
+    if name in _MATHLIB_SHAPE_EXACT:
+        return True
+    if _MATHLIB_SHAPE_PREFIX_RE.match(name):
+        return True
+    # `Nat.*` lemma guesses are overwhelmingly Mathlib-only in this corpus.
+    if name.startswith("Nat."):
+        return True
+    return False
+
 
 @dataclass(frozen=True)
 class RuntimePaths:
@@ -1277,6 +1306,10 @@ def _build_check_hints(failure_class: str, details: str) -> list[str]:
             if n not in _LEAN_TACTIC_NAMES and "." not in n
             and n and n[0].islower() and "_" not in n
         ]
+        mathlib_hits = [
+            n for n in unknown_names
+            if n not in _LEAN_TACTIC_NAMES and _is_mathlib_shaped(n)
+        ]
         if tactic_hits:
             name = tactic_hits[0]
             hints.append(
@@ -1300,8 +1333,20 @@ def _build_check_hints(failure_class: str, details: str) -> list[str]:
         elif "decide_True" in details or "decide_False" in details:
             hints.append("CRITICAL: `decide_True` and `decide_False` do not exist. Remove them. Instead, pass precondition hypotheses directly to `simp` - it handles `decide` reduction automatically.")
         else:
-            hints.append("Use search_public_defs to find correct names from spec/impl files.")
-        if not tactic_hits and not var_hits:
+            if mathlib_hits:
+                name = mathlib_hits[0]
+                hints.append(
+                    f"`{name}` is a Mathlib-style lemma name, but this workspace has NO "
+                    f"Mathlib dependency — only core Lean 4, Batteries, and the task's own "
+                    f"`Benchmark.*` modules are importable. Do not keep guessing names like "
+                    f"`add_sub_*`, `sub_eq_*`, `lt_of_*`, or `Nat.div_*` — they will not be "
+                    f"found. For arithmetic goals use `omega` (linear Nat/Int), `ring` "
+                    f"(commutative rings), or `simp arith` directly; for project helpers "
+                    f"use search_public_defs on a keyword, not a guessed lemma name."
+                )
+            else:
+                hints.append("Use search_public_defs to find correct names from spec/impl files.")
+        if not tactic_hits and not var_hits and not mathlib_hits:
             hints.append("Check imports. Standard names: Nat.lt_of_not_ge, Nat.not_le_of_lt.")
     elif failure_class == "unsolved_goals":
         hints.append("Use inspect_lean_goals with a ?_ hole to see exact goal state.")
