@@ -1011,15 +1011,19 @@ def build_run_analysis(
         # Fallback for interactive-mode attempts that do not populate `trace`:
         # derive candidate changes/hashes directly from candidate_file_contents.
         # Count every transition (incl. reverts like A -> B -> A), and record
-        # each distinct hash separately.
-        candidate_text = str(attempt.get("candidate_file_contents", ""))
-        if candidate_text.strip():
-            candidate_hash = stable_digest(candidate_text)
-            distinct_candidate_hashes.add(candidate_hash)
-            if not isinstance(trace, dict) or not trace.get("candidate_sha256"):
+        # each distinct hash separately. Skip this block entirely when `trace`
+        # is already populated, so non-interactive traces are not redundantly
+        # re-hashed (which would be harmless while digests match but fragile
+        # if the two derivation paths ever diverge).
+        trace_has_hash = isinstance(trace, dict) and bool(trace.get("candidate_sha256"))
+        if not trace_has_hash:
+            candidate_text = str(attempt.get("candidate_file_contents", ""))
+            if candidate_text.strip():
+                candidate_hash = stable_digest(candidate_text)
+                distinct_candidate_hashes.add(candidate_hash)
                 if candidate_text != previous_candidate:
                     candidate_change_count += 1
-            previous_candidate = candidate_text
+                previous_candidate = candidate_text
     return {
         "attempt_count": len(attempts),
         "tool_calls_used": tool_calls_used,
@@ -1132,9 +1136,15 @@ def _post_chat_completion(
             try:
                 return json.loads(body)
             except json.JSONDecodeError as exc:
-                raise SystemExit(
-                    f"chat completion request returned non-JSON response: {body[:400]!r}"
-                ) from exc
+                # Non-JSON 200 responses (HTML error pages from a CDN or load
+                # balancer mid-deploy are common) must be treated as transient
+                # failures so the retry loop and fallback-model chain can take
+                # over, not as SystemExit which aborts the whole task.
+                last_error = f"non-JSON response: {body[:200]!r}"
+                if attempt == MAX_CHAT_COMPLETION_RETRIES - 1:
+                    raise _ChatCompletionError(status=0, detail=last_error, model=model) from exc
+                time.sleep(_backoff_delay(attempt, None))
+                continue
         except error.HTTPError as exc:
             detail = exc.read().decode("utf-8", errors="replace")
             last_error = f"HTTP {exc.code}: {detail[:400]}"
