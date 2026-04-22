@@ -28,7 +28,8 @@
   "extra_body": {
     "thinking": {
       "type": "disabled"
-    }
+    },
+    "length_retry_token_cap": 12000
   },
   "request_timeout_seconds": 120
 }

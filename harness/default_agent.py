@@ -1196,6 +1196,9 @@ def send_chat_completion(
         if isinstance(item, str) and item.strip()
     ]
     payload.pop("fallback_models", None)
+    # Benchmark-only knob consumed in execute_interactive_agent_task; strip
+    # it so providers don't reject the request with an unknown-field error.
+    payload.pop("length_retry_token_cap", None)
     models_to_try: list[str] = [config.model, *fallback_models]
     last_exc: _ChatCompletionError | None = None
     for model in models_to_try:
@@ -1783,6 +1786,16 @@ def execute_interactive_agent_task(
     consecutive_length_stops = 0
     max_total_turns = config.max_attempts * 2  # hard cap to prevent infinite loops
     token_budget = config.max_completion_tokens
+    # Ceiling for the length-retry silent bump. Read from config.extra_body so
+    # operators can opt into larger bumps for providers that accept them, but
+    # default to `max_completion_tokens` so models with a hard cap at that value
+    # don't get HTTP 400 when the bump kicks in. Stripped from the request
+    # payload in `send_chat_completion` so it never leaks to the provider.
+    length_retry_token_cap = int(
+        config.extra_body.get("length_retry_token_cap", config.max_completion_tokens)
+    )
+    if length_retry_token_cap < config.max_completion_tokens:
+        length_retry_token_cap = config.max_completion_tokens
     # Temperature schedule: escalate after repeated same-class failures to break out
     # of deterministic loops where temperature=0 reproduces byte-identical responses.
     current_temperature = config.temperature
@@ -1828,7 +1841,7 @@ def execute_interactive_agent_task(
             # provider-enforced per-response limit (some models hard-cap at the
             # configured value and would return HTTP 400 on anything larger).
             if consecutive_length_stops <= 3:
-                token_budget = min(int(token_budget * 1.5), config.max_completion_tokens)
+                token_budget = min(int(token_budget * 1.5), length_retry_token_cap)
                 continue
             # Subsequent length stops: inject a nudge to simplify and use tools
             transcript.append({"role": "assistant", "content": ""})
