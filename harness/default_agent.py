@@ -1983,7 +1983,6 @@ def execute_agent_task(
     prebuild_reports: list[dict[str, Any]] = []
     if config.mode == "interactive":
         prebuild_reports = prebuild_task_modules(task)
-    if config.mode == "interactive":
         response, response_text, candidate_text, evaluation, attempts, tool_calls_used = execute_interactive_agent_task(
             config,
             task,

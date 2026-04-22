@@ -175,8 +175,10 @@ class TaskProofRuntime:
         if not tactic.strip():
             return {"status": "rejected", "reason": "tactic_must_not_be_empty"}
         original = self.current_proof_text
-        # Replace standalone ?_ holes (not named holes like ?_foo)
-        modified = re.sub(r"\?_(?!\w)", tactic.strip(), original)
+        # Replace standalone `?_` holes (not named holes like `?_foo` and not
+        # identifiers ending in `?_`). Must match HOLE_PATTERN so both tools
+        # agree on what counts as a hole.
+        modified = HOLE_PATTERN.sub(tactic.strip(), original)
         if modified == original:
             return {
                 "status": "unsupported",
