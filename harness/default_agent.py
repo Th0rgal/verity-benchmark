@@ -2007,14 +2007,14 @@ def execute_interactive_agent_task(
                     "result": result,
                 }
             )
-            if tool_name == "run_lean_check" and result.get("failure_mode") == "lean_check_failed":
+            if tool_name in ("run_lean_check", "write_editable_proof") and result.get("failure_mode") == "lean_check_failed":
                 saw_lean_failure = True
                 fc = result.get("failure_class") or classify_failure(str(result.get("details", "")))
                 # Skip environment errors: they are infra noise that would
                 # break the temperature schedule's same-class sliding window.
                 if str(fc) != "environment_error":
                     failure_class_history.append(str(fc))
-            elif tool_name in ("run_lean_check", "try_tactic_at_hole") and result.get("status") == "passed":
+            elif tool_name in ("run_lean_check", "try_tactic_at_hole", "write_editable_proof") and result.get("status") == "passed":
                 # Normalize to evaluation schema. `try_tactic_at_hole` returns
                 # extra keys like `tactic` that must be stripped, otherwise the
                 # final result fails schema validation (additionalProperties:

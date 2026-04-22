@@ -78,7 +78,7 @@ class TaskProofRuntime:
         except FileNotFoundError:
             return {"status": "missing", "path": rel_path}
 
-    def write_editable_proof(self, content: str) -> dict[str, Any]:
+    def write_editable_proof(self, content: str, *, check: bool = True) -> dict[str, Any]:
         self.current_proof_text = content if content.endswith("\n") else f"{content}\n"
         warnings: list[dict[str, str]] = []
         if not self.current_proof_text.strip():
@@ -110,15 +110,28 @@ class TaskProofRuntime:
                 "kind": "theorem_statement_mismatch",
                 "detail": "editable theorem signature changed; revert to the original statement.",
             })
-        status = "ok_with_warnings" if warnings else "ok"
         result: dict[str, Any] = {
-            "status": status,
+            "status": "ok_with_warnings" if warnings else "ok",
             "path": self.paths.editable_rel_path,
             "bytes": len(self.current_proof_text.encode("utf-8")),
             "lines": len(self.current_proof_text.splitlines()),
         }
         if warnings:
             result["warnings"] = warnings
+        # Fold the Lean check into the write. Each write+check used to cost
+        # two tool slots and two model round-trips; inlining saves one full
+        # round-trip (hundreds of ms to seconds of LLM latency per proof
+        # iteration) and doubles the effective budget for proof exploration.
+        # The caller can disable by passing check=False (kept for callers
+        # that only want to stage a draft without paying for Lean).
+        if check:
+            # Reuse the full run_lean_check pipeline (auto-heal + annotation +
+            # repair hints) so downstream success/failure detection is
+            # identical to a bare run_lean_check call. Write-time metadata
+            # (path, bytes, lines, warnings) stays visible in the result so
+            # the model still sees format warnings like non_public_imports
+            # alongside the Lean verdict.
+            result.update(self.execute_tool("run_lean_check", {}))
         return result
 
     def search_public_defs(self, query: str, *, limit: int = 20) -> dict[str, Any]:
@@ -310,7 +323,7 @@ class TaskProofRuntime:
                 "type": "function",
                 "function": {
                     "name": "write_editable_proof",
-                    "description": "Replace the entire editable proof file with complete Lean code.",
+                    "description": "Replace the entire editable proof file with complete Lean code and automatically run the Lean check. The response reports status (passed/failed/ok/ok_with_warnings) and, on failure, failure_mode, details, and failure_class. A separate run_lean_check call is not needed after this.",
                     "parameters": {
                         "type": "object",
                         "additionalProperties": False,
