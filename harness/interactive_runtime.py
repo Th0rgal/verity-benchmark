@@ -12,9 +12,12 @@ from task_runner import ROOT, run_command as lean_run_command
 
 
 PLACEHOLDER_PATTERN = re.compile(r"\b(sorry|admit|axiom)\b")
-HOLE_PATTERN = re.compile(r"\?(?:_|\w+)")
+# Match standalone `?_` holes only (not `?x` metavariables used in valid tactics).
+HOLE_PATTERN = re.compile(r"(?<!\w)\?_(?!\w)")
 DEF_PATTERN = re.compile(r"^\s*(?:def|theorem|lemma|abbrev|opaque)\s+([A-Za-z0-9_'.]+)")
-HIDDEN_PROOF_IMPORT_PATTERN = re.compile(r"^\s*import\s+Benchmark\.Cases\..*\.Proofs\b", re.MULTILINE)
+HIDDEN_PROOF_IMPORT_PATTERN = re.compile(
+    r"^\s*(?:import|open|export)\s+Benchmark\.Cases\..*\.Proofs\b", re.MULTILINE
+)
 IMPORT_PATTERN = re.compile(r"^\s*import\s+([A-Za-z0-9_.']+)\s*$", re.MULTILINE)
 
 
@@ -77,12 +80,46 @@ class TaskProofRuntime:
 
     def write_editable_proof(self, content: str) -> dict[str, Any]:
         self.current_proof_text = content if content.endswith("\n") else f"{content}\n"
-        return {
-            "status": "ok",
+        warnings: list[dict[str, str]] = []
+        if not self.current_proof_text.strip():
+            warnings.append({"kind": "empty_content", "detail": "candidate is empty"})
+        if PLACEHOLDER_PATTERN.search(self.current_proof_text):
+            warnings.append({
+                "kind": "placeholder_detected",
+                "detail": "contains `sorry`/`admit`/`axiom`; replace before run_lean_check.",
+            })
+        if HIDDEN_PROOF_IMPORT_PATTERN.search(self.current_proof_text):
+            warnings.append({
+                "kind": "hidden_proof_import_detected",
+                "detail": "remove Benchmark.Cases.*.Proofs import/open/export.",
+            })
+        blocked = self._find_blocked_case_imports(self.current_proof_text)
+        if blocked:
+            warnings.append({
+                "kind": "hidden_case_import_detected",
+                "detail": "non-public imports: " + ", ".join(blocked),
+            })
+        if HOLE_PATTERN.search(self.current_proof_text):
+            warnings.append({
+                "kind": "unfilled_hole",
+                "detail": "proof still contains `?_` holes; fill before submitting.",
+            })
+        candidate_signature = self._extract_theorem_signature(self.current_proof_text)
+        if candidate_signature != self.expected_theorem_signature:
+            warnings.append({
+                "kind": "theorem_statement_mismatch",
+                "detail": "editable theorem signature changed; revert to the original statement.",
+            })
+        status = "ok_with_warnings" if warnings else "ok"
+        result: dict[str, Any] = {
+            "status": status,
             "path": self.paths.editable_rel_path,
             "bytes": len(self.current_proof_text.encode("utf-8")),
             "lines": len(self.current_proof_text.splitlines()),
         }
+        if warnings:
+            result["warnings"] = warnings
+        return result
 
     def search_public_defs(self, query: str, *, limit: int = 20) -> dict[str, Any]:
         query_text = query.strip()
@@ -351,6 +388,14 @@ class TaskProofRuntime:
             return self.write_editable_proof(str(arguments.get("content", "")))
         if name == "run_lean_check":
             result = self.evaluate_current()
+            # Auto-heal environment errors (missing .olean) once before annotating.
+            if result.get("status") == "failed" and result.get("failure_mode") == "lean_check_failed":
+                details = str(result.get("details", ""))
+                if classify_failure(details) == "environment_error":
+                    module_name = _missing_olean_module(details)
+                    healed = _attempt_lake_build(module_name)
+                    if healed:
+                        result = self.evaluate_current()
             if result.get("status") == "failed":
                 result = self._annotate_check_result(result)
                 # Also add structured repair hints from main's guidance
@@ -384,6 +429,14 @@ class TaskProofRuntime:
         hints = _build_check_hints(failure_class, details)
         annotated = dict(result)
         annotated["failure_class"] = failure_class
+
+        # environment_error is infrastructure, not a proof problem. Don't track
+        # stagnation for it (retrying won't help) and tag the result clearly.
+        if failure_class == "environment_error":
+            annotated["environment_error"] = True
+            if hints:
+                annotated["repair_hints"] = hints
+            return annotated
 
         if not is_lean_failure:
             if hints:
@@ -546,6 +599,61 @@ class TaskProofRuntime:
         return module_path.replace("/", ".")
 
 
+_LAKE_BUILD_CACHE: set[str] = set()
+
+
+def _attempt_lake_build(module_name: str | None) -> bool:
+    """Best-effort `lake build` for a module. Returns True on success."""
+    if not module_name:
+        return False
+    if not module_name.startswith("Benchmark."):
+        return False
+    if module_name in _LAKE_BUILD_CACHE:
+        # Already attempted in this process; skip.
+        return False
+    _LAKE_BUILD_CACHE.add(module_name)
+    code, _output = lean_run_command(["lake", "build", module_name], cwd=ROOT)
+    return code == 0
+
+
+def prebuild_task_modules(task: dict[str, Any]) -> list[dict[str, Any]]:
+    """Pre-build implementation/specification .olean files for a task.
+
+    Returns a list of build reports. Meant to be called once before starting
+    the agent loop so on-the-fly compilation inside `lake env lean` does not
+    race with fast agent retries.
+    """
+    reports: list[dict[str, Any]] = []
+    targets: list[str] = []
+    for rel_path in list(task.get("implementation_files", [])) + list(task.get("specification_files", [])):
+        path = Path(rel_path)
+        if path.suffix != ".lean":
+            continue
+        module_name = ".".join(path.with_suffix("").parts)
+        # Only modules inside the `Benchmark` lean_lib are buildable via `lake build`.
+        # Source-of-truth files under `cases/` are mirrored into `Benchmark/Cases/` and
+        # that mirror is what lake actually compiles.
+        if not module_name.startswith("Benchmark."):
+            continue
+        if module_name in targets:
+            continue
+        targets.append(module_name)
+    for module_name in targets:
+        if module_name in _LAKE_BUILD_CACHE:
+            reports.append({"module": module_name, "status": "cached"})
+            continue
+        _LAKE_BUILD_CACHE.add(module_name)
+        code, output = lean_run_command(["lake", "build", module_name], cwd=ROOT)
+        reports.append(
+            {
+                "module": module_name,
+                "status": "ok" if code == 0 else "failed",
+                "output": output[-600:] if code != 0 else "",
+            }
+        )
+    return reports
+
+
 def extract_contract_simp_terms(task: dict[str, Any]) -> list[str]:
     """Extract concrete simp terms from implementation and specification files.
 
@@ -586,11 +694,39 @@ def extract_contract_simp_terms(task: dict[str, Any]) -> list[str]:
     return terms
 
 
+ENVIRONMENT_ERROR_PATTERNS = (
+    re.compile(r"object file ['\"][^'\"]+\.olean['\"]? does not exist"),
+    re.compile(r"failed to load environment"),
+    re.compile(r"lean executable .* not found", re.IGNORECASE),
+)
+
+
+def _missing_olean_module(details: str) -> str | None:
+    """Extract the module name whose .olean is missing, if the error is environmental."""
+    match = re.search(r"object file ['\"]([^'\"]+\.olean)['\"]?", details)
+    if not match:
+        return None
+    olean_path = match.group(1)
+    # Strip any leading directories up to "Benchmark" (since paths may be absolute)
+    marker = "/Benchmark/"
+    idx = olean_path.find(marker)
+    if idx >= 0:
+        rel = olean_path[idx + 1 :]
+    else:
+        rel = olean_path
+    if rel.endswith(".olean"):
+        rel = rel[: -len(".olean")]
+    return rel.replace("/", ".")
+
+
 def classify_failure(details: str) -> str:
     """Classify a Lean checker failure into a coarse category."""
     if not details:
         return "unknown"
     lower = details.lower()
+    for pattern in ENVIRONMENT_ERROR_PATTERNS:
+        if pattern.search(details):
+            return "environment_error"
     if "unknown identifier" in lower or "unknown constant" in lower:
         return "unknown_identifier"
     if "unsolved goals" in lower:
@@ -625,6 +761,13 @@ def classify_failure(details: str) -> str:
 def _build_check_hints(failure_class: str, details: str) -> list[str]:
     """Build targeted repair hints based on failure classification."""
     hints: list[str] = []
+    if failure_class == "environment_error":
+        hints.append(
+            "ENVIRONMENT ERROR (not your fault): a dependency .olean is missing. "
+            "The harness is attempting to rebuild it. If this persists, your proof is likely correct; "
+            "retry run_lean_check once more."
+        )
+        return hints
     if failure_class == "unknown_identifier":
         if "decide_True" in details or "decide_False" in details:
             hints.append("CRITICAL: `decide_True` and `decide_False` do not exist. Remove them. Instead, pass precondition hypotheses directly to `simp` - it handles `decide` reduction automatically.")

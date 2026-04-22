@@ -8,6 +8,7 @@ import os
 import re
 import subprocess
 import sys
+import random
 import time
 from dataclasses import dataclass
 from datetime import datetime, timezone
@@ -16,7 +17,13 @@ from typing import Any
 from urllib import error, request
 
 from benchmark_config import load_benchmark_agent_defaults
-from interactive_runtime import TaskProofRuntime, tool_result_json, extract_contract_simp_terms, classify_failure
+from interactive_runtime import (
+    TaskProofRuntime,
+    classify_failure,
+    extract_contract_simp_terms,
+    prebuild_task_modules,
+    tool_result_json,
+)
 from task_runner import ROOT, load_task_record, resolve_task_manifest
 
 AGENT_RESULTS_DIR = ROOT / "results" / "agent_runs"
@@ -452,9 +459,48 @@ def resolve_config(path: Path, *, require_secrets: bool, profile: str | None = N
     )
 
 
+def _synthesized_interactive_tools_prompt() -> str:
+    """Render the real interactive tool surface from TaskProofRuntime.tool_specs().
+
+    Replaces the static harness/TOOLS.md which advertises `lake build`, `scripts/run_task.sh`,
+    and `scripts/run_all.sh` — none of which are actually callable in interactive mode.
+    """
+    lines = [
+        "# Interactive Tool Surface",
+        "",
+        "You have exactly these function tools. Call them; do NOT call shell commands:",
+        "",
+    ]
+    # Build a minimal task shim to get tool_specs without instantiating a real task.
+    # Note: tool_specs() uses self.paths.public_files for the read_public_file enum,
+    # so we enumerate generic names here instead of calling tool_specs() directly.
+    surface = [
+        ("read_public_file(path)", "Read one of the task's public Lean files (impl/spec/editable)."),
+        ("write_editable_proof(content)", "Replace the editable proof file. Returns immediate warnings for placeholders, theorem-signature changes, hidden imports, or unfilled `?_` holes. Does NOT run Lean."),
+        ("run_lean_check()", "Run `lake env lean` on the editable proof. Returns pass/fail with error details, failure_class, and repair_hints. Auto-retries once on environment errors (missing .olean)."),
+        ("inspect_lean_goals()", "Inspect goal state at explicit `?_` holes. Unsupported if no hole present."),
+        ("try_tactic_at_hole(tactic)", "Replace all `?_` holes with a tactic and check. Preserves original proof on failure."),
+        ("search_public_defs(query)", "Search the task's public impl/spec files for def/theorem/lemma names."),
+    ]
+    for name, desc in surface:
+        lines.append(f"- `{name}` — {desc}")
+    lines.extend([
+        "",
+        "Typical loop: write_editable_proof → run_lean_check → read repair_hints → iterate.",
+        "Do NOT emit `lake build` or `scripts/...`; there is no shell tool.",
+    ])
+    return "\n".join(lines)
+
+
 def build_system_prompt(config: ResolvedAgentConfig) -> str:
     sections = []
     for rel_path in config.system_prompt_files:
+        # In interactive mode, replace the static TOOLS.md (which advertises shell
+        # commands that don't exist) with a synthesized description of the real
+        # function-tool surface.
+        if config.mode == "interactive" and rel_path.endswith("TOOLS.md"):
+            sections.append(f"[{rel_path}]\n{_synthesized_interactive_tools_prompt()}")
+            continue
         path = ROOT / rel_path
         sections.append(f"[{rel_path}]\n{path.read_text(encoding='utf-8').strip()}")
     return "\n\n".join(sections).strip()
@@ -860,7 +906,13 @@ def build_attempt_trace(
         "candidate_sha256": stable_digest(candidate_text),
         "status": status,
         "failure_mode": failure_mode,
-        "candidate_changed_from_previous": None if previous_attempt is None else candidate_text != previous_candidate,
+        # Treat the first non-empty candidate as a change (previously was None, which
+        # broke candidate_change_count analytics — every successful run showed 0).
+        "candidate_changed_from_previous": (
+            bool(candidate_text.strip())
+            if previous_attempt is None
+            else candidate_text != previous_candidate
+        ),
         "failure_mode_changed_from_previous": (
             None if previous_attempt is None else failure_mode != previous_trace.get("failure_mode")
         ),
@@ -942,21 +994,37 @@ def build_run_analysis(
     reasoning_attempts = 0
     candidate_change_count = 0
     failure_mode_change_count = 0
+    distinct_candidate_hashes: set[str] = set()
+    previous_candidate = ""
     for attempt in attempts:
-        trace = attempt.get("trace", {})
-        if not isinstance(trace, dict):
-            continue
-        if int(trace.get("provider_reasoning_chars") or 0) > 0:
-            reasoning_attempts += 1
-        if trace.get("candidate_changed_from_previous") is True:
-            candidate_change_count += 1
-        if trace.get("failure_mode_changed_from_previous") is True:
-            failure_mode_change_count += 1
+        trace = attempt.get("trace", {}) or {}
+        if isinstance(trace, dict):
+            if int(trace.get("provider_reasoning_chars") or 0) > 0:
+                reasoning_attempts += 1
+            if trace.get("candidate_changed_from_previous") is True:
+                candidate_change_count += 1
+            if trace.get("failure_mode_changed_from_previous") is True:
+                failure_mode_change_count += 1
+            candidate_hash = trace.get("candidate_sha256")
+            if isinstance(candidate_hash, str) and candidate_hash and int(trace.get("candidate_chars") or 0) > 0:
+                distinct_candidate_hashes.add(candidate_hash)
+        # Fallback for interactive-mode attempts that do not populate `trace`:
+        # derive candidate changes/hashes directly from candidate_file_contents.
+        candidate_text = str(attempt.get("candidate_file_contents", ""))
+        if candidate_text.strip():
+            candidate_hash = stable_digest(candidate_text)
+            if candidate_hash not in distinct_candidate_hashes:
+                distinct_candidate_hashes.add(candidate_hash)
+                if not isinstance(trace, dict) or not trace.get("candidate_sha256"):
+                    if candidate_text != previous_candidate:
+                        candidate_change_count += 1
+            previous_candidate = candidate_text
     return {
         "attempt_count": len(attempts),
         "tool_calls_used": tool_calls_used,
         "reasoning_attempt_count": reasoning_attempts,
         "candidate_change_count": candidate_change_count,
+        "distinct_candidate_count": len(distinct_candidate_hashes),
         "failure_mode_change_count": failure_mode_change_count,
         "final_failure_mode": evaluation.get("failure_mode"),
         "final_status": evaluation.get("status"),
@@ -984,47 +1052,128 @@ def build_finalization_messages(
     ]
 
 
+RETRY_STATUS_CODES = frozenset({408, 409, 425, 429, 500, 502, 503, 504})
+MAX_CHAT_COMPLETION_RETRIES = 6
+
+
+def _parse_retry_after(value: str | None) -> float | None:
+    if not value:
+        return None
+    value = value.strip()
+    if not value:
+        return None
+    try:
+        return max(0.0, float(value))
+    except ValueError:
+        return None
+
+
+def _backoff_delay(attempt: int, retry_after: float | None) -> float:
+    if retry_after is not None:
+        return min(retry_after, 60.0)
+    # Exponential backoff with jitter, capped at 30s.
+    base = min(30.0, 2.0 ** attempt)
+    return base * (0.5 + random.random() * 0.5)
+
+
+def _post_chat_completion(
+    config: ResolvedAgentConfig,
+    payload: dict[str, Any],
+    model: str,
+) -> dict[str, Any]:
+    """POST one chat completion request with retries on transient failures.
+
+    Retries on HTTP 408/409/425/429/500/502/503/504 and URL-level errors (timeouts)
+    using exponential backoff with jitter, respecting Retry-After when present.
+    """
+    url = f"{config.base_url}{config.chat_completions_path}"
+    body_payload = dict(payload)
+    body_payload["model"] = model
+    req_body = json.dumps(body_payload).encode("utf-8")
+    headers = {
+        "Authorization": f"Bearer {config.api_key}",
+        "Content-Type": "application/json",
+        "User-Agent": "verity-benchmark/0.1",
+        **config.headers,
+    }
+    last_error: str | None = None
+    for attempt in range(MAX_CHAT_COMPLETION_RETRIES):
+        req = request.Request(url, data=req_body, headers=headers, method="POST")
+        try:
+            with request.urlopen(req, timeout=config.request_timeout_seconds) as response:
+                body = response.read().decode("utf-8")
+            try:
+                return json.loads(body)
+            except json.JSONDecodeError as exc:
+                raise SystemExit(
+                    f"chat completion request returned non-JSON response: {body[:400]!r}"
+                ) from exc
+        except error.HTTPError as exc:
+            detail = exc.read().decode("utf-8", errors="replace")
+            last_error = f"HTTP {exc.code}: {detail[:400]}"
+            if exc.code not in RETRY_STATUS_CODES or attempt == MAX_CHAT_COMPLETION_RETRIES - 1:
+                raise _ChatCompletionError(status=exc.code, detail=detail, model=model) from exc
+            retry_after = _parse_retry_after(exc.headers.get("Retry-After") if exc.headers else None)
+            time.sleep(_backoff_delay(attempt, retry_after))
+            continue
+        except error.URLError as exc:
+            last_error = f"URL error: {exc}"
+            if attempt == MAX_CHAT_COMPLETION_RETRIES - 1:
+                raise _ChatCompletionError(status=0, detail=str(exc), model=model) from exc
+            time.sleep(_backoff_delay(attempt, None))
+            continue
+    raise _ChatCompletionError(status=0, detail=last_error or "unknown", model=model)
+
+
+class _ChatCompletionError(Exception):
+    def __init__(self, *, status: int, detail: str, model: str) -> None:
+        super().__init__(f"chat completion failed with status {status}: {detail[:400]}")
+        self.status = status
+        self.detail = detail
+        self.model = model
+
+
 def send_chat_completion(
     config: ResolvedAgentConfig,
     messages: list[dict[str, Any]],
     *,
     tools: list[dict[str, Any]] | None = None,
     max_tokens_override: int | None = None,
+    temperature_override: float | None = None,
 ) -> dict[str, Any]:
-    url = f"{config.base_url}{config.chat_completions_path}"
-    payload = {
-        "model": config.model,
+    payload: dict[str, Any] = {
         "messages": messages,
-        "temperature": config.temperature,
+        "temperature": config.temperature if temperature_override is None else temperature_override,
         "max_tokens": max_tokens_override or config.max_completion_tokens,
     }
     if tools:
         payload["tools"] = tools
         payload["tool_choice"] = "auto"
     payload.update(config.extra_body)
-    req = request.Request(
-        url,
-        data=json.dumps(payload).encode("utf-8"),
-        headers={
-            "Authorization": f"Bearer {config.api_key}",
-            "Content-Type": "application/json",
-            "User-Agent": "verity-benchmark/0.1",
-            **config.headers,
-        },
-        method="POST",
+    # Allow configuring a fallback chain via extra_body.fallback_models (list of model ids).
+    # This lets a rate-limited primary (e.g. "opus") degrade gracefully instead of failing the run.
+    fallback_models = [
+        str(item)
+        for item in (config.extra_body.get("fallback_models") or [])
+        if isinstance(item, str) and item.strip()
+    ]
+    payload.pop("fallback_models", None)
+    models_to_try: list[str] = [config.model, *fallback_models]
+    last_exc: _ChatCompletionError | None = None
+    for model in models_to_try:
+        try:
+            return _post_chat_completion(config, payload, model)
+        except _ChatCompletionError as exc:
+            last_exc = exc
+            # Fall back only on rate-limit / service-unavailable style errors.
+            if exc.status not in (429, 500, 502, 503, 504) and exc.status != 0:
+                break
+            continue
+    if last_exc is None:
+        raise SystemExit("chat completion request failed with no attempts")
+    raise SystemExit(
+        f"chat completion request failed with HTTP {last_exc.status} (model={last_exc.model}): {last_exc.detail[:400]}"
     )
-    try:
-        with request.urlopen(req, timeout=config.request_timeout_seconds) as response:
-            body = response.read().decode("utf-8")
-    except error.HTTPError as exc:
-        detail = exc.read().decode("utf-8", errors="replace")
-        raise SystemExit(f"chat completion request failed with HTTP {exc.code}: {detail}") from exc
-    except error.URLError as exc:
-        raise SystemExit(f"chat completion request failed: {exc}") from exc
-    try:
-        return json.loads(body)
-    except json.JSONDecodeError as exc:
-        raise SystemExit(f"chat completion request returned non-JSON response: {body[:400]!r}") from exc
 
 
 def list_models(config: ResolvedAgentConfig) -> dict[str, Any]:
@@ -1593,13 +1742,25 @@ def execute_interactive_agent_task(
     consecutive_length_stops = 0
     max_total_turns = config.max_attempts * 2  # hard cap to prevent infinite loops
     token_budget = config.max_completion_tokens
+    # Temperature schedule: escalate after repeated same-class failures to break out
+    # of deterministic loops where temperature=0 reproduces byte-identical responses.
+    current_temperature = config.temperature
+    failure_class_history: list[str] = []
 
     turn = 0
     while proof_attempts < config.max_attempts and turn < max_total_turns:
         turn += 1
+        # Adjust temperature when the last two proof attempts failed with the same class.
+        if (
+            len(failure_class_history) >= 2
+            and failure_class_history[-1] == failure_class_history[-2]
+            and failure_class_history[-1] not in ("", "environment_error")
+        ):
+            current_temperature = min(0.7, max(current_temperature + 0.2, 0.2))
         response = send_chat_completion(
             config, transcript, tools=runtime.tool_specs(),
             max_tokens_override=token_budget if token_budget != config.max_completion_tokens else None,
+            temperature_override=current_temperature if current_temperature != config.temperature else None,
         )
         response_text = extract_text(response)
         tool_calls = extract_tool_calls(response)
@@ -1613,9 +1774,9 @@ def execute_interactive_agent_task(
             finish_reason = choices[0].get("finish_reason", "")
         if finish_reason == "length" and not tool_calls and not response_text.strip():
             consecutive_length_stops += 1
-            if consecutive_length_stops == 1:
-                # First length stop: bump token budget once and retry silently
-                token_budget = min(int(token_budget * 1.5), 4500)
+            # Up to 3 silent budget bumps before nudging the model to simplify.
+            if consecutive_length_stops <= 3:
+                token_budget = min(int(token_budget * 1.5), 12000)
                 continue
             # Subsequent length stops: inject a nudge to simplify and use tools
             transcript.append({"role": "assistant", "content": ""})
@@ -1627,7 +1788,7 @@ def execute_interactive_agent_task(
                     "then call run_lean_check. Keep the proof short."
                 ),
             })
-            if consecutive_length_stops >= 3:
+            if consecutive_length_stops >= 5:
                 # Reset budget back to configured value after persistent overruns
                 token_budget = config.max_completion_tokens
             continue
@@ -1656,6 +1817,11 @@ def execute_interactive_agent_task(
                 evaluation = runtime.evaluate_current()
                 attempts[-1]["candidate_file_contents"] = runtime.current_proof_text
                 attempts[-1]["evaluation"] = evaluation
+                failure_class_history.append(
+                    classify_failure(str(evaluation.get("details", "")))
+                    if evaluation.get("status") == "failed"
+                    else ""
+                )
                 if evaluation["status"] == "passed":
                     return response, response_text, runtime.current_proof_text, evaluation, attempts, tool_calls_used
                 # Failed candidate without tool calls: feed error back
@@ -1740,6 +1906,8 @@ def execute_interactive_agent_task(
             )
             if tool_name == "run_lean_check" and result.get("failure_mode") == "lean_check_failed":
                 saw_lean_failure = True
+                fc = result.get("failure_class") or classify_failure(str(result.get("details", "")))
+                failure_class_history.append(str(fc))
             elif tool_name in ("run_lean_check", "try_tactic_at_hole") and result.get("status") == "passed":
                 # Normalize to evaluation schema (try_tactic_at_hole returns tactic/details without failure_mode)
                 evaluation = dict(result)
@@ -1808,6 +1976,12 @@ def execute_agent_task(
         return 0, result_path
 
     start = time.perf_counter()
+    # Pre-build implementation/specification modules so `lake env lean` inside
+    # TaskProofRuntime.evaluate_candidate does not race against on-the-fly
+    # compilation with fast agent retries.
+    prebuild_reports: list[dict[str, Any]] = []
+    if config.mode == "interactive":
+        prebuild_reports = prebuild_task_modules(task)
     if config.mode == "interactive":
         response, response_text, candidate_text, evaluation, attempts, tool_calls_used = execute_interactive_agent_task(
             config,
@@ -1850,6 +2024,8 @@ def execute_agent_task(
     result["attempts"] = attempts
     result["tool_calls_used"] = tool_calls_used
     result["analysis"] = build_run_analysis(attempts=attempts, evaluation=evaluation, tool_calls_used=tool_calls_used)
+    if prebuild_reports:
+        result["prebuild_reports"] = prebuild_reports
     validate_result_payload(result, task_ref)
     result_path = write_result(task_ref, config, result)
     return (0 if evaluation["status"] == "passed" else 1), result_path
