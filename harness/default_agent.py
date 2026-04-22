@@ -2015,9 +2015,14 @@ def execute_interactive_agent_task(
                 if str(fc) != "environment_error":
                     failure_class_history.append(str(fc))
             elif tool_name in ("run_lean_check", "try_tactic_at_hole") and result.get("status") == "passed":
-                # Normalize to evaluation schema (try_tactic_at_hole returns tactic/details without failure_mode)
-                evaluation = dict(result)
+                # Normalize to evaluation schema. `try_tactic_at_hole` returns
+                # extra keys like `tactic` that must be stripped, otherwise the
+                # final result fails schema validation (additionalProperties:
+                # false) and the whole task aborts with no result file.
+                _EVAL_KEYS = ("status", "failure_mode", "details", "command", "candidate_workspace")
+                evaluation = {k: result[k] for k in _EVAL_KEYS if k in result}
                 evaluation.setdefault("failure_mode", None)
+                evaluation.setdefault("details", "")
                 attempts[-1]["candidate_file_contents"] = runtime.current_proof_text
                 attempts[-1]["evaluation"] = evaluation
                 return response, response_text, runtime.current_proof_text, evaluation, attempts, tool_calls_used
