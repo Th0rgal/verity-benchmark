@@ -45,6 +45,13 @@ class TaskProofRuntime:
         # failures — repeated identical hints are pure noise and train the
         # model to ignore the list instead of acting on it.
         self._emitted_hint_keys: set[str] = set()
+        # Normalised fingerprint of the previous failing Lean details text,
+        # plus a count of how many times the same fingerprint has repeated
+        # in a row. Used to detect "no-progress loops" where the model
+        # resubmits a proof that yields byte-identical errors — corpus
+        # analysis found 12/29 failing tasks hit this pattern.
+        self._last_details_fp: str | None = None
+        self._same_details_streak: int = 0
         self.paths = RuntimePaths(
             editable_rel_path=editable_rel_path,
             theorem_name=str(task["theorem_name"]),
@@ -483,6 +490,17 @@ class TaskProofRuntime:
             else:
                 break
 
+        # Detect true no-progress loops: the normalized error text matches the
+        # previous failure byte-for-byte. This is a much stronger signal than
+        # same-class stagnation — it proves the last edit had zero effect on
+        # what Lean actually saw.
+        details_fp = _normalize_details_fp(details)
+        if details_fp and details_fp == self._last_details_fp:
+            self._same_details_streak += 1
+        else:
+            self._same_details_streak = 1
+        self._last_details_fp = details_fp
+
         # Escalate on either: 2+ consecutive same-class failures, or 4+ total failures
         if same_class_count >= 2 or total_failures >= 4:
             if same_class_count >= 2:
@@ -498,6 +516,22 @@ class TaskProofRuntime:
             escalation = self._build_escalation_hint(failure_class)
             if escalation:
                 hints.append(escalation)
+
+        # When the error text is byte-identical to the previous attempt, the
+        # model's latest edit had zero effect — hints must call this out
+        # explicitly, not just repeat class-level advice. Keep this BEFORE
+        # the dedup so the fingerprint-unique streak count is surfaced fresh
+        # each time.
+        if self._same_details_streak >= 2:
+            hints.insert(0, (
+                f"NO-PROGRESS LOOP DETECTED: your last {self._same_details_streak} "
+                "submissions produced byte-identical Lean errors. The changes you are "
+                "making do not reach the failing goal. Stop editing around the symptom. "
+                "Instead: (1) `write_editable_proof` with the failing tactic replaced by "
+                "`?_`, (2) `inspect_lean_goals` to read the real goal at that hole, "
+                "(3) `try_tactic_at_hole` with tactics you have NOT tried yet "
+                "(e.g. `simp_all`, `aesop`, `decide`, `exact?`, `constructor; all_goals ...`)."
+            ))
 
         # Dedupe hints we've already shown this session. Repeated-verbatim hints
         # are noise: corpus analysis of failing tasks showed the same 4-5 hints
@@ -760,6 +794,26 @@ def extract_contract_simp_terms(task: dict[str, Any]) -> list[str]:
             if not def_name.endswith("_spec") and def_name not in terms:
                 terms.append(def_name)
     return terms
+
+
+_FP_LINE_COL_RE = re.compile(r"CandidateCheck\.lean:\d+:\d+:")
+_FP_WS_RE = re.compile(r"\s+")
+
+
+def _normalize_details_fp(details: str) -> str:
+    """Return a whitespace/line-number-agnostic fingerprint of a Lean error.
+
+    Strips the leading `CandidateCheck.lean:LINE:COL:` markers and collapses
+    all whitespace runs so two Lean runs that differ only in formatting
+    noise produce the same fingerprint. Truncated to 512 chars — long
+    enough to distinguish genuinely different errors, short enough that
+    minor trailing-hint variation doesn't break the match.
+    """
+    if not details:
+        return ""
+    d = _FP_LINE_COL_RE.sub("", details)
+    d = _FP_WS_RE.sub(" ", d).strip()
+    return d[:512]
 
 
 # Missing-olean errors can be infrastructure (a Benchmark dependency wasn't
