@@ -427,7 +427,7 @@ class TaskProofRuntime:
                 "type": "function",
                 "function": {
                     "name": "search_public_defs",
-                    "description": "Search public implementation/specification files for matching def/theorem/lemma names.",
+                    "description": "Search the task's public implementation/specification files for matching def/theorem/lemma names. Scope is ONLY those task files — it does NOT search Lean core, Batteries, or Mathlib (Mathlib is not a dependency of this project). For standard-library lemmas, prefer `exact?` / `apply?` / `rw?` via `try_tactic_at_hole`, or tactics like `simp` / `omega` / `decide` that already know common arithmetic and boolean facts.",
                     "parameters": {
                         "type": "object",
                         "additionalProperties": False,

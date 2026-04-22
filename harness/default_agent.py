@@ -480,7 +480,7 @@ def _synthesized_interactive_tools_prompt() -> str:
         ("run_lean_check()", "Re-run `lake env lean` without changing the file (redundant immediately after write_editable_proof)."),
         ("inspect_lean_goals()", "Inspect goal state at explicit `?_` holes. Unsupported if no hole present."),
         ("try_tactic_at_hole(tactic)", "Replace all `?_` holes with a tactic and check. Pass a raw tactic (e.g. `omega`, `simp_all`, `decide`); substitution auto-wraps as `(by tac)` at term positions like `exact ?_`. Preserves original proof on failure."),
-        ("search_public_defs(query)", "Search the task's public impl/spec files for def/theorem/lemma names."),
+        ("search_public_defs(query)", "Search the task's public impl/spec files for def/theorem/lemma names. Does NOT search Lean core / Batteries / Mathlib — use `exact?`/`apply?`/`rw?` via `try_tactic_at_hole` for standard-library lemmas."),
     ]
     for name, desc in surface:
         lines.append(f"- `{name}` — {desc}")
