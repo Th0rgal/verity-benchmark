@@ -1814,6 +1814,35 @@ def _build_check_hints(failure_class: str, details: str) -> list[str]:
                 "run fails even though the rest of the skeleton is fine."
             )
     elif failure_class == "parse_error":
+        # Lean 4 core does NOT recognise `lemma` — it is a Mathlib-only alias
+        # for `theorem`. When the agent writes `(private) lemma foo ...` in a
+        # no-Mathlib workspace, Lean reports `unexpected identifier; expected
+        # 'abbrev', 'axiom', ..., or 'theorem'` at the `lemma` token. Corpus
+        # analysis of 83 interactive runs: 3 of 29 failed tasks
+        # (lido/locked_funds_solvency, openzeppelin/preview_deposit_rounds_down,
+        # safe/in_list_reachable — 10% of failures) wrote `lemma` helpers at
+        # some point; 1 of 54 passed runs also tried it but moved on after
+        # one rewrite. The generic parse-error hint below lists four shapes
+        # (tactic-in-term-position, missing `by`, stray tokens, branch
+        # indentation) but NONE of them mention keyword choice, so the agent
+        # keeps re-editing the proof body while the real fix is a one-token
+        # rename at the declaration header. Fire the lemma-specific hint FIRST
+        # when the error's "expected … or 'theorem'" list appears (a fingerprint
+        # unique to the top-level-command parse shape).
+        _expects_theorem = (
+            "expected 'abbrev'" in details
+            and "'theorem'" in details
+        )
+        if _expects_theorem:
+            hints.append(
+                "Lean 4 core does NOT recognise `lemma` — it is a Mathlib-only "
+                "alias for `theorem`, and this workspace has no Mathlib. The "
+                "\"expected 'abbrev', …, or 'theorem'\" list in the error is "
+                "Lean telling you which top-level commands ARE valid at that "
+                "position. Fix: rename every `lemma` (and `private lemma`) "
+                "helper in the candidate to `theorem` (and `private theorem`). "
+                "The declaration body does not need any other change."
+            )
         hints.append(
             "Lean rejected the proof before type-checking — the candidate contains "
             "invalid Lean 4 syntax. Common causes: (a) a tactic written in term "
