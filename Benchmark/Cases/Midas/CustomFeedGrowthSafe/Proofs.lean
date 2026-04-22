@@ -1852,7 +1852,7 @@ private theorem setRoundDataSafe_rejects_zero_price_prev_started_data_ts_le
     (hPrevStarted : lastStartedAtOf s <= blockTimestamp)
     (hDataTsLe : dataTimestamp <= blockTimestamp) :
     setRoundDataSafe_rejects_zero_price_spec dataTimestamp growthApr blockTimestamp s := by
-  unfold setRoundDataSafe_rejects_zero_price_spec safeCallResult
+  unfold setRoundDataSafe_rejects_zero_price_spec safeRejected safeCallResult
   have hZeroMul :
       mul (mul 0 (sub blockTimestamp dataTimestamp)) growthApr = 0 := by
     simp [Verity.Core.Uint256.mul]
@@ -1918,7 +1918,7 @@ private theorem setRoundDataSafe_rejects_zero_price_prev_started_data_ts_gt
     (hPrevStarted : lastStartedAtOf s <= blockTimestamp)
     (hDataTsLe : ¬ dataTimestamp <= blockTimestamp) :
     setRoundDataSafe_rejects_zero_price_spec dataTimestamp growthApr blockTimestamp s := by
-  unfold setRoundDataSafe_rejects_zero_price_spec safeCallResult
+  unfold setRoundDataSafe_rejects_zero_price_spec safeRejected safeCallResult
   have hOnlyUpEval :
       (getStorage CustomFeedGrowthSafe.onlyUp).run s =
         ContractResult.success (onlyUpWordOf s) s := by
@@ -1951,7 +1951,7 @@ private theorem setRoundDataSafe_rejects_zero_price_prev_started_gt
     (hLastUpdated : lastTimestampOf s != 0)
     (hPrevStarted : ¬ lastStartedAtOf s <= blockTimestamp) :
     setRoundDataSafe_rejects_zero_price_spec dataTimestamp growthApr blockTimestamp s := by
-  unfold setRoundDataSafe_rejects_zero_price_spec safeCallResult
+  unfold setRoundDataSafe_rejects_zero_price_spec safeRejected safeCallResult
   have hOnlyUpEval :
       (getStorage CustomFeedGrowthSafe.onlyUp).run s =
         ContractResult.success (onlyUpWordOf s) s := by
@@ -2000,7 +2000,7 @@ theorem setRoundDataSafe_deviation_bound
     setRoundDataSafe_deviation_bound_spec data dataTimestamp growthApr blockTimestamp s s' := by
   let _ := hLatest
   let _ := hLastUpdated
-  simpa [setRoundDataSafe_deviation_bound_spec] using hDeviation
+  simpa [setRoundDataSafe_deviation_bound_spec, withinDeviationBound] using hDeviation
 
 theorem setRoundDataSafe_enforces_time_gap
     (data dataTimestamp growthApr blockTimestamp : Uint256) (s : ContractState)
@@ -2008,7 +2008,7 @@ theorem setRoundDataSafe_enforces_time_gap
     (hTimeGap : sub blockTimestamp (lastTimestampOf s) > 3600) :
     let s' := ((CustomFeedGrowthSafe.setRoundDataSafe data dataTimestamp growthApr blockTimestamp).run s).snd
     setRoundDataSafe_enforces_time_gap_spec blockTimestamp s s' := by
-  unfold setRoundDataSafe_enforces_time_gap_spec
+  unfold setRoundDataSafe_enforces_time_gap_spec respectsTimeGap
   have hTimeOrder' : (lastTimestampOf s : Nat) ≤ (blockTimestamp : Nat) := by
     simpa using hTimeOrder
   have hGap' : ((sub blockTimestamp (lastTimestampOf s) : Uint256) : Nat) > 3600 := by
@@ -2061,7 +2061,7 @@ theorem setRoundDataSafe_onlyUp_nonnegative_deviation
     setRoundDataSafe_onlyUp_nonnegative_deviation_spec data dataTimestamp growthApr blockTimestamp s s' := by
   let _ := hLatest
   let _ := hLastUpdated
-  simpa [setRoundDataSafe_onlyUp_nonnegative_deviation_spec] using hOnlyUpDeviation
+  simpa [setRoundDataSafe_onlyUp_nonnegative_deviation_spec, respectsOnlyUp] using hOnlyUpDeviation
 
 theorem setRoundDataSafe_propagates_band_guard
     (data dataTimestamp growthApr blockTimestamp : Uint256) (s : ContractState)
@@ -2087,7 +2087,7 @@ theorem setRoundDataSafe_propagates_band_guard
     (hDataTsLt : dataTimestamp < blockTimestamp) :
     let s' := ((CustomFeedGrowthSafe.setRoundDataSafe data dataTimestamp growthApr blockTimestamp).run s).snd
     setRoundDataSafe_propagates_band_guard_spec data dataTimestamp growthApr blockTimestamp s s' := by
-  unfold setRoundDataSafe_propagates_band_guard_spec
+  unfold setRoundDataSafe_propagates_band_guard_spec answerInRange aprInRange
   dsimp
   rw [setRoundDataSafe_writes_latestRound data dataTimestamp growthApr blockTimestamp s
     hPrevStarted hDataTsLe hLastAnswerNZ hOnlyUpDeviation hDeviationCap hOnlyUpApr
@@ -2098,7 +2098,291 @@ theorem setRoundDataSafe_propagates_band_guard
   rw [setRoundDataSafe_writes_growthApr data dataTimestamp growthApr blockTimestamp s
     hPrevStarted hDataTsLe hLastAnswerNZ hOnlyUpDeviation hDeviationCap hOnlyUpApr
     hTimeOrder hTimeGap hStarted hDataLo hDataHi hGrowthLo hGrowthHi hDataTsLt]
-  exact ⟨hDataLo, hDataHi, hGrowthLo, hGrowthHi⟩
+  exact ⟨⟨hDataLo, hDataHi⟩, ⟨hGrowthLo, hGrowthHi⟩⟩
+
+theorem setRoundDataSafe_writes_submitted_round
+    (data dataTimestamp growthApr blockTimestamp : Uint256) (s : ContractState)
+    (hPrevStarted : lastTimestampOf s != 0 → lastStartedAtOf s <= blockTimestamp)
+    (hDataTsLe : lastTimestampOf s != 0 → dataTimestamp <= blockTimestamp)
+    (hLastAnswerNZ :
+      lastTimestampOf s != 0 → candidateLivePrice data dataTimestamp growthApr blockTimestamp ≠ 0 →
+        lastAnswerOf s blockTimestamp != 0)
+    (hOnlyUpDeviation :
+      lastTimestampOf s != 0 → onlyUpWordOf s != 0 →
+        slt (signedDeviationOfSafeCall data dataTimestamp growthApr blockTimestamp s) 0 = false)
+    (hDeviationCap :
+      lastTimestampOf s != 0 →
+        deviationOfSafeCall data dataTimestamp growthApr blockTimestamp s <= maxAnswerDeviationOf s)
+    (hOnlyUpApr : onlyUpWordOf s != 0 → slt growthApr 0 = false)
+    (hTimeOrder : lastTimestampOf s <= blockTimestamp)
+    (hTimeGap : sub blockTimestamp (lastTimestampOf s) > 3600)
+    (hStarted : dataTimestamp > lastStartedAtOf s)
+    (hDataLo : slt data (minAnswerOf s) = false)
+    (hDataHi : sgt data (maxAnswerOf s) = false)
+    (hGrowthLo : slt growthApr (minGrowthAprOf s) = false)
+    (hGrowthHi : sgt growthApr (maxGrowthAprOf s) = false)
+    (hDataTsLt : dataTimestamp < blockTimestamp) :
+    let s' := ((CustomFeedGrowthSafe.setRoundDataSafe data dataTimestamp growthApr blockTimestamp).run s).snd
+    writesSubmittedRound data dataTimestamp growthApr blockTimestamp s s' := by
+  unfold writesSubmittedRound
+  dsimp
+  have hLatest := setRoundDataSafe_writes_latestRound data dataTimestamp growthApr blockTimestamp s
+    hPrevStarted hDataTsLe hLastAnswerNZ hOnlyUpDeviation hDeviationCap hOnlyUpApr
+    hTimeOrder hTimeGap hStarted hDataLo hDataHi hGrowthLo hGrowthHi hDataTsLt
+  have hAnswer := setRoundDataSafe_writes_answer data dataTimestamp growthApr blockTimestamp s
+    hPrevStarted hDataTsLe hLastAnswerNZ hOnlyUpDeviation hDeviationCap hOnlyUpApr
+    hTimeOrder hTimeGap hStarted hDataLo hDataHi hGrowthLo hGrowthHi hDataTsLt
+  have hStartedAt := setRoundDataSafe_writes_startedAt data dataTimestamp growthApr blockTimestamp s
+    hPrevStarted hDataTsLe hLastAnswerNZ hOnlyUpDeviation hDeviationCap hOnlyUpApr
+    hTimeOrder hTimeGap hStarted hDataLo hDataHi hGrowthLo hGrowthHi hDataTsLt
+  have hGrowth := setRoundDataSafe_writes_growthApr data dataTimestamp growthApr blockTimestamp s
+    hPrevStarted hDataTsLe hLastAnswerNZ hOnlyUpDeviation hDeviationCap hOnlyUpApr
+    hTimeOrder hTimeGap hStarted hDataLo hDataHi hGrowthLo hGrowthHi hDataTsLt
+  have hUpdatedWrites := setRoundDataSafe_projected_writes data dataTimestamp growthApr blockTimestamp s
+    hPrevStarted hDataTsLe hLastAnswerNZ hOnlyUpDeviation hDeviationCap hOnlyUpApr
+    hTimeOrder hTimeGap hStarted hDataLo hDataHi hGrowthLo hGrowthHi hDataTsLt
+    0 CustomFeedGrowthSafe.roundUpdatedAt.slot (nextRoundIdOf s)
+  have hUpdated :
+      roundUpdatedAtOf
+          (((CustomFeedGrowthSafe.setRoundDataSafe data dataTimestamp growthApr blockTimestamp).run s).snd)
+          (nextRoundIdOf s) =
+        blockTimestamp := by
+    simpa [roundUpdatedAtOf, writeMapUintAfterRound, nextRoundIdOf, roundAnswerSlot, roundStartedAtSlot,
+      roundUpdatedAtSlot, roundGrowthAprSlot] using hUpdatedWrites.2
+  refine ⟨hLatest, ?_, ?_, ?_, ?_⟩
+  · rw [hLatest]
+    exact hAnswer
+  · rw [hLatest]
+    exact hStartedAt
+  · rw [hLatest]
+    exact hUpdated
+  · rw [hLatest]
+    exact hGrowth
+
+theorem setRoundDataSafe_zero_rejected_under_strict_deviation
+    (dataTimestamp growthApr blockTimestamp : Uint256) (s : ContractState)
+    (hLatest : latestRoundOf s >= 1) :
+    zeroRejectedUnderStrictDeviation dataTimestamp growthApr blockTimestamp s := by
+  unfold zeroRejectedUnderStrictDeviation hasHistory
+  intro hGuard
+  exact setRoundDataSafe_rejects_zero_price dataTimestamp growthApr blockTimestamp s
+    hLatest hGuard.1 hGuard.2
+
+private theorem latestRound_ne_nextRoundId (s : ContractState) :
+    latestRoundOf s ≠ nextRoundIdOf s := by
+  intro hEq
+  unfold nextRoundIdOf at hEq
+  have hValEq : (latestRoundOf s : Nat) = (add (latestRoundOf s) 1).val := by
+    simpa using congrArg (fun x : Uint256 => x.val) hEq
+  by_cases hMax : (latestRoundOf s : Nat) = Verity.Core.MAX_UINT256
+  · have hWrap :
+        (add (latestRoundOf s) 1).val = 0 := by
+      have hWrapNat :
+          (((latestRoundOf s : Nat) + 1) % Verity.Core.Uint256.modulus) = 0 := by
+        rw [hMax, Verity.Core.Uint256.max_uint256_succ_eq_modulus, Nat.mod_self]
+      simpa [Verity.Core.Uint256.add, Verity.Core.Uint256.ofNat] using hWrapNat
+    rw [hWrap] at hValEq
+    have hLatestPos : (latestRoundOf s : Nat) ≠ 0 := by
+      rw [hMax]
+      decide
+    exact hLatestPos hValEq
+  · have hLtMod :
+        (latestRoundOf s : Nat) + 1 < Verity.Core.Uint256.modulus := by
+      have hLeMax := Verity.Core.Uint256.val_le_max (latestRoundOf s)
+      have hLtMax : (latestRoundOf s : Nat) < Verity.Core.MAX_UINT256 := by
+        exact Nat.lt_of_le_of_ne hLeMax hMax
+      rw [← Verity.Core.Uint256.max_uint256_succ_eq_modulus]
+      exact Nat.succ_lt_succ hLtMax
+    have hAddVal :
+        (add (latestRoundOf s) 1).val = (latestRoundOf s : Nat) + 1 := by
+      simpa [Verity.Core.Uint256.add, Verity.Core.Uint256.ofNat] using
+        (Nat.mod_eq_of_lt hLtMod)
+    rw [hAddVal] at hValEq
+    exact Nat.ne_of_lt (Nat.lt_succ_self (latestRoundOf s).val) hValEq
+
+private theorem setRoundDataSafe_accepted_or_rejected
+    (data dataTimestamp growthApr blockTimestamp : Uint256) (s : ContractState) :
+    safeAccepted data dataTimestamp growthApr blockTimestamp s ∨
+      safeRejected data dataTimestamp growthApr blockTimestamp s := by
+  unfold safeAccepted safeRejected safeCallResult
+  cases hRun : (CustomFeedGrowthSafe.setRoundDataSafe data dataTimestamp growthApr blockTimestamp).run s <;>
+    simp [ContractResult.isSuccess, hRun]
+
+private theorem safeRejected_snd_eq
+    (data dataTimestamp growthApr blockTimestamp : Uint256) (s : ContractState)
+    (hRejected : safeRejected data dataTimestamp growthApr blockTimestamp s) :
+    (safeCallResult data dataTimestamp growthApr blockTimestamp s).snd = s := by
+  unfold safeRejected at hRejected
+  unfold safeCallResult Contract.run at hRejected ⊢
+  cases hRaw : CustomFeedGrowthSafe.setRoundDataSafe data dataTimestamp growthApr blockTimestamp s <;>
+    simp [ContractResult.isSuccess, hRaw] at hRejected ⊢
+
+private theorem setRoundDataSafe_projected_writes_of_safe_inputs
+    (data dataTimestamp growthApr blockTimestamp : Uint256) (s : ContractState)
+    (hSafeInputs : safeInputsOk data dataTimestamp growthApr blockTimestamp s)
+    (storageSlot mapSlot : Nat) (k : Uint256) :
+    let s' := ((CustomFeedGrowthSafe.setRoundDataSafe data dataTimestamp growthApr blockTimestamp).run s).snd
+    s'.storage storageSlot = writeStorageAfterRound s storageSlot ∧
+      s'.storageMapUint mapSlot k = writeMapUintAfterRound data dataTimestamp growthApr blockTimestamp s mapSlot k := by
+  rcases hSafeInputs with
+    ⟨hHistoryChecks, hOnlyUpAprCond, hTimeOrder, hTimeGapNat, hStarted, hDataTsLt, hAnswerRange,
+      hAprRange⟩
+  have hDataLo : slt data (minAnswerOf s) = false := hAnswerRange.1
+  have hDataHi : sgt data (maxAnswerOf s) = false := hAnswerRange.2
+  have hGrowthLo : slt growthApr (minGrowthAprOf s) = false := hAprRange.1
+  have hGrowthHi : sgt growthApr (maxGrowthAprOf s) = false := hAprRange.2
+  have hTimeOrderNat : (lastTimestampOf s : Nat) ≤ (blockTimestamp : Nat) := by
+    simpa using hTimeOrder
+  have hTimeGap :
+      sub blockTimestamp (lastTimestampOf s) > 3600 := by
+    have hGapNat :
+        ((blockTimestamp : Nat) - (lastTimestampOf s : Nat)) > 3600 := by
+      simpa [respectsTimeGap] using hTimeGapNat
+    have hGapVal :
+        ((sub blockTimestamp (lastTimestampOf s) : Uint256) : Nat) > 3600 := by
+      change (((blockTimestamp - lastTimestampOf s : Uint256) : Nat) > 3600)
+      rw [Verity.Core.Uint256.sub_eq_of_le hTimeOrderNat]
+      exact hGapNat
+    simpa using hGapVal
+  have hPrevStarted :
+      lastTimestampOf s != 0 → lastStartedAtOf s <= blockTimestamp := by
+    intro _hLastUpdated
+    have hPrevStartedNat : (lastStartedAtOf s : Nat) < (blockTimestamp : Nat) := by
+      exact Nat.lt_trans (by simpa [advancesStartedAt] using hStarted)
+        (by simpa [submittedTimestampBeforeCurrentTime] using hDataTsLt)
+    exact Nat.le_of_lt hPrevStartedNat
+  have hDataTsLe :
+      lastTimestampOf s != 0 → dataTimestamp <= blockTimestamp := by
+    intro _hLastUpdated
+    exact Nat.le_of_lt (by simpa [submittedTimestampBeforeCurrentTime] using hDataTsLt)
+  have hOnlyUpApr :
+      onlyUpWordOf s != 0 → slt growthApr 0 = false := by
+    intro hOnlyUpNZ
+    exact hOnlyUpAprCond (by simpa using hOnlyUpNZ)
+  by_cases hLastUpdated0 : lastTimestampOf s = 0
+  · by_cases hOnlyUp0 : onlyUpWordOf s = 0
+    · exact setRoundDataSafe_zero_history_onlyup_off_writes data dataTimestamp growthApr blockTimestamp s
+        hLastUpdated0 hOnlyUp0 hTimeOrder hTimeGap hStarted hDataLo hDataHi hGrowthLo hGrowthHi
+        hDataTsLt storageSlot mapSlot k
+    · exact setRoundDataSafe_zero_history_onlyup_on_writes data dataTimestamp growthApr blockTimestamp s
+        hLastUpdated0 hOnlyUp0 (hOnlyUpApr (by simpa using hOnlyUp0)) hTimeOrder hTimeGap hStarted
+        hDataLo hDataHi hGrowthLo hGrowthHi hDataTsLt storageSlot mapSlot k
+  · have hLastUpdatedNZ : lastTimestampOf s != 0 := by simpa using hLastUpdated0
+    have hHistory' := hHistoryChecks hLastUpdatedNZ
+    have hDeviationCap :
+        deviationOfSafeCall data dataTimestamp growthApr blockTimestamp s <= maxAnswerDeviationOf s :=
+      hHistory'.1
+    have hLastAnswerNZCond :
+        candidateLivePrice data dataTimestamp growthApr blockTimestamp ≠ 0 →
+          lastAnswerOf s blockTimestamp != 0 :=
+      hHistory'.2.1
+    have hOnlyUpDeviationCond :
+        candidateLivePrice data dataTimestamp growthApr blockTimestamp ≠ 0 →
+          respectsOnlyUp data dataTimestamp growthApr blockTimestamp s :=
+      hHistory'.2.2
+    by_cases hCandidateZero : candidateLivePrice data dataTimestamp growthApr blockTimestamp = 0
+    · by_cases hOnlyUp0 : onlyUpWordOf s = 0
+      · exact setRoundDataSafe_candidate_zero_onlyup_off_writes data dataTimestamp growthApr blockTimestamp s
+          hLastUpdated0 (hPrevStarted hLastUpdatedNZ) (hDataTsLe hLastUpdatedNZ) hDeviationCap
+          hCandidateZero hOnlyUp0 hTimeOrder hTimeGap hStarted hDataLo hDataHi hGrowthLo
+          hGrowthHi hDataTsLt storageSlot mapSlot k
+      · exact setRoundDataSafe_candidate_zero_onlyup_on_writes data dataTimestamp growthApr blockTimestamp s
+          hLastUpdated0 (hPrevStarted hLastUpdatedNZ) (hDataTsLe hLastUpdatedNZ) hDeviationCap
+          hCandidateZero hOnlyUp0 (hOnlyUpApr (by simpa using hOnlyUp0)) hTimeOrder hTimeGap
+          hStarted hDataLo hDataHi hGrowthLo hGrowthHi hDataTsLt storageSlot mapSlot k
+    · have hLastAnswerNZ : lastAnswerOf s blockTimestamp != 0 := hLastAnswerNZCond hCandidateZero
+      by_cases hOnlyUp0 : onlyUpWordOf s = 0
+      · exact setRoundDataSafe_candidate_nonzero_onlyup_off_writes data dataTimestamp growthApr blockTimestamp s
+          hLastUpdated0 (hPrevStarted hLastUpdatedNZ) (hDataTsLe hLastUpdatedNZ) hLastAnswerNZ
+          hDeviationCap hCandidateZero hOnlyUp0 hTimeOrder hTimeGap hStarted hDataLo hDataHi
+          hGrowthLo hGrowthHi hDataTsLt storageSlot mapSlot k
+      · have hOnlyUpDeviation :
+            slt (signedDeviationOfSafeCall data dataTimestamp growthApr blockTimestamp s) 0 = false :=
+          (hOnlyUpDeviationCond hCandidateZero) (by simpa using hOnlyUp0)
+        exact setRoundDataSafe_candidate_nonzero_onlyup_on_writes data dataTimestamp growthApr blockTimestamp s
+          hLastUpdated0 (hPrevStarted hLastUpdatedNZ) (hDataTsLe hLastUpdatedNZ) hLastAnswerNZ
+          hOnlyUpDeviation hDeviationCap hCandidateZero hOnlyUp0
+          (hOnlyUpApr (by simpa using hOnlyUp0)) hTimeOrder hTimeGap hStarted hDataLo hDataHi
+          hGrowthLo hGrowthHi hDataTsLt storageSlot mapSlot k
+
+theorem setRoundDataSafe_accepts_and_writes_submitted_round
+    (data dataTimestamp growthApr blockTimestamp : Uint256) (s : ContractState) :
+    setRoundDataSafe_accepts_and_writes_submitted_round_spec
+      data dataTimestamp growthApr blockTimestamp s := by
+  unfold setRoundDataSafe_accepts_and_writes_submitted_round_spec
+  dsimp
+  intro hSafeInputs
+  let s' := ((CustomFeedGrowthSafe.setRoundDataSafe data dataTimestamp growthApr blockTimestamp).run s).snd
+  have hLatestWrites :=
+    setRoundDataSafe_projected_writes_of_safe_inputs data dataTimestamp growthApr blockTimestamp s
+      hSafeInputs CustomFeedGrowthSafe.latestRound.slot 0 0
+  have hAnswerWrites :=
+    setRoundDataSafe_projected_writes_of_safe_inputs data dataTimestamp growthApr blockTimestamp s
+      hSafeInputs 0 CustomFeedGrowthSafe.roundAnswer.slot (nextRoundIdOf s)
+  have hStartedWrites :=
+    setRoundDataSafe_projected_writes_of_safe_inputs data dataTimestamp growthApr blockTimestamp s
+      hSafeInputs 0 CustomFeedGrowthSafe.roundStartedAt.slot (nextRoundIdOf s)
+  have hUpdatedWrites :=
+    setRoundDataSafe_projected_writes_of_safe_inputs data dataTimestamp growthApr blockTimestamp s
+      hSafeInputs 0 CustomFeedGrowthSafe.roundUpdatedAt.slot (nextRoundIdOf s)
+  have hGrowthWrites :=
+    setRoundDataSafe_projected_writes_of_safe_inputs data dataTimestamp growthApr blockTimestamp s
+      hSafeInputs 0 CustomFeedGrowthSafe.roundGrowthApr.slot (nextRoundIdOf s)
+  have hWrites :
+      writesSubmittedRound data dataTimestamp growthApr blockTimestamp s
+        ((safeCallResult data dataTimestamp growthApr blockTimestamp s).snd) := by
+    unfold writesSubmittedRound
+    unfold safeCallResult
+    have hLatest :
+        latestRoundOf
+            (((CustomFeedGrowthSafe.setRoundDataSafe data dataTimestamp growthApr blockTimestamp).run s).snd) =
+          nextRoundIdOf s := by
+      simpa [writeStorageAfterRound, nextRoundIdOf, latestRoundOf] using hLatestWrites.1
+    have hAnswer :
+        roundAnswerOf
+            (((CustomFeedGrowthSafe.setRoundDataSafe data dataTimestamp growthApr blockTimestamp).run s).snd)
+            (nextRoundIdOf s) = data := by
+      simpa [writeMapUintAfterRound, nextRoundIdOf, roundAnswerOf, roundAnswerSlot, roundStartedAtSlot,
+        roundUpdatedAtSlot, roundGrowthAprSlot] using hAnswerWrites.2
+    have hStartedAt :
+        roundStartedAtOf
+            (((CustomFeedGrowthSafe.setRoundDataSafe data dataTimestamp growthApr blockTimestamp).run s).snd)
+            (nextRoundIdOf s) = dataTimestamp := by
+      simpa [writeMapUintAfterRound, nextRoundIdOf, roundStartedAtOf, roundAnswerSlot, roundStartedAtSlot,
+        roundUpdatedAtSlot, roundGrowthAprSlot] using hStartedWrites.2
+    have hUpdated :
+        roundUpdatedAtOf
+            (((CustomFeedGrowthSafe.setRoundDataSafe data dataTimestamp growthApr blockTimestamp).run s).snd)
+            (nextRoundIdOf s) = blockTimestamp := by
+      simpa [writeMapUintAfterRound, nextRoundIdOf, roundUpdatedAtOf, roundAnswerSlot, roundStartedAtSlot,
+        roundUpdatedAtSlot, roundGrowthAprSlot] using hUpdatedWrites.2
+    have hGrowth :
+        roundGrowthAprOf
+            (((CustomFeedGrowthSafe.setRoundDataSafe data dataTimestamp growthApr blockTimestamp).run s).snd)
+            (nextRoundIdOf s) = growthApr := by
+      simpa [writeMapUintAfterRound, nextRoundIdOf, roundGrowthAprOf, roundAnswerSlot, roundStartedAtSlot,
+        roundUpdatedAtSlot, roundGrowthAprSlot] using hGrowthWrites.2
+    refine ⟨hLatest, ?_, ?_, ?_, ?_⟩
+    · rw [hLatest]
+      exact hAnswer
+    · rw [hLatest]
+      exact hStartedAt
+    · rw [hLatest]
+      exact hUpdated
+    · rw [hLatest]
+      exact hGrowth
+  have hAccepted : safeAccepted data dataTimestamp growthApr blockTimestamp s := by
+    have hOutcome := setRoundDataSafe_accepted_or_rejected data dataTimestamp growthApr blockTimestamp s
+    cases hOutcome with
+    | inl hAccepted =>
+        exact hAccepted
+    | inr hRejected =>
+        have hSnd : (safeCallResult data dataTimestamp growthApr blockTimestamp s).snd = s :=
+          safeRejected_snd_eq data dataTimestamp growthApr blockTimestamp s hRejected
+        have hWritesAtStart : writesSubmittedRound data dataTimestamp growthApr blockTimestamp s s := by
+          simpa [hSnd] using hWrites
+        exact False.elim (latestRound_ne_nextRoundId s hWritesAtStart.1)
+  exact ⟨hAccepted, hWrites⟩
 
 theorem setRoundDataSafe_full_correctness
     (data dataTimestamp growthApr blockTimestamp : Uint256) (s : ContractState)
