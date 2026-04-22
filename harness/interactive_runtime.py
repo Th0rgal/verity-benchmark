@@ -599,21 +599,28 @@ class TaskProofRuntime:
         return module_path.replace("/", ".")
 
 
-_LAKE_BUILD_CACHE: set[str] = set()
+_LAKE_BUILD_CACHE: dict[str, bool] = {}
 
 
 def _attempt_lake_build(module_name: str | None) -> bool:
-    """Best-effort `lake build` for a module. Returns True on success."""
+    """Best-effort `lake build` for a module. Returns True on success.
+
+    Only successful builds are cached; failures are retried on subsequent calls
+    so that transient build errors can be recovered from when the runtime is
+    reused across tasks (e.g. batch / suite runs in a single process).
+    """
     if not module_name:
         return False
     if not module_name.startswith("Benchmark."):
         return False
-    if module_name in _LAKE_BUILD_CACHE:
-        # Already attempted in this process; skip.
+    if _LAKE_BUILD_CACHE.get(module_name):
+        # Already built successfully in this process; skip.
         return False
-    _LAKE_BUILD_CACHE.add(module_name)
     code, _output = lean_run_command(["lake", "build", module_name], cwd=ROOT)
-    return code == 0
+    success = code == 0
+    if success:
+        _LAKE_BUILD_CACHE[module_name] = True
+    return success
 
 
 def prebuild_task_modules(task: dict[str, Any]) -> list[dict[str, Any]]:
@@ -639,16 +646,18 @@ def prebuild_task_modules(task: dict[str, Any]) -> list[dict[str, Any]]:
             continue
         targets.append(module_name)
     for module_name in targets:
-        if module_name in _LAKE_BUILD_CACHE:
+        if _LAKE_BUILD_CACHE.get(module_name):
             reports.append({"module": module_name, "status": "cached"})
             continue
-        _LAKE_BUILD_CACHE.add(module_name)
         code, output = lean_run_command(["lake", "build", module_name], cwd=ROOT)
+        success = code == 0
+        if success:
+            _LAKE_BUILD_CACHE[module_name] = True
         reports.append(
             {
                 "module": module_name,
-                "status": "ok" if code == 0 else "failed",
-                "output": output[-600:] if code != 0 else "",
+                "status": "ok" if success else "failed",
+                "output": output[-600:] if not success else "",
             }
         )
     return reports

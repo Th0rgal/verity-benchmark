@@ -1010,14 +1010,15 @@ def build_run_analysis(
                 distinct_candidate_hashes.add(candidate_hash)
         # Fallback for interactive-mode attempts that do not populate `trace`:
         # derive candidate changes/hashes directly from candidate_file_contents.
+        # Count every transition (incl. reverts like A -> B -> A), and record
+        # each distinct hash separately.
         candidate_text = str(attempt.get("candidate_file_contents", ""))
         if candidate_text.strip():
             candidate_hash = stable_digest(candidate_text)
-            if candidate_hash not in distinct_candidate_hashes:
-                distinct_candidate_hashes.add(candidate_hash)
-                if not isinstance(trace, dict) or not trace.get("candidate_sha256"):
-                    if candidate_text != previous_candidate:
-                        candidate_change_count += 1
+            distinct_candidate_hashes.add(candidate_hash)
+            if not isinstance(trace, dict) or not trace.get("candidate_sha256"):
+                if candidate_text != previous_candidate:
+                    candidate_change_count += 1
             previous_candidate = candidate_text
     return {
         "attempt_count": len(attempts),
