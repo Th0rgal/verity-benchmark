@@ -1404,11 +1404,40 @@ def _build_check_hints(failure_class: str, details: str) -> list[str]:
             hints.append("Check imports. Standard names: Nat.lt_of_not_ge, Nat.not_le_of_lt.")
     elif failure_class == "unsolved_goals":
         hints.append("Use inspect_lean_goals with a ?_ hole to see exact goal state.")
+        # Detect `case <label>` markers in the unsolved-goals output. When
+        # present, the agent has already case-split successfully and exactly
+        # one branch remains open — re-splitting is wrong, the fix is to
+        # close the specific branch using its branch-specific hypothesis.
+        # Corpus analysis: 59 of 127 unsolved_goals incidents across 22
+        # tasks (46%) carry a `case <label>` marker; the current hint set
+        # tells the agent to "restructure with by_cases" which can make it
+        # undo its own working split.
+        case_labels = re.findall(r"\ncase ([a-zA-Z_][a-zA-Z0-9_.]*)\n", details)
+        if case_labels:
+            seen_lbls: list[str] = []
+            for lbl in case_labels:
+                if lbl not in seen_lbls:
+                    seen_lbls.append(lbl)
+            lbl_list = ", ".join(f"`{l}`" for l in seen_lbls[:4])
+            hints.append(
+                f"The unsolved goals list shows open case(s): {lbl_list}. You have "
+                f"ALREADY split successfully — do NOT restructure or re-split. Focus on "
+                f"closing just the named branch(es) using the branch-specific "
+                f"hypotheses now in scope (e.g. `h✝ : ¬P` inside a negative case). "
+                f"Common fixes per branch: add the branch hypothesis to "
+                f"`simp_all [..., hbranch]`, use `omega` when the branch hypothesis "
+                f"is an arithmetic (in)equality, or finish with `exact absurd hx hy` "
+                f"when two branch hypotheses contradict each other."
+            )
         if "if " in details or "match" in details:
             hints.append("If simp leaves `if`/`match` with free variables, use `by_cases` on each unresolved condition BEFORE calling simp. Pass all case hypotheses to simp. Do NOT use `split` after simp or `native_decide`/`decide` on goals with free variables.")
         if "unused" in details.lower() and ("hBound" in details or "hypothesis" in details.lower()):
             hints.append("If a hypothesis is reported as unused by simp, try `simp_all` instead of `simp`. `simp_all` rewrites hypotheses into the goal, resolving mismatches between spec helper names and unfolded definitions.")
-        hints.append("Try restructuring: `by_cases h : condition · simp [..., h] · simp [..., h]`.")
+        # Only suggest a fresh by_cases restructure when we're NOT already
+        # inside a successful case-split — otherwise the agent may undo its
+        # own progress.
+        if not case_labels:
+            hints.append("Try restructuring: `by_cases h : condition · simp [..., h] · simp [..., h]`.")
     elif failure_class == "type_mismatch":
         if "decide" in details:
             hints.append("The goal contains `decide` expressions. Pass all precondition hypotheses to `simp` and it will reduce `decide` automatically. Do NOT try to manually match `decide` types.")
