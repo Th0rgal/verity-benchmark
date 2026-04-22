@@ -740,15 +740,25 @@ class TaskProofRuntime:
                 "(e.g. `simp_all`, `aesop`, `decide`, `exact?`, `constructor; all_goals ...`)."
             ))
 
-        # Highest-leverage directive: corpus analysis showed 16/29 failed tasks
-        # ended with `?_` or `exact ?_` still in the final submitted proof.
-        # `?_` is a probe for `inspect_lean_goals` / `try_tactic_at_hole`, never
-        # a valid proof. When Lean fails AND the current proof still contains a
-        # hole, say so explicitly — the generic synthesis_failed / unsolved_goals
-        # hints don't make this connection clear, and the `?_` advice elsewhere
-        # was misread as "write `?_` and submit it". Insert AFTER the no-progress
-        # directive so this ends up at hints[0] when both fire (hole is the root
-        # cause, no-progress is the symptom).
+        # Dedupe hints we've already shown this session. Repeated-verbatim hints
+        # are noise: corpus analysis of failing tasks showed the same 4-5 hints
+        # echoed across 5+ stagnation events, training the model to skip the
+        # repair_hints list entirely. Only surface *new* advice each time.
+        hints = self._filter_seen_hints(hints)
+
+        # Highest-leverage directive: corpus analysis of 83 runs shows 12/29
+        # failed tasks (41%) ended with `?_` still in the submitted proof, and
+        # in every one of those runs the agent re-submitted a `?_`-containing
+        # proof 2–9 times after the first rejection. The hint BELOW already
+        # existed but was inserted BEFORE `_filter_seen_hints`, so dedup
+        # suppressed it on the 2nd–Nth resubmission and the agent got no
+        # feedback tying its specific, detectable mistake (still-unfilled hole)
+        # to the specific failure class. Insert AFTER the dedup filter so this
+        # safety-critical, state-conditional warning fires on EVERY submission
+        # that still contains `?_`. The hint is keyed to the literal proof
+        # text state, not to the abstract hint corpus, so it is not a "noise"
+        # dedup candidate — it tells the agent something about its concrete
+        # current submission.
         if HOLE_PATTERN.search(self.current_proof_text):
             hole_count = len(HOLE_PATTERN.findall(self.current_proof_text))
             hints.insert(0, (
@@ -764,12 +774,6 @@ class TaskProofRuntime:
                 "`write_editable_proof` with concrete tactics substituted for "
                 "every `?_`."
             ))
-
-        # Dedupe hints we've already shown this session. Repeated-verbatim hints
-        # are noise: corpus analysis of failing tasks showed the same 4-5 hints
-        # echoed across 5+ stagnation events, training the model to skip the
-        # repair_hints list entirely. Only surface *new* advice each time.
-        hints = self._filter_seen_hints(hints)
         if not hints and same_class_count >= 3:
             # All the standing advice has already been seen and isn't working.
             # Issue a one-shot pivot directive rather than sending an empty list,
