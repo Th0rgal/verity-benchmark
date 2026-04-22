@@ -606,7 +606,7 @@ def build_user_prompt(task: dict[str, Any], *, interactive: bool) -> str:
         "You are in interactive mode with verification tools.\n"
         "All implementation, specification, and editable proof files are already provided below. "
         "Do NOT re-read them with read_public_file — start working immediately.\n"
-        "Workflow: call write_editable_proof with your complete proof file, then call run_lean_check to verify.\n"
+        "Workflow: call write_editable_proof with your complete proof file — it returns the Lean check result directly, you do NOT need a separate run_lean_check call afterward.\n"
         "If the check fails, read the failure_class and repair_hints in the result.\n"
         "For unknown_identifier errors: use search_public_defs to find correct names.\n"
         "For unsolved_goals: use inspect_lean_goals with a ?_ hole to see the exact goal, then write targeted tactics.\n"
@@ -1878,8 +1878,8 @@ def execute_interactive_agent_task(
                 "role": "user",
                 "content": (
                     "Your response was cut off. Do not over-think. "
-                    "Immediately call write_editable_proof with a simple proof attempt, "
-                    "then call run_lean_check. Keep the proof short."
+                    "Immediately call write_editable_proof with a simple proof attempt "
+                    "(it runs the Lean check automatically). Keep the proof short."
                 ),
             })
             # Reset budget back to configured value after persistent overruns
@@ -1939,15 +1939,15 @@ def execute_interactive_agent_task(
                     )
                     if guidance:
                         repair_msg += f"\nRepair guidance:\n{guidance}\n"
-                    repair_msg += "\nUse write_editable_proof to write a corrected proof, then run_lean_check to verify."
+                    repair_msg += "\nUse write_editable_proof to write a corrected proof (it runs the Lean check automatically; no separate run_lean_check needed)."
                     transcript.append({"role": "assistant", "content": response_text or ""})
                     transcript.append({"role": "user", "content": repair_msg})
                 elif failure_mode in ("placeholder_detected", "theorem_statement_mismatch"):
                     retry_msg = (
                         f"Your response did not produce a valid proof candidate (proof attempt {proof_attempts} of {config.max_attempts}, "
                         f"failure: {failure_mode}).\n"
-                        "Use the write_editable_proof tool to submit the complete editable Lean proof file, "
-                        "then use run_lean_check to verify it.\n"
+                        "Use the write_editable_proof tool to submit the complete editable Lean proof file "
+                        "(it runs the Lean check automatically; no separate run_lean_check needed).\n"
                         "Do not explain or analyze. Use the tools directly.\n"
                     )
                     transcript.append({"role": "assistant", "content": response_text})
@@ -1957,8 +1957,8 @@ def execute_interactive_agent_task(
             else:
                 # Empty response or no valid candidate: nudge model to use tools
                 nudge_msg = (
-                    "You must use the write_editable_proof tool to submit your proof, "
-                    "then call run_lean_check to verify it. Do not respond with text only.\n"
+                    "You must use the write_editable_proof tool to submit your proof "
+                    "(it runs the Lean check automatically). Do not respond with text only.\n"
                 )
                 transcript.append({"role": "assistant", "content": response_text or ""})
                 transcript.append({"role": "user", "content": nudge_msg})
@@ -2040,7 +2040,7 @@ def execute_interactive_agent_task(
                         "content": (
                             "Stop searching and write a proof now. The search_public_defs tool only searches "
                             "this task's implementation and specification files, not the Lean standard library. "
-                            "Use write_editable_proof to submit your best proof attempt, then run_lean_check to verify."
+                            "Use write_editable_proof to submit your best proof attempt (it runs the Lean check automatically)."
                         ),
                     }
                 )
