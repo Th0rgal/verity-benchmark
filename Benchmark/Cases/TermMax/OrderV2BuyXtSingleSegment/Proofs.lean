@@ -62,6 +62,13 @@ theorem swapDebtTokenToXt_updates_virtual_xt_reserve
     simp [hBaseCut]
   cases hNegWord : isNegativeInt256Word cutOffsetWord
   · simp_all [TermMaxOrderV2BuyXtSingleSegment.swapDebtTokenToXtExactInSingleSegment,
+      TermMaxOrderV2BuyXtSingleSegment.swapAndUpdateReserves,
+      TermMaxOrderV2BuyXtSingleSegment.buyXt,
+      TermMaxOrderV2BuyXtSingleSegment.buyToken,
+      TermMaxOrderV2BuyXtSingleSegment.buyXtStep,
+      TermMaxOrderV2BuyXtSingleSegment.buyXtCurve,
+      TermMaxOrderV2BuyXtSingleSegment.cutsReverseIter,
+      TermMaxOrderV2BuyXtSingleSegment.calcIntervalProps,
       swapDebtTokenToXt_updates_virtual_xt_reserve_spec,
       singleSegmentBuyXtTokenAmtOut,
       signedReserveOffset,
@@ -70,17 +77,23 @@ theorem swapDebtTokenToXt_updates_virtual_xt_reserve
       DECIMAL_BASE,
       DAYS_IN_YEAR,
       SIGNED_INT256_BOUND,
-      TermMaxOrderV2BuyXtSingleSegment.virtualXtReserve,
       Verity.require,
       Verity.bind,
       Bind.bind,
       Verity.pure,
       Pure.pure,
       Contract.run,
-      ContractResult.snd,
-      getStorage,
-      setStorage]
+      ContractResult.snd]
+    simp [getStorage, setStorage, TermMaxOrderV2BuyXtSingleSegment.virtualXtReserve,
+      hSignedOffsetSafe, hVXtNonZero, hNoCross, hMinOut]
   · simp_all [TermMaxOrderV2BuyXtSingleSegment.swapDebtTokenToXtExactInSingleSegment,
+      TermMaxOrderV2BuyXtSingleSegment.swapAndUpdateReserves,
+      TermMaxOrderV2BuyXtSingleSegment.buyXt,
+      TermMaxOrderV2BuyXtSingleSegment.buyToken,
+      TermMaxOrderV2BuyXtSingleSegment.buyXtStep,
+      TermMaxOrderV2BuyXtSingleSegment.buyXtCurve,
+      TermMaxOrderV2BuyXtSingleSegment.cutsReverseIter,
+      TermMaxOrderV2BuyXtSingleSegment.calcIntervalProps,
       swapDebtTokenToXt_updates_virtual_xt_reserve_spec,
       singleSegmentBuyXtTokenAmtOut,
       signedReserveOffset,
@@ -89,15 +102,14 @@ theorem swapDebtTokenToXt_updates_virtual_xt_reserve
       DECIMAL_BASE,
       DAYS_IN_YEAR,
       SIGNED_INT256_BOUND,
-      TermMaxOrderV2BuyXtSingleSegment.virtualXtReserve,
       Verity.require,
       Verity.bind,
       Bind.bind,
       Verity.pure,
       Pure.pure,
       Contract.run,
-      ContractResult.snd,
-      getStorage,
-      setStorage]
+      ContractResult.snd]
+    simp [getStorage, setStorage, TermMaxOrderV2BuyXtSingleSegment.virtualXtReserve,
+      hSignedOffsetSafe, hVXtNonZero, hNoCross, hMinOut]
 
 end Benchmark.Cases.TermMax.OrderV2BuyXtSingleSegment

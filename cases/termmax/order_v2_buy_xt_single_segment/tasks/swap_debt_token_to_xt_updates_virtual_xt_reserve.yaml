@@ -33,4 +33,4 @@ abstraction_notes: >
   `virtualXtReserve_before - deltaXt_curve`.
 unsupported_feature_codes:
   - array_of_struct_param_unsupported
-  - internal_helper_bind_unsupported
+  - higher_order_function_param_specialized

@@ -8,7 +8,7 @@ implementation_id: contracts_v2
 stage: build_green
 translation_status: translated
 spec_status: frozen
-proof_status: partial
+proof_status: complete
 upstream_repo: https://github.com/term-structure/termmax-contract-v2
 upstream_commit: 64bd47b98e064c7fb91ab4a59b70520e0ec285d5
 original_contract_path: contracts/v2/TermMaxOrderV2.sol
@@ -34,21 +34,25 @@ abstraction_tags:
   - exact_in_xt_only
   - single_segment_slice
   - direct_curvecut_params
+  - helper_stack_restored
+  - higher_order_helper_specialized
   - callbacks_elided
   - transfer_rebalance_elided
 abstraction_notes: >
   This benchmark isolates the exact-input `debtToken -> XT` pricing/state-update
-  path of `TermMaxOrderV2`. The model keeps the `_buyXtStep`, `_buyToken`, and
-  `_swapAndUpdateReserves` arithmetic and reserve write, but freezes the curve to
-  a single active lend-side cut passed as direct parameters. That simplification
-  is forced by the current Verity surface: `CurveCut[]` is an array of structs,
-  while the dynamic-array lowering only supports single-word elements, and
-  executable `verity_contract` bodies still reject internal helper-call binds
-  like `let b ← helper a`. Token transfers, callbacks, pool/GT rebalancing, and
-  event emission are omitted because they do not affect `virtualXtReserve`.
+  path of `TermMaxOrderV2`. The model now keeps the Solidity helper stack
+  structurally visible (`calcIntervalProps`, `cutsReverseIter`, `_buyXtStep`,
+  `_buyToken`, `_buyXt`, `_swapAndUpdateReserves`) while freezing the curve to a
+  single active lend-side cut passed as direct parameters. The remaining
+  fidelity gap is that `CurveCut[]` is still an array of structs, which the
+  current Verity macro path cannot represent as a storage dynamic array, and the
+  Solidity function-pointer parameters of `_buyToken` / `_swapAndUpdateReserves`
+  are specialized to the concrete `_buyXtStep` / `_buyXt` path. Token
+  transfers, callbacks, pool/GT rebalancing, and event emission are omitted
+  because they do not affect `virtualXtReserve`.
 unsupported_feature_codes:
   - array_of_struct_param_unsupported
-  - internal_helper_bind_unsupported
+  - higher_order_function_param_specialized
 notes: >
   TermMax range-order AMM slice for pricing-state transition correctness. The
   proof target is the highest-signal easy theorem in this family: on the
