@@ -1,11 +1,13 @@
 ---
 name: verity-prove-invariant
 description: >
-  Three-phase workflow for adding a new Verity benchmark case: research the protocol,
-  model the contract in Lean with explicit simplifications, then prove a chosen
-  invariant (or delegate that step to another agent). Trigger terms: verity prove,
-  new benchmark case, prove invariant, formally verify, add verity case, verify
-  protocol, model contract in verity, lean contract verification.
+  Three-phase workflow for adding a new Verity benchmark case: research the protocol
+  and confirm the invariant, audit how close a line-by-line Verity translation can
+  stay to the Solidity source, model the contract in Lean with explicit acknowledged
+  simplifications, then prove a chosen invariant (or delegate modeling/proving to
+  another agent). Trigger terms: verity prove, new benchmark case, prove invariant,
+  formally verify, add verity case, verify protocol, model contract in verity, lean
+  contract verification.
 ---
 
 # Verity Prove Invariant
@@ -13,6 +15,21 @@ description: >
 Add a new formal-verification case to the Verity benchmark. The workflow has three
 phases, each **gated by explicit user acknowledgement** — never cross a phase boundary
 silently.
+
+Default modeling bias:
+
+- Preserve **semantics always**.
+- Subject to that, preserve the Solidity source shape as closely as possible:
+  function boundaries, helper names, branch structure, slot comments, packed-layout
+  intent, and external-call boundaries.
+- Do **not** jump to a high-level abstraction if a near line-by-line Verity
+  translation is available.
+- If you must simplify or structurally rewrite, identify it before modeling and
+  explain whether the reason is:
+  1. no Verity issue, just a cleaner equivalent expression
+  2. proof-coverage gap only
+  3. Verity ergonomics / feature gap that should probably be fixed
+  4. hard blocker
 
 ## When to use
 
@@ -27,7 +44,7 @@ silently.
 
 ---
 
-## Phase 1 — Research & invariant alignment (before any code)
+## Phase 1 — Research, invariant alignment, and translation audit (before any code)
 
 Output ONE text response covering all of the following, then **stop and wait for user
 acknowledgement**. Do not proceed to Phase 2 until the user explicitly confirms.
@@ -43,16 +60,45 @@ acknowledgement**. Do not proceed to Phase 2 until the user explicitly confirms.
 3. **If the user proposed an invariant,** say explicitly whether it makes sense. If
    it's too weak (trivially true), too strong (requires modelling the whole world),
    or mis-targets the contract, say so and propose an adjustment.
-4. **Wait.** End with: "Confirm you're aligned on this invariant and the scope, and
-   I'll start modelling."
+4. **Translation fidelity audit.** For the exact Solidity files/functions in scope,
+   identify the constructs that can be translated near line-by-line in Verity and the
+   constructs that would require rewrites or trusted boundaries. For each non-trivial
+   rewrite, include:
+   - the exact Solidity construct / snippet / file path
+   - the closest Verity surface you would use
+   - the classification: no issue / proof-gap-only / Verity-gap / hard blocker
+   - whether this changes syntax only, or also risks changing semantics
+5. **Draft simplifications before code.** List every simplification you currently
+   expect to make, or explicitly say "none yet". If a simplification is driven by
+   Verity limitations, say whether:
+   - there is a workaround in the current local package
+   - there is a workaround in a repo-local or user-provided Verity fork
+   - this should probably become a Verity issue
+6. **Delegation option.** If the user wants another agent to do the implementation,
+   say you can emit a full modeling+proof prompt in the format described in
+   `references/delegated-model-and-prove-prompt.md`.
+7. **Wait.** End with: "Confirm you're aligned on this invariant, the line-by-line
+   modeling plan, and the listed simplifications / Verity gaps, and I'll start
+   modelling."
 
 Research the protocol using web fetches of its docs + the actual Solidity source
 (raw.githubusercontent.com). Read enough source to identify the require checks, state
-variables, and external calls you'll need to decide about modelling.
+variables, storage layout decisions, loops / queues, and external calls you'll need
+to decide about modelling fidelity.
+
+Before you claim a Verity limitation, check in this order:
+
+1. the current local package at `.lake/packages/verity/`
+2. any repo-local or user-provided Verity fork (for example `.context/lfglabs-verity`)
+3. [veritylang.com](https://veritylang.com)
+
+Do not report a construct as unsupported if it is actually present but only has
+partial proof coverage. Distinguish clearly between "cannot express", "can express but
+proof story is incomplete", and "can express cleanly".
 
 ---
 
-## Phase 2 — Model & proving prompt
+## Phase 2 — Line-by-line model scaffold & delegation
 
 Only start after the user acknowledges Phase 1.
 
@@ -81,7 +127,20 @@ families/<family>/
 Inversion warning: the reference proof goes in `Cases/.../Proofs.lean`, NOT in the
 `Generated/.../Tasks/*.lean` placeholder. The placeholder stays `exact ?_` forever.
 
-### 2b. Write Contract.lean with an explicit simplifications block
+### 2b. Translation policy before the first edit
+
+Use the following order of preference:
+
+1. near line-by-line Verity translation that preserves source structure and semantics
+2. syntax-close rewrite that preserves semantics and leaves the source mapping obvious
+3. narrower semantic model with explicit acknowledged simplifications
+
+Do not silently switch from (1) to (3).
+
+If you discover a new simplification after Phase 1 that was not previously disclosed,
+stop and tell the user before baking it into the model.
+
+### 2c. Write Contract.lean with an explicit simplifications block
 
 Put a doc-comment at the top listing every simplification you make, in two columns:
 "what was simplified" and "why (concretely: the Verity feature that's missing, or the
@@ -89,35 +148,46 @@ semantics that would be lost)". Be honest — do not call something a simplifica
 you can model it faithfully.
 
 **Before you declare something unsupported, verify it against the current Verity
-package.** Verity evolves. Check `.lake/packages/verity/` and [veritylang.com](https://veritylang.com)
-for the current DSL surface.
+surface.** Verity evolves across branches. Check:
+
+- `.lake/packages/verity/`
+- any repo-local or user-provided Verity fork
+- [veritylang.com](https://veritylang.com)
 
 Current Verity gotchas as of this writing (re-check each time — these dated):
 - **Lean reserved keywords** inside `verity_contract` parameter lists: `from`, `until`,
   `if`, `then`, `else`, `match`. Rename to `holder`, `expiry`, etc.
 - **Allowed DSL bind sources**: `getStorage` / `getStorageAddr` / `getMapping` /
   `getMappingAddr` / `getMapping2` / `getMappingUint` / `msgSender` / `msgValue` /
-  `tload` / `ecrecover` / `ecmCall`. `blockTimestamp` is NOT exposed by the macro
-  today — pass it as a function parameter if needed.
+  `tload` / `ecrecover` / `ecmCall`. **Do not assume `blockTimestamp` is absent**:
+  support differs across branches, so verify the actual package/fork before threading
+  it as a function parameter.
 - **Nested mappings ARE supported** via `Address → Address → Uint256 := slot N` and
   `getMapping2` / `setMapping2`. Don't claim otherwise.
 - **No `let (a, b) := pair` destructuring** inside a `verity_contract` function body.
   Inline the tuple fields instead, or compute them outside and pass them in.
+- **External calls** often require ECMs, bounded low-level surfaces, or trusted
+  boundaries. Preserve the call site structurally where possible; if you must abstract
+  it away, say so explicitly.
+- **Packed-slot / inline-assembly storage logic** may be representable semantically
+  without preserving the exact source write shape. If you rewrite packed writes into
+  ordinary fields, keep the original slot/bit-layout intent visible in comments or
+  helper definitions.
 
-### 2c. Write Specs.lean
+### 2d. Write Specs.lean
 
 State each property as a `def foo_spec (... : ContractState) : Prop`. Keep specs
 minimal — each spec should be one clear sentence of English. Use `balanceOf`, `supply`,
 and similar helpers to hide storage-slot indices from the spec surface.
 
-### 2d. Write Generated placeholders + YAMLs
+### 2e. Write Generated placeholders + YAMLs
 
 For each theorem, create:
 - `Benchmark/Generated/<Project>/<Case>/Tasks/<Name>.lean` ending in `exact ?_`
 - `cases/<project>/<case>/tasks/<name>.yaml` pointing at that file
 - Matching entry in `case.yaml` selected_functions + abstraction_tags
 
-### 2e. Verify the scaffold builds
+### 2f. Verify the scaffold builds
 
 ```bash
 lake build Benchmark.Cases.<Project>.<Case>.Contract
@@ -128,7 +198,23 @@ lake build   # default target builds Cases/ only, skips Generated placeholders
 All three must be green BEFORE you move to the proving step. A scaffold that
 doesn't compile wastes every minute of proving time downstream.
 
-### 2f. Hand over to the proving step
+### 2g. Delegated modeling+proof prompt (optional)
+
+If the user wants to hand the whole task to another agent **before** or **instead of**
+doing the implementation yourself, emit a prompt in the format described in
+`references/delegated-model-and-prove-prompt.md`.
+
+That prompt must include:
+
+- absolute workspace path
+- pinned upstream source links / commit
+- approved invariant
+- instruction to preserve source structure line-by-line where possible
+- known Verity capability notes and possible simplification pressure points
+- required file layout and build commands
+- the same persistence rule used for proofs in this skill
+
+### 2h. Hand over to the proving step
 
 Ask the user:
 
@@ -191,6 +277,10 @@ Emit this when the user picks option (2):
 > Do not return "I got stuck". If `simp` leaves a residual goal, read the goal and
 > pick a tactic for that specific shape. If that fails, axiomatize with justification.
 
+If the user instead wants a delegated agent to handle both the modeling and the proof,
+use the separate template in `references/delegated-model-and-prove-prompt.md`, not the
+proof-only prompt above.
+
 ### Post-proof review (mandatory)
 
 Once any proof lands, write a short report back to the user:
@@ -237,6 +327,9 @@ If it involves `sub + add` cancellation, use `Verity.Core.Uint256.sub_add_cancel
 ## Anti-patterns — do not do these
 
 - Claiming a Verity feature is unsupported without checking the current package first.
+- Claiming a Verity feature is unsupported when it is really only a proof-coverage gap.
+- Starting `Contract.lean` before explicitly listing the expected simplifications and
+  Verity friction points to the user.
 - Writing the proof inside `Generated/.../Tasks/*.lean`. That file stays `exact ?_`.
 - Batching simplification-reasons under one paragraph ("we simplified FHE"). Each
   simplification gets its own bullet with a concrete "why".
@@ -244,6 +337,8 @@ If it involves `sub + add` cancellation, use `Verity.Core.Uint256.sub_add_cancel
   stop and ask.
 - Skipping Phase 1 because the user gave you an invariant. Still write the
   protocol summary + evaluate the invariant before you touch code.
+- Prematurely abstracting the Solidity into a high-level toy model when a closer
+  source-structured translation is available.
 - Publishing an article, readme, or PR saying "all N functions covered" when the
   theorem count doesn't actually cover them. Count proofs against the public function
   surface before claiming coverage.
