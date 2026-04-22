@@ -922,10 +922,22 @@ _TERM_POSITION_RE = re.compile(
     r"|:=\s*"                    # RHS of let / have := ?_
     r")$"
 )
-_FP_LINE_COL_RE = re.compile(r"CandidateCheck\.lean:\d+:\d+:")
+# Lean's diagnostic header format is `<source-file>:LINE:COL: <kind>: <msg>`.
+# Two code paths reach this regex family:
+#   1. `evaluate_candidate` (run_lean_check / write_editable_proof) writes a
+#      `CandidateCheck.lean` stub and reports errors against that name.
+#   2. `inspect_lean_goals` runs Lean against the actual editable file path
+#      (e.g. `Benchmark/Generated/Foo/Bar.lean`) because it needs `check_goals`
+#      to introspect the real `?_` hole — no stub wrapper.
+# Corpus analysis of 83 runs found 32/88 (36%) of inspect_lean_goals outputs
+# still contained `linter.unusedSimpArgs` blocks because the old, hardcoded
+# `CandidateCheck\.lean:` regex silently skipped them. Accepting any
+# `<nonws>.lean:LINE:COL:` header lets the same strip + fingerprint logic
+# apply to both code paths uniformly.
+_FP_LINE_COL_RE = re.compile(r"\S+\.lean:\d+:\d+:")
 _FP_WS_RE = re.compile(r"\s+")
 _LEAN_BLOCK_HEADER_RE = re.compile(
-    r"^CandidateCheck\.lean:\d+:\d+:\s*(error|warning|note|info):"
+    r"^\S+\.lean:\d+:\d+:\s*(error|warning|note|info):"
 )
 
 
@@ -978,11 +990,14 @@ def _strip_noise_warnings(output: str) -> str:
     details blob — pure noise from the model's point of view because
     the actual repair work is always driven by errors, not by this lint.
 
-    A block begins at a `CandidateCheck.lean:L:C: warning: This simp
-    argument is unused:` header and ends at the next Lean diagnostic
-    header (error/warning/note/info) or end-of-output. Every other
-    diagnostic kind (including unrelated warnings) is preserved
-    verbatim.
+    A block begins at a `<source>.lean:L:C: warning: This simp argument
+    is unused:` header and ends at the next Lean diagnostic header
+    (error/warning/note/info) or end-of-output. The `<source>` prefix
+    is matched generically so outputs from `inspect_lean_goals` (which
+    runs Lean against the editable file directly, not the
+    `CandidateCheck.lean` stub) are stripped the same as outputs from
+    `run_lean_check`. Every other diagnostic kind (including unrelated
+    warnings) is preserved verbatim.
     """
     if not output or "This simp argument is unused" not in output:
         return output
@@ -1060,7 +1075,7 @@ def _substitute_holes(proof: str, tactic: str) -> str:
 def _normalize_details_fp(details: str) -> str:
     """Return a whitespace/line-number-agnostic fingerprint of a Lean error.
 
-    Strips the leading `CandidateCheck.lean:LINE:COL:` markers and collapses
+    Strips the leading `<source>.lean:LINE:COL:` markers and collapses
     all whitespace runs so two Lean runs that differ only in formatting
     noise produce the same fingerprint. Truncated to 512 chars — long
     enough to distinguish genuinely different errors, short enough that
