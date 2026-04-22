@@ -1509,6 +1509,21 @@ def _build_check_hints(failure_class: str, details: str) -> list[str]:
             or "ContractResult.revert" in details
             or "Contract.run" in details
         )
+        # Also catch the case where the literal markers above are absent
+        # but the goal carries a raw `(X).run s).snd` pattern — i.e. the
+        # agent tried to close the theorem without ever unfolding
+        # `Contract.run`. Corpus analysis: this adds `swap_owner_ownerListInvariant`
+        # (1 failed task whose final error has "unsolved goals" alongside a
+        # synthesis placeholder), with 0 of 54 passed runs' final details
+        # matching the pattern in a goal line.
+        if not has_monadic_trace:
+            for _ln in details.split("\n"):
+                _stripped = _ln.lstrip()
+                if _stripped.startswith("⊢") and re.search(
+                    r"\.run\s+\w+\)\.snd", _ln
+                ):
+                    has_monadic_trace = True
+                    break
         if has_monadic_trace:
             hints.append(
                 "Your `simp` unfolded the contract function but the goal "
@@ -1724,6 +1739,44 @@ def _build_check_hints(failure_class: str, details: str) -> list[str]:
             "the tactic so Lean knows the expected type, or (c) use `?_` (named hole) "
             "with `inspect_lean_goals` to see what Lean expected there before filling it."
         )
+        # Corpus analysis: 3 of 7 failed runs ending in `synthesis_failed` left
+        # a raw `(X).run s).snd` monadic trace in the goal at the hole — the
+        # agent had written `exact ?_` without ever unfolding the contract
+        # function, so `inspect_lean_goals` would just show the un-reduced
+        # trace again. Of 54 passed runs, only 1 intermediate check hit this
+        # shape (and the run recovered afterward), so the pattern is a clean
+        # failure-side signal. Tasks: safe/swap_owner_ownerListInvariant,
+        # safe/setupOwners_ownerListInvariant, safe/removeOwner_isOwnerCorrectness,
+        # zama/transfer_sufficient. The existing generic hint above never tells
+        # the agent that the hole is unreachable until `Contract.run` unfolds.
+        _run_snd_in_goal = False
+        for _ln in details.split("\n"):
+            _stripped = _ln.lstrip()
+            if _stripped.startswith("⊢") and re.search(
+                r"\.run\s+\w+\)\.snd", _ln
+            ):
+                _run_snd_in_goal = True
+                break
+        if _run_snd_in_goal:
+            hints.append(
+                "The goal at the `?_` / `_` hole still contains a raw "
+                "`(X).run s).snd` monadic trace — `Contract.run` has NOT "
+                "been reduced, so no placeholder term can unify with it. "
+                "Filling the hole with more `?_` or `inspect_lean_goals` "
+                "alone will not make progress; you must first UNFOLD the "
+                "contract function before (or at) the hole. Concrete move: "
+                "replace `exact ?_` with "
+                "`simp [X, Contract.run, Verity.bind, Bind.bind, Verity.pure, "
+                "Pure.pure, ContractResult.snd]` where `X` is the contract "
+                "function literally visible in the goal (e.g. "
+                "`OwnerManager.swapOwner`, `ERC7984.transfer`). Once the "
+                "trace is reduced, re-run inspect_lean_goals to see the "
+                "propositional residue and close it with `split_ifs` / "
+                "`simp_all` / branch-hypotheses as usual. Do NOT submit a "
+                "final proof body that still contains `?_`; the harness "
+                "reports `don't know how to synthesize placeholder` and the "
+                "run fails even though the rest of the skeleton is fine."
+            )
     elif failure_class == "parse_error":
         hints.append(
             "Lean rejected the proof before type-checking — the candidate contains "
