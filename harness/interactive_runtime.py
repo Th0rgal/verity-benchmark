@@ -1795,6 +1795,42 @@ def _build_check_hints(failure_class: str, details: str) -> list[str]:
                 "reports `don't know how to synthesize placeholder` and the "
                 "run fails even though the rest of the skeleton is fine."
             )
+        else:
+            # Corpus analysis of 29 failed runs: 7 terminate with
+            # `don't know how to synthesize placeholder`. Of those 7, only
+            # ~3 have a `(X).run s).snd` monadic trace in the goal (handled
+            # above). The other ~4 land with goals that are arithmetic on
+            # `s.storage` (ethereum/full_deposit_preserves_partial_gap,
+            # lido/shares_conversion_monotone), list-predicate witnesses
+            # (safe/setup_owners_acyclicity,
+            # safe/setup_owners_owner_list_invariant), or conditional
+            # `if … then … else …` expressions — shapes where the existing
+            # generic `show <goal type>` hint is not actionable, so the
+            # agent just re-probes with `inspect_lean_goals` and loops
+            # until the tool budget runs out. Emit a shape-aware hint so
+            # the agent knows to replace the underscore with an explicit
+            # witness rather than continue probing.
+            hints.append(
+                "`don't know how to synthesize placeholder` means an "
+                "underscore `_` (or named hole `?_`) inside a `refine` / "
+                "`exact ⟨…⟩` / constructor call has no canonical filling. "
+                "Lean will NOT invent a Nat, Uint256, list, or proof term "
+                "— you must supply it. Concrete fixes by goal shape: "
+                "(a) arithmetic (e.g. `⊢ add x 1 - add y 1 = x - y`, "
+                "`⊢ n + k = m`) → replace `_` with `(by omega)` or "
+                "`(by simp; omega)`; "
+                "(b) conditional (`⊢ if P then … else …`) → case-split "
+                "with `split_ifs` BEFORE reaching the hole so each branch "
+                "has a concrete target; "
+                "(c) list-invariant witness → write the explicit list "
+                "literal (e.g. `[owner1, owner2, owner3]`) rather than "
+                "`_`; "
+                "(d) propositional `And` / `Exists` → replace `⟨_, _⟩` "
+                "with `⟨<explicit witness>, by <tactic>⟩`. Repeating "
+                "`inspect_lean_goals` at the same hole will show the same "
+                "unsolvable placeholder — do not retry the same shape, "
+                "rewrite the hole with one of the concrete forms above."
+            )
     elif failure_class == "parse_error":
         # Lean 4 core does NOT recognise `lemma` — it is a Mathlib-only alias
         # for `theorem`. When the agent writes `(private) lemma foo ...` in a
