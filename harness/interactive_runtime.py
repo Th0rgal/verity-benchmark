@@ -728,7 +728,7 @@ def _missing_olean_module(details: str) -> str | None:
     olean_path = match.group(1)
     # Strip any leading directories up to "Benchmark" (since paths may be absolute)
     marker = "/Benchmark/"
-    idx = olean_path.find(marker)
+    idx = olean_path.rfind(marker)
     if idx >= 0:
         rel = olean_path[idx + 1 :]
     else:

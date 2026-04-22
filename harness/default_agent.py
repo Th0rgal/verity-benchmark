@@ -1168,15 +1168,17 @@ def send_chat_completion(
     max_tokens_override: int | None = None,
     temperature_override: float | None = None,
 ) -> dict[str, Any]:
-    payload: dict[str, Any] = {
-        "messages": messages,
-        "temperature": config.temperature if temperature_override is None else temperature_override,
-        "max_tokens": max_tokens_override or config.max_completion_tokens,
-    }
+    payload: dict[str, Any] = {"messages": messages}
     if tools:
         payload["tools"] = tools
         payload["tool_choice"] = "auto"
+    # Apply extra_body first so computed overrides below win over any
+    # temperature/max_tokens keys the user may have stashed in extra_body.
     payload.update(config.extra_body)
+    payload["temperature"] = (
+        config.temperature if temperature_override is None else temperature_override
+    )
+    payload["max_tokens"] = max_tokens_override or config.max_completion_tokens
     # Allow configuring a fallback chain via extra_body.fallback_models (list of model ids).
     # This lets a rate-limited primary (e.g. "opus") degrade gracefully instead of failing the run.
     fallback_models = [
