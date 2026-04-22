@@ -1593,28 +1593,6 @@ def _build_check_hints(failure_class: str, details: str) -> list[str]:
     elif failure_class == "type_mismatch":
         if "decide" in details:
             hints.append("The goal contains `decide` expressions. Pass all precondition hypotheses to `simp` and it will reduce `decide` automatically. Do NOT try to manually match `decide` types.")
-        # Detect the recurring Uint256/Address `.val` coercion asymmetry:
-        # one side of the mismatch has a `.val` projection and the other
-        # does not. Corpus analysis of 83 runs: 6 of 16 type_mismatch
-        # incidents across 5 of 29 failed tasks (17%) hit this exact
-        # pattern — e.g. hypothesis `hx : ¬x = 0` but goal expected
-        # `¬x.val = 0`. The agent repeatedly retried `exact hx` instead
-        # of bridging through simp/simpa.
-        _tm = re.search(
-            r"has type\s+(.{5,300}?)\s+but is expected to have type\s+(.{5,300})",
-            details, re.DOTALL,
-        )
-        if _tm and (".val" in _tm.group(1)) != (".val" in _tm.group(2)):
-            hints.append(
-                "Your hypothesis differs from the expected type by a `.val` projection "
-                "(Uint256/Address/Nat). Do NOT keep retrying `exact h` — Lean will not "
-                "insert the coercion for you. Use `by simpa using h` or `by simp_all` "
-                "to let simp bridge the `.val`; if the goal is a Prop inequality, "
-                "`by omega` after exposing `.val` on both sides also works. If the "
-                "mismatch is inside a negation like `¬x = 0` vs `¬x.val = 0`, rewrite "
-                "with the underlying injectivity lemma (e.g. `Core.Uint256.val_eq_zero`, "
-                "`Core.Address.ofNat_eq_zero`) found via search_public_defs."
-            )
         hints.append("Unfold definitions to align types. Check spec matches impl.")
     elif failure_class == "split_failed":
         hints.append("Do not split the post-state. Use by_cases with branch-specific helpers.")
@@ -1878,6 +1856,34 @@ def _build_check_hints(failure_class: str, details: str) -> list[str]:
             "Use `s.storage 0` (function application) not `s.storage[0]` or "
             "`s.storage.0`. `ContractState.storage` is a function `Nat → Uint256`."
         )
+    # Detect the recurring Uint256/Address `.val` coercion asymmetry: one side
+    # of a `type mismatch … has type … but is expected to have type …` pair
+    # has a `.val` projection and the other does not. Corpus analysis of 83
+    # interactive runs: the pattern `"after simplification has type … .val"`
+    # appears in 14 of 29 failed tasks (48%), yet only 2 of those tasks have
+    # `failure_class == "type_mismatch"` at the point of failure — the rest
+    # cascade into `unsolved_goals` / `unknown_identifier` when secondary
+    # errors come from the same simp call, so the old in-branch hint was
+    # skipped for 12/14 of the actual `.val` mismatches. Lifting the check
+    # to run cross-class fires the hint whenever the mismatch text appears,
+    # regardless of which error Lean listed first.
+    _tm = re.search(
+        r"has type\s+(.{5,300}?)\s+but is expected to have type\s+(.{5,300})",
+        details, re.DOTALL,
+    )
+    if _tm and (".val" in _tm.group(1)) != (".val" in _tm.group(2)):
+        _val_hint = (
+            "Your hypothesis differs from the expected type by a `.val` projection "
+            "(Uint256/Address/Nat). Do NOT keep retrying `exact h` — Lean will not "
+            "insert the coercion for you. Use `by simpa using h` or `by simp_all` "
+            "to let simp bridge the `.val`; if the goal is a Prop inequality, "
+            "`by omega` after exposing `.val` on both sides also works. If the "
+            "mismatch is inside a negation like `¬x = 0` vs `¬x.val = 0`, rewrite "
+            "with the underlying injectivity lemma (e.g. `Core.Uint256.val_eq_zero`, "
+            "`Core.Address.ofNat_eq_zero`) found via search_public_defs."
+        )
+        if _val_hint not in hints:
+            hints.append(_val_hint)
     return hints
 
 
