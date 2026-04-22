@@ -1192,8 +1192,11 @@ def send_chat_completion(
             return _post_chat_completion(config, payload, model)
         except _ChatCompletionError as exc:
             last_exc = exc
-            # Fall back only on rate-limit / service-unavailable style errors.
-            if exc.status not in (429, 500, 502, 503, 504) and exc.status != 0:
+            # Fall back on the same transient statuses `_post_chat_completion`
+            # retries internally (plus status 0 for network/read errors), so a
+            # primary that keeps returning 408/409/425/429/5xx gets routed to
+            # the configured fallback chain instead of hard-failing.
+            if exc.status not in RETRY_STATUS_CODES and exc.status != 0:
                 break
             continue
     if last_exc is None:
