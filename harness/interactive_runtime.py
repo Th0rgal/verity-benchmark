@@ -361,6 +361,7 @@ class TaskProofRuntime:
             # error and every other warning kind — only the known-useless
             # linter goes away.
             output = _strip_noise_warnings(output)
+            output = _cap_lean_output(output)
             if code != 0:
                 return {
                     "status": "failed",
@@ -916,6 +917,42 @@ _FP_WS_RE = re.compile(r"\s+")
 _LEAN_BLOCK_HEADER_RE = re.compile(
     r"^CandidateCheck\.lean:\d+:\d+:\s*(error|warning|note|info):"
 )
+
+
+_LEAN_OUTPUT_CAP_CHARS = 16000
+
+
+def _cap_lean_output(output: str, max_chars: int = _LEAN_OUTPUT_CAP_CHARS) -> str:
+    """Bound Lean-check output to a character budget the model can read.
+
+    Corpus analysis of 201 interactive `run_lean_check` results found the
+    stripped-output distribution was heavy-tailed: median 1.4 KB, p95 32 KB,
+    max 136 KB (pre-strip max 300 KB — a single call consuming >70 k tokens).
+    The tail is driven by goals whose state contains deeply nested
+    `match`/`if` chains over contract state; 16 separate errors each
+    displaying a 10 KB goal easily adds up to 100 KB. That blows the
+    context budget and buries the first (usually most actionable) error.
+
+    Truncate to `max_chars` with a clear marker so the first errors stay
+    intact and the model knows output was elided. 16 KB keeps ~89 % of
+    real corpus outputs untouched while capping the worst case at about
+    4 k tokens.
+    """
+    if len(output) <= max_chars:
+        return output
+    # Cut on a line boundary inside the budget so we never slice mid-token.
+    head = output[:max_chars]
+    last_newline = head.rfind("\n")
+    if last_newline > max_chars // 2:
+        head = head[:last_newline]
+    dropped = len(output) - len(head)
+    return (
+        f"{head}\n"
+        f"[... Lean output truncated: {dropped} more characters elided to "
+        f"keep the tool result within the model's context budget. The first "
+        f"errors are preserved above — address them before expecting the "
+        f"later diagnostics to matter, since Lean errors cascade.]"
+    )
 
 
 def _strip_noise_warnings(output: str) -> str:
