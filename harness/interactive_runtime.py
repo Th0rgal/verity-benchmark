@@ -403,7 +403,7 @@ class TaskProofRuntime:
                 "type": "function",
                 "function": {
                     "name": "run_lean_check",
-                    "description": "Run the official harness Lean check for the current editable proof.",
+                    "description": "Re-run the Lean check on the current editable proof without modifying it. Redundant immediately after `write_editable_proof`, which already runs the check — if the proof text is unchanged since the last evaluation, this call returns a cached result tagged `cached: true` rather than re-invoking Lean.",
                     "parameters": {
                         "type": "object",
                         "additionalProperties": False,
