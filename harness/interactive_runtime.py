@@ -200,10 +200,17 @@ class TaskProofRuntime:
         if not tactic.strip():
             return {"status": "rejected", "reason": "tactic_must_not_be_empty"}
         original = self.current_proof_text
-        # Replace standalone `?_` holes (not named holes like `?_foo` and not
-        # identifiers ending in `?_`). Must match HOLE_PATTERN so both tools
-        # agree on what counts as a hole.
-        modified = HOLE_PATTERN.sub(tactic.strip(), original)
+        # Substitute each `?_` with a context-adapted form of `tactic`. Corpus
+        # analysis of 72 failed try_tactic_at_hole calls found 47 (65%) passed
+        # a raw tactic (e.g. `omega`, `rfl`, `simp_all [...]`) into a proof
+        # where the hole sat at a TERM position like `exact ?_` — making the
+        # substituted proof read `exact omega`, which Lean rejects because
+        # `omega` is a tactic, not a term. Automatically wrap the substituted
+        # tactic with `(by ...)` at term-position holes, and strip an existing
+        # `by ` wrapper at tactic-position holes, so the model's intent
+        # survives context mismatches. Holes at other positions get the raw
+        # tactic.
+        modified = _substitute_holes(original, tactic.strip())
         if modified == original:
             return {
                 "status": "unsupported",
@@ -821,8 +828,75 @@ def extract_contract_simp_terms(task: dict[str, Any]) -> list[str]:
     return terms
 
 
+# Term-expecting tokens/punctuation that immediately precede a `?_` hole
+# when the hole is in term (expression) position rather than tactic position.
+# Matches at end-of-string after the hole's predecessor text is sliced off.
+_TERM_POSITION_RE = re.compile(
+    r"(?:"
+    r"\b(?:exact|refine|apply|show|have|let|suffices|exact?|refine!|exact!|"
+    r"use|calc|from|fun)\s*"  # term-expecting keywords
+    r"|[⟨(,\[{]\s*"             # inside anonymous constructors / tuples / lists
+    r"|:=\s*"                    # RHS of let / have := ?_
+    r")$"
+)
 _FP_LINE_COL_RE = re.compile(r"CandidateCheck\.lean:\d+:\d+:")
 _FP_WS_RE = re.compile(r"\s+")
+
+
+def _is_term_position_hole(proof: str, hole_start: int) -> bool:
+    """True iff the `?_` at `hole_start` sits where Lean expects a term.
+
+    Looks back up to 40 chars of the preceding text (stripping trailing
+    whitespace) and matches against known term-expecting prefixes. Used by
+    `_substitute_holes` to decide whether a raw tactic substitution must be
+    wrapped in `(by ...)` so the resulting expression type-checks.
+    """
+    window = proof[max(0, hole_start - 40):hole_start]
+    # Strip trailing whitespace/newlines — `exact\n  ?_` is still term position.
+    window_r = window.rstrip()
+    # Re-append a single space so the regex's trailing `\s*$` consistently
+    # matches with or without original whitespace.
+    return bool(_TERM_POSITION_RE.search(window_r + " "))
+
+
+def _substitute_holes(proof: str, tactic: str) -> str:
+    """Replace every `?_` in `proof` with a context-adapted form of `tactic`.
+
+    At term-position holes (`exact ?_`, `⟨?_, ?_⟩`, `:= ?_`, ...) the
+    substitute must be a term, so wrap a raw tactic as `(by <tactic>)` unless
+    the caller already provided a term form. At tactic-position holes the
+    substitute must be a tactic, so strip a leading `by ` to avoid nested
+    `by ... by ...` blocks.
+    """
+    raw = tactic.strip()
+    # Already a term form? (leading `by `/`by\n`, or fully wrapped in parens)
+    starts_by = raw.startswith("by ") or raw.startswith("by\n")
+    fully_paren_wrapped = (
+        raw.startswith("(") and raw.endswith(")") and raw.count("(") == raw.count(")")
+    )
+    is_term_form = starts_by or fully_paren_wrapped
+    # Precompute the tactic-position form: strip a leading `by ` or `by\n`
+    # so substitution at a tactic hole doesn't nest `by`. Leave paren-
+    # wrapped forms alone — those often indicate grouping the caller wants
+    # preserved as a single tactic (`(first | a | b)`).
+    if starts_by:
+        tactic_form = raw[3:].lstrip()
+    else:
+        tactic_form = raw
+    # Term-position form: `(by <tac>)` unless caller already passed a term.
+    term_form = raw if is_term_form else f"(by {raw})"
+
+    out: list[str] = []
+    cursor = 0
+    for match in HOLE_PATTERN.finditer(proof):
+        out.append(proof[cursor:match.start()])
+        if _is_term_position_hole(proof, match.start()):
+            out.append(term_form)
+        else:
+            out.append(tactic_form)
+        cursor = match.end()
+    out.append(proof[cursor:])
+    return "".join(out)
 
 
 def _normalize_details_fp(details: str) -> str:
