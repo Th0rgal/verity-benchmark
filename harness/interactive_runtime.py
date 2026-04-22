@@ -2048,6 +2048,58 @@ def _build_check_hints(failure_class: str, details: str) -> list[str]:
         )
         if _val_hint not in hints:
             hints.append(_val_hint)
+    # Detect Lean's `unused simp argument` linter warning and surface
+    # generic meta-advice. Corpus analysis of 29 failed interactive runs:
+    # 16 tasks (55%) emit at least one `This simp argument is unused:
+    # <name>` warning (450 total matches across those tasks), spanning 5
+    # failure classes — unsolved_goals (8), synthesis_failed (3),
+    # unknown_identifier (3), free_variables (1), omega_failed (1). The
+    # only pre-existing gate lives inside the `unsolved_goals` branch and
+    # fires on `"hBound" in details or "hypothesis" in details.lower()` —
+    # `hBound` is a hypothesis name from one single task, and the word
+    # `"hypothesis"` never appears in Lean's linter text (the linter says
+    # "simp argument"), so in practice the old gate only matched 1 of 16
+    # tasks. A cross-class check on the exact warning text fires on all
+    # 16 with no FP risk: 45 passing tasks also hit this warning during
+    # iteration and still closed their proofs, so the warning is
+    # non-terminal. The name-bearing hint text is naturally state-keyed
+    # (different flagged args → different first-80-char fingerprint), so
+    # it won't be dedup-suppressed when the agent resubmits with new
+    # unused args.
+    _unused_simp_args = re.findall(
+        r"This simp argument is unused:\s*\n\s*(\S+)", details
+    )
+    if _unused_simp_args:
+        # Dedupe while preserving order, cap to keep hint readable.
+        _seen: set[str] = set()
+        _ordered: list[str] = []
+        for _n in _unused_simp_args:
+            if _n not in _seen:
+                _seen.add(_n)
+                _ordered.append(_n)
+            if len(_ordered) >= 4:
+                break
+        _names_str = ", ".join(f"`{n}`" for n in _ordered)
+        _unused_hint = (
+            f"Lean's linter reports UNUSED simp arguments ({_names_str}): "
+            f"these hypotheses/definitions cannot be used as rewrites by "
+            f"`simp [...]` against the current goal. Piling on more arguments "
+            f"will not close it. Concrete moves: (1) REMOVE each flagged "
+            f"argument as the linter suggests — leaving dead args in obscures "
+            f"the real obstruction. (2) If the flagged item is a HYPOTHESIS "
+            f"in BEq form (e.g. `(x != y) = true`), convert to Prop form "
+            f"FIRST: `have h' : x ≠ y := by simpa using h`, then pass `h'` "
+            f"to simp, OR switch the whole call to `simp_all` — `simp_all` "
+            f"rewrites hypotheses INTO the goal and often bridges BEq/Prop "
+            f"mismatches that `simp [h]` cannot. (3) If the flagged item is "
+            f"a DEFINITION (module-qualified, e.g. `ContractX.foo`), simp "
+            f"either already unfolded it or it has no simp-lemma form — "
+            f"drop it, and if you need the unfolding use `unfold` / "
+            f"`simp only [ContractX.foo]` explicitly. Do NOT resubmit with "
+            f"the same unused arguments."
+        )
+        if _unused_hint not in hints:
+            hints.append(_unused_hint)
     return hints
 
 
