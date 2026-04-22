@@ -774,6 +774,43 @@ class TaskProofRuntime:
                 "`write_editable_proof` with concrete tactics substituted for "
                 "every `?_`."
             ))
+
+        # Second safety-critical, state-conditional warning that must survive
+        # `_filter_seen_hints`: tactic-in-term-position.
+        # Corpus analysis of 29 failed runs: 19 tasks (66%) emit at least one
+        # `unknown identifier '<tactic>'` diagnostic — 173 occurrences for
+        # 'simp', 100 for 'simpa', 52 for 'omega', 43 for 'native_decide',
+        # 24 for 'simp_all'. One task alone (safe/swap_owner_is_owner_correctness)
+        # emits 52 repeats of `unknown identifier 'simp'` in a single run.
+        # The existing tactic-in-term hint inside `_build_check_hints`
+        # (line ~1466) is suppressed by the dedup filter after its first
+        # emission, so the agent never gets feedback tying the specific
+        # mistake to each subsequent rejection. This is identical to the
+        # hole-warning failure mode: a state-conditional critical warning
+        # that must repeat as long as the state persists. Re-detect the
+        # tactic-in-term case against the current `details` and insert a
+        # persistent warning post-dedup. The hint is keyed to the concrete
+        # error-text state (which tactic is being misused), not the generic
+        # hint corpus, so it is not a "noise" dedup candidate.
+        _tactic_in_term = [
+            n for n in _UNKNOWN_IDENT_RE.findall(details)
+            if n in _LEAN_TACTIC_NAMES
+        ]
+        if _tactic_in_term:
+            _tactic_name = _tactic_in_term[0]
+            hints.insert(0, (
+                f"TACTIC IN TERM POSITION: Lean reports `unknown identifier "
+                f"'{_tactic_name}'` because `{_tactic_name}` is a TACTIC, not "
+                f"a term. It appears in your proof after `exact` / `refine` / "
+                f"`apply` / `:=` or inside `⟨ ⟩` — all term positions. Fix: "
+                f"wrap the tactic in `by`, e.g. `exact by {_tactic_name} ...`, "
+                f"`refine ⟨by {_tactic_name}, ...⟩`, or drop the `exact` / "
+                f"`refine` prefix so `{_tactic_name}` runs as a tactic "
+                f"directly (`by {_tactic_name} ...` at the top of the proof "
+                f"body). Do NOT call search_public_defs for `{_tactic_name}` "
+                f"— it is not a definition, it is a tactic, and the only fix "
+                f"is the `by` wrapper."
+            ))
         if not hints and same_class_count >= 3:
             # All the standing advice has already been seen and isn't working.
             # Issue a one-shot pivot directive rather than sending an empty list,
