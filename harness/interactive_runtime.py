@@ -779,7 +779,7 @@ class TaskProofRuntime:
     def _extract_theorem_signature(self, text: str) -> str | None:
         short_name = self.paths.theorem_name.rsplit(".", 1)[-1]
         pattern = re.compile(
-            rf"theorem\s+{re.escape(short_name)}\b(?P<signature>.*?)(?::=)",
+            rf"theorem\s+{re.escape(short_name)}\b(?P<signature>.*?):=\s*by\b",
             re.DOTALL,
         )
         match = pattern.search(text)
