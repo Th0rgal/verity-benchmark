@@ -1815,8 +1815,11 @@ def execute_interactive_agent_task(
         if finish_reason == "length" and not tool_calls and not response_text.strip():
             consecutive_length_stops += 1
             # Up to 3 silent budget bumps before nudging the model to simplify.
+            # Cap bump at `config.max_completion_tokens` so we never exceed the
+            # provider-enforced per-response limit (some models hard-cap at the
+            # configured value and would return HTTP 400 on anything larger).
             if consecutive_length_stops <= 3:
-                token_budget = min(int(token_budget * 1.5), 12000)
+                token_budget = min(int(token_budget * 1.5), config.max_completion_tokens)
                 continue
             # Subsequent length stops: inject a nudge to simplify and use tools
             transcript.append({"role": "assistant", "content": ""})
@@ -1828,12 +1831,15 @@ def execute_interactive_agent_task(
                     "then call run_lean_check. Keep the proof short."
                 ),
             })
-            if consecutive_length_stops >= 5:
-                # Reset budget back to configured value after persistent overruns
-                token_budget = config.max_completion_tokens
+            # Reset budget back to configured value after persistent overruns
+            token_budget = config.max_completion_tokens
             continue
         else:
+            # Recovered from any length streak -- reset both the counter and
+            # the (possibly-elevated) token budget so we don't leak state into
+            # subsequent turns.
             consecutive_length_stops = 0
+            token_budget = config.max_completion_tokens
 
         attempts.append(
             {
@@ -1857,11 +1863,18 @@ def execute_interactive_agent_task(
                 evaluation = runtime.evaluate_current()
                 attempts[-1]["candidate_file_contents"] = runtime.current_proof_text
                 attempts[-1]["evaluation"] = evaluation
-                failure_class_history.append(
+                # Track real model-driven failure classes for the temperature
+                # schedule's sliding window. Environment errors are infra noise
+                # that would break same-class detection (e.g. ["type_error",
+                # "environment_error", "type_error"] looks like a class change)
+                # so they are filtered out of the history.
+                fc_entry = (
                     classify_failure(str(evaluation.get("details", "")))
                     if evaluation.get("status") == "failed"
                     else ""
                 )
+                if fc_entry != "environment_error":
+                    failure_class_history.append(fc_entry)
                 if evaluation["status"] == "passed":
                     return response, response_text, runtime.current_proof_text, evaluation, attempts, tool_calls_used
                 # Failed candidate without tool calls: feed error back
@@ -1947,7 +1960,10 @@ def execute_interactive_agent_task(
             if tool_name == "run_lean_check" and result.get("failure_mode") == "lean_check_failed":
                 saw_lean_failure = True
                 fc = result.get("failure_class") or classify_failure(str(result.get("details", "")))
-                failure_class_history.append(str(fc))
+                # Skip environment errors: they are infra noise that would
+                # break the temperature schedule's same-class sliding window.
+                if str(fc) != "environment_error":
+                    failure_class_history.append(str(fc))
             elif tool_name in ("run_lean_check", "try_tactic_at_hole") and result.get("status") == "passed":
                 # Normalize to evaluation schema (try_tactic_at_hole returns tactic/details without failure_mode)
                 evaluation = dict(result)
