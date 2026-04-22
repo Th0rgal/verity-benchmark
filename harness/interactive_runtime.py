@@ -533,6 +533,31 @@ class TaskProofRuntime:
                 "(e.g. `simp_all`, `aesop`, `decide`, `exact?`, `constructor; all_goals ...`)."
             ))
 
+        # Highest-leverage directive: corpus analysis showed 16/29 failed tasks
+        # ended with `?_` or `exact ?_` still in the final submitted proof.
+        # `?_` is a probe for `inspect_lean_goals` / `try_tactic_at_hole`, never
+        # a valid proof. When Lean fails AND the current proof still contains a
+        # hole, say so explicitly — the generic synthesis_failed / unsolved_goals
+        # hints don't make this connection clear, and the `?_` advice elsewhere
+        # was misread as "write `?_` and submit it". Insert AFTER the no-progress
+        # directive so this ends up at hints[0] when both fire (hole is the root
+        # cause, no-progress is the symptom).
+        if HOLE_PATTERN.search(self.current_proof_text):
+            hole_count = len(HOLE_PATTERN.findall(self.current_proof_text))
+            hints.insert(0, (
+                f"UNFILLED HOLE IN SUBMITTED PROOF: your proof still contains "
+                f"{hole_count} `?_` hole(s). `?_` is a PROBE for `inspect_lean_goals` "
+                "and `try_tactic_at_hole`, never a final proof — Lean will reject "
+                "every submission containing `?_`. Do not submit `?_` again. Next "
+                "move: call `try_tactic_at_hole` with one concrete tactic at a "
+                "time (`omega`, `simp_all`, `decide`, `rfl`, `assumption`, "
+                "`trivial`, `exact h`, `linarith`, `aesop`, `exact?`). If any "
+                "succeeds, the proof updates in place and the task closes. If "
+                "none do, use `inspect_lean_goals` to read each hole's goal, then "
+                "`write_editable_proof` with concrete tactics substituted for "
+                "every `?_`."
+            ))
+
         # Dedupe hints we've already shown this session. Repeated-verbatim hints
         # are noise: corpus analysis of failing tasks showed the same 4-5 hints
         # echoed across 5+ stagnation events, training the model to skip the
