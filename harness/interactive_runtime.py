@@ -269,12 +269,22 @@ class TaskProofRuntime:
         # from the other two tools. Reusing that helper keeps the advice
         # consistent across the tool surface and gives the model a concrete
         # next tactic to try instead of a bare error payload.
+        # `details` is already stripped of `linter.unusedSimpArgs` noise and
+        # capped at `_LEAN_OUTPUT_CAP_CHARS` (16 KB) by `evaluate_candidate`.
+        # Earlier code re-truncated to 2000 chars — a legacy band-aid from
+        # before the upstream cleanup pipeline existed. Corpus analysis of
+        # the 78 try_tactic_at_hole failures in the current corpus found
+        # 41/78 (53%) hit that 2000-char cap, chopping off already-cleaned
+        # diagnostic content (goal state, context, line numbers) that
+        # run_lean_check would have returned in full on the same failure.
+        # Drop the extra truncation so all three tools surface the same
+        # error fidelity; the 16 KB pipeline cap remains the backstop.
         details = str(evaluation.get("details", ""))
         failure_class = classify_failure(details)
         result = {
             "status": "failed",
             "tactic": tactic.strip(),
-            "details": details[:2000],
+            "details": details,
             "failure_class": failure_class,
         }
         hints = _build_check_hints(failure_class, details)
