@@ -1058,6 +1058,15 @@ MAX_CHAT_COMPLETION_RETRIES = 6
 
 
 def _parse_retry_after(value: str | None) -> float | None:
+    """Parse an HTTP `Retry-After` header.
+
+    Accepts both forms permitted by RFC 7231:
+    - delta-seconds (e.g. "120")
+    - HTTP-date (e.g. "Wed, 21 Oct 2015 07:28:00 GMT")
+
+    Returns the number of seconds to wait, or None if the value cannot be
+    parsed. A date in the past is clamped to 0.
+    """
     if not value:
         return None
     value = value.strip()
@@ -1066,6 +1075,19 @@ def _parse_retry_after(value: str | None) -> float | None:
     try:
         return max(0.0, float(value))
     except ValueError:
+        pass
+    try:
+        from email.utils import parsedate_to_datetime
+        import datetime as _dt
+
+        parsed = parsedate_to_datetime(value)
+        if parsed is None:
+            return None
+        if parsed.tzinfo is None:
+            parsed = parsed.replace(tzinfo=_dt.timezone.utc)
+        delta = (parsed - _dt.datetime.now(_dt.timezone.utc)).total_seconds()
+        return max(0.0, delta)
+    except (TypeError, ValueError):
         return None
 
 
