@@ -5,3 +5,4 @@ import Benchmark.Cases.Kleros
 import Benchmark.Cases.DamnVulnerableDeFi
 import Benchmark.Cases.Lido
 import Benchmark.Cases.Zama
+import Benchmark.Cases.Wildcat

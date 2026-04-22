@@ -1,0 +1,48 @@
+manifest_kind: case
+project: wildcat
+case_id: borrow_liquidity_safety
+schema_version: 1
+split: active
+family_id: wildcat
+implementation_id: v2_protocol
+stage: build_green
+translation_status: translated
+spec_status: frozen
+proof_status: complete
+upstream_repo: https://github.com/wildcat-finance/v2-protocol
+upstream_commit: a70f297fbd1b1ab597e0e9a3458a2d13a34b4657
+original_contract_path: src/market/WildcatMarket.sol
+source_ref: https://github.com/wildcat-finance/v2-protocol@a70f297fbd1b1ab597e0e9a3458a2d13a34b4657:src/market/WildcatMarket.sol
+lean_target: Benchmark.Cases.Wildcat.BorrowLiquiditySafety.Compile
+spec_target: Benchmark.Cases.Wildcat.BorrowLiquiditySafety.Specs
+proof_target: Benchmark.Cases.Wildcat.BorrowLiquiditySafety.Proofs
+selected_functions:
+  - borrow
+  - _getUpdatedState
+  - liquidityRequired
+  - borrowableAssets
+source_language: solidity
+verity_version: 4ebe4931d25e5a1594fcd3f43ff040ecc3c4225a
+lean_toolchain: leanprover/lean4:v4.22.0
+abstraction_level: protocol_slice
+abstraction_tags:
+  - borrow_liquidity_slice
+  - state_update_compressed
+  - external_boundaries_trusted
+  - packed_storage_rewritten
+abstraction_notes: >
+  The benchmark keeps the Wildcat V2 successful borrow path, the
+  `MarketState.liquidityRequired` arithmetic, and the final transfer/write
+  sequence. `_getUpdatedState()` is compressed to a precomputed protocol-fee
+  delta applied before the borrow check, while the pending-withdrawal and
+  unclaimed-withdrawal fields are treated as already current borrow-check
+  inputs. Hooks, sanctions, and ERC20 balance reads/transfers remain explicit
+  trusted boundaries.
+unsupported_feature_codes: []
+notes: >
+  Wildcat V2 borrow safety slice proving that a successful positive borrow
+  cannot pull market assets below the liquidity requirement computed from the
+  updated state used by the borrow guard. The required liquidity includes the
+  reserve-ratio-backed portion of non-pending supply, 100% of pending
+  withdrawals, 100% of normalized unclaimed withdrawals, and updated accrued
+  protocol fees.

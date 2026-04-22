@@ -1,0 +1,16 @@
+manifest_kind: family
+schema_version: 1
+family_id: wildcat
+display_name: Wildcat
+split: active
+status: active
+description: >
+  Benchmark family for Wildcat protocol slices focused on borrower liquidity
+  obligations, reserve accounting, and withdrawal-priority-aware safety
+  properties.
+implementation_ids:
+  - v2_protocol
+case_ids:
+  - wildcat/borrow_liquidity_safety
+source_languages:
+  - solidity

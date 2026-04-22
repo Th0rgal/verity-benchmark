@@ -1,0 +1,17 @@
+manifest_kind: implementation
+schema_version: 1
+family_id: wildcat
+implementation_id: v2_protocol
+display_name: Wildcat V2 Protocol
+split: active
+status: translated
+upstream_repo: https://github.com/wildcat-finance/v2-protocol
+upstream_commit: a70f297fbd1b1ab597e0e9a3458a2d13a34b4657
+source_language: solidity
+source_artifact_path: src/market/WildcatMarket.sol
+case_ids:
+  - wildcat/borrow_liquidity_safety
+notes: >
+  Implementation entry for Wildcat V2. This benchmark case isolates the borrow
+  path and proves the positive-borrow liquidity preservation property against
+  the tagged `v2.0.0` market logic.

@@ -1,0 +1,36 @@
+manifest_kind: task
+schema_version: 1
+task_id: positive_borrow_preserves_required_liquidity
+case_id: wildcat/borrow_liquidity_safety
+split: active
+family_id: wildcat
+implementation_id: v2_protocol
+source_ref: https://github.com/wildcat-finance/v2-protocol@a70f297fbd1b1ab597e0e9a3458a2d13a34b4657:src/market/WildcatMarket.sol
+task_interface_version: 2
+theorem_name: Benchmark.Cases.Wildcat.BorrowLiquiditySafety.positive_borrow_preserves_required_liquidity
+proof_family: functional_correctness
+property_class: accounting_bound
+difficulty: medium
+category: arithmetic-invariant
+track: proof-only
+translation_status: translated
+proof_status: complete
+evaluation_engine: lean_proof_generation
+implementation_files:
+  - cases/wildcat/borrow_liquidity_safety/verity/Contract.lean
+  - Benchmark/Cases/Wildcat/BorrowLiquiditySafety/Contract.lean
+specification_files:
+  - cases/wildcat/borrow_liquidity_safety/verity/Specs.lean
+  - Benchmark/Cases/Wildcat/BorrowLiquiditySafety/Specs.lean
+editable_files:
+  - Benchmark/Generated/Wildcat/BorrowLiquiditySafety/Tasks/PositiveBorrowPreservesRequiredLiquidity.lean
+reference_solution_module: Benchmark.Cases.Wildcat.BorrowLiquiditySafety.Proofs
+reference_solution_declaration: Benchmark.Cases.Wildcat.BorrowLiquiditySafety.positive_borrow_preserves_required_liquidity
+abstraction_level: protocol_slice
+abstraction_notes: >
+  Focused Wildcat V2 borrow/liquidity benchmark. The state update is compressed
+  to a protocol-fee delta while the borrow theorem still reasons about the
+  updated liquidity requirement that includes reserve-ratio-backed outstanding
+  supply, pending withdrawals, normalized unclaimed withdrawals, and accrued
+  protocol fees.
+unsupported_feature_codes: []
