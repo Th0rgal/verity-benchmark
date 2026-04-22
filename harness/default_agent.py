@@ -1149,6 +1149,15 @@ def _post_chat_completion(
                 raise _ChatCompletionError(status=0, detail=str(exc), model=model) from exc
             time.sleep(_backoff_delay(attempt, None))
             continue
+        except TimeoutError as exc:
+            # Python 3.10+: socket.timeout during SSL read surfaces as
+            # TimeoutError rather than urllib.error.URLError. Treat it as
+            # a transient network failure and retry with backoff.
+            last_error = f"Read timeout: {exc}"
+            if attempt == MAX_CHAT_COMPLETION_RETRIES - 1:
+                raise _ChatCompletionError(status=0, detail=str(exc), model=model) from exc
+            time.sleep(_backoff_delay(attempt, None))
+            continue
     raise _ChatCompletionError(status=0, detail=last_error or "unknown", model=model)
 
 
