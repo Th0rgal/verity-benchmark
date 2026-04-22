@@ -1272,6 +1272,19 @@ def classify_failure(details: str) -> str:
         return "omega_failed"
     if "tactic 'constructor' failed" in details and "not an inductive datatype" in lower:
         return "constructor_failed"
+    # `cases` / `induction` on a non-inductive target (e.g. an implication
+    # `A → B`, a function, or a Prop that isn't a recognised eliminator) is a
+    # distinct failure mode from `constructor` — Lean phrases it as "major
+    # premise type is not an inductive type". Corpus analysis: 22 incidents in
+    # 1 failed task (setup_owners_acyclicity) all repeating the same `cases h`
+    # on an implication, because the generic "other" bucket gave no actionable
+    # hint. Split into its own class so the hint can cover `intro` /
+    # `by_cases` / `absurd` — the actual remedies for this shape.
+    if (
+        ("tactic 'cases' failed" in details or "tactic 'induction' failed" in details)
+        and "not an inductive type" in lower
+    ):
+        return "cases_failed"
     if "unknown module prefix" in lower:
         return "module_not_found"
     if "don't know how to synthesize placeholder" in lower:
@@ -1475,6 +1488,21 @@ def _build_check_hints(failure_class: str, details: str) -> list[str]:
             "`unfold` first to expose an inductive head symbol, (b) `intro` pending "
             "hypotheses if the goal is `A → B`, or (c) use `refine ⟨_, _⟩` / "
             "`exact ⟨_, _⟩` if you already know the witnesses for an And/Exists."
+        )
+    elif failure_class == "cases_failed":
+        hints.append(
+            "`cases` / `induction` requires an inductive-type term. The major "
+            "premise here is NOT inductive — most commonly it's an implication "
+            "`A → B` (the agent tried `cases h` where `h : A → B`), a function "
+            "type, or a raw equality between non-inductive values. Remedies: "
+            "(a) if the hypothesis is `A → B`, first produce `A` and apply it "
+            "(`have hb := h ha`) or `intro` if the implication is the goal; "
+            "(b) for a decidable Prop use `by_cases h : P` instead of `cases`; "
+            "(c) to derive `False` from a contradictory hypothesis use "
+            "`exact absurd … h` or `exact (h …).elim`; (d) for `Bool`-valued "
+            "equalities like `x == y = true`, rewrite with `Bool.ne_iff` / "
+            "`beq_iff_eq` before case-splitting. Do NOT keep retrying `cases` "
+            "on the same target."
         )
     elif failure_class == "module_not_found":
         hints.append(
