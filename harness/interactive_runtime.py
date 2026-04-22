@@ -1597,6 +1597,49 @@ def _build_check_hints(failure_class: str, details: str) -> list[str]:
     elif failure_class == "type_mismatch":
         if "decide" in details:
             hints.append("The goal contains `decide` expressions. Pass all precondition hypotheses to `simp` and it will reduce `decide` automatically. Do NOT try to manually match `decide` types.")
+        # Corpus analysis of 29 failed interactive runs: 8 tasks (28%) hit a
+        # type_mismatch where "is expected to have type" is followed by
+        # un-reduced monadic-trace machinery — `ContractResult.revert`,
+        # `ContractResult.success`, or nested `match match if ...` blocks.
+        # This is a distinct shape from the cross-class `.val` coercion
+        # asymmetry detector: here the hypothesis has been simplified to a
+        # concrete shape (e.g. `¬Core.Address.ofNat (s.storageMap 0 owner).val = 0`)
+        # but the expected type still carries the raw Contract.run trace
+        # (e.g. `... ((match match if owner = 0 then ContractResult.revert ...`).
+        # The generic "Unfold definitions" hint below does not name the
+        # actual reducers to feed simp, so the agent loops on `exact h`
+        # or `rw [...]` without ever reducing the goal. Tasks affected:
+        # safe/{add_owner,remove_owner,swap_owner,setup_owners}_* covering
+        # is_owner_correctness, owner_list_invariant, in_list_reachable.
+        _expected_unreduced = bool(
+            re.search(
+                r"is expected to have type.{0,800}?"
+                r"(?:ContractResult\.(?:revert|success)|match\s+match)",
+                details,
+                re.DOTALL,
+            )
+        )
+        if _expected_unreduced:
+            hints.append(
+                "TYPE MISMATCH with un-reduced monadic trace on the "
+                "EXPECTED side: your hypothesis has been simplified "
+                "(e.g. `.storageMap 0 owner`) but the goal's expected "
+                "type still contains raw `ContractResult.revert` / "
+                "`ContractResult.success` / nested `match match if ...` "
+                "blocks from an unreduced `Contract.run`. `exact h` will "
+                "NEVER unify these — Lean does not automatically reduce "
+                "the expected type. Fix: reduce the goal FIRST with "
+                "`simp only [X, Contract.run, ContractResult.snd, "
+                "ContractResult.revert, ContractResult.success, "
+                "Verity.bind, Bind.bind, Verity.pure, Pure.pure]` where "
+                "`X` is the contract function literally visible in the "
+                "match (e.g. `OwnerManager.addOwner`, "
+                "`OwnerManager.removeOwner`, `OwnerManager.swapOwner`, "
+                "`OwnerManager.setupOwners`). You may also need "
+                "`split_ifs` on the `if owner = 0` / sentinel guards. "
+                "ONLY after the expected type is in simplified form will "
+                "`exact h` / `simpa using h` unify."
+            )
         hints.append("Unfold definitions to align types. Check spec matches impl.")
     elif failure_class == "split_failed":
         hints.append("Do not split the post-state. Use by_cases with branch-specific helpers.")
