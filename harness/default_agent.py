@@ -1093,7 +1093,11 @@ def _parse_retry_after(value: str | None) -> float | None:
 
 def _backoff_delay(attempt: int, retry_after: float | None) -> float:
     if retry_after is not None:
-        return min(retry_after, 60.0)
+        # Honour the provider-requested wait. Clamp only at a safety ceiling
+        # (10 minutes) so a pathological header cannot stall the run
+        # indefinitely; the previous 60s clamp was too aggressive and caused
+        # retries to fire while the rate limit was still in force.
+        return min(retry_after, 600.0)
     # Exponential backoff with jitter, capped at 30s.
     base = min(30.0, 2.0 ** attempt)
     return base * (0.5 + random.random() * 0.5)

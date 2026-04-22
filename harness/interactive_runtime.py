@@ -703,16 +703,19 @@ def extract_contract_simp_terms(task: dict[str, Any]) -> list[str]:
     return terms
 
 
-ENVIRONMENT_ERROR_PATTERNS = (
-    re.compile(r"object file ['\"][^'\"]+\.olean['\"]? does not exist"),
-    re.compile(r"failed to load environment"),
+# Missing-olean errors can be infrastructure (a Benchmark dependency wasn't
+# pre-built) or the model's fault (imported a module that doesn't exist). We
+# only classify the former as environment_error so stagnation/temperature
+# logic still applies to model-caused import mistakes.
+_MISSING_OLEAN_RE = re.compile(r"object file ['\"]([^'\"]+\.olean)['\"]? does not exist")
+INFRA_ONLY_ERROR_PATTERNS = (
     re.compile(r"lean executable .* not found", re.IGNORECASE),
 )
 
 
 def _missing_olean_module(details: str) -> str | None:
     """Extract the module name whose .olean is missing, if the error is environmental."""
-    match = re.search(r"object file ['\"]([^'\"]+\.olean)['\"]?", details)
+    match = _MISSING_OLEAN_RE.search(details)
     if not match:
         return None
     olean_path = match.group(1)
@@ -733,9 +736,16 @@ def classify_failure(details: str) -> str:
     if not details:
         return "unknown"
     lower = details.lower()
-    for pattern in ENVIRONMENT_ERROR_PATTERNS:
+    # Infrastructure errors that the model cannot reasonably be blamed for.
+    for pattern in INFRA_ONLY_ERROR_PATTERNS:
         if pattern.search(details):
             return "environment_error"
+    # Missing .olean is infra only when it is a Benchmark.* dependency (which
+    # should have been pre-built). A missing olean for any other path means
+    # the model imported / referenced something that doesn't exist.
+    missing_module = _missing_olean_module(details)
+    if missing_module and missing_module.startswith("Benchmark."):
+        return "environment_error"
     if "unknown identifier" in lower or "unknown constant" in lower:
         return "unknown_identifier"
     if "unsolved goals" in lower:
