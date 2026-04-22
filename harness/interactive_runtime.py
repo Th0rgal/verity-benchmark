@@ -21,6 +21,25 @@ HIDDEN_PROOF_IMPORT_PATTERN = re.compile(
 )
 IMPORT_PATTERN = re.compile(r"^\s*import\s+([A-Za-z0-9_.']+)\s*$", re.MULTILINE)
 
+# Well-known Lean 4 tactics that Lean reports as "unknown identifier" when
+# written in *term* position (e.g. `exact simp [...]`, `refine omega`, `:= by_cases h`).
+# Corpus analysis of 83 runs: 20 of 29 failed tasks (69%) hit this at least once,
+# with `simp`, `simpa`, `omega`, `exact`, `native_decide`, `intro`, `simp_all`, and
+# `by_cases` accounting for 61 occurrences. The existing `unknown_identifier` hint
+# sends the model to `search_public_defs`, which cannot help here — these are
+# language keywords, not definitions.
+_LEAN_TACTIC_NAMES = frozenset({
+    "simp", "simpa", "simp_all", "dsimp",
+    "omega", "decide", "native_decide",
+    "exact", "refine", "apply", "intro", "intros",
+    "constructor", "cases", "induction", "by_cases", "obtain",
+    "unfold", "rfl", "rw", "rewrite", "ring", "linarith", "nlinarith",
+    "split", "left", "right", "use", "show", "have", "suffices", "let",
+    "trivial", "tauto", "contradiction", "assumption", "skip",
+    "ext", "funext", "congr", "norm_num", "field_simp", "abel",
+})
+_UNKNOWN_IDENT_RE = re.compile(r"unknown (?:identifier|constant) '([^']+)'")
+
 
 @dataclass(frozen=True)
 class RuntimePaths:
@@ -603,7 +622,7 @@ class TaskProofRuntime:
                     f"You have failed {total_failures} times across different error classes. "
                     "Step back and reconsider your proof strategy from scratch."
                 )
-            escalation = self._build_escalation_hint(failure_class)
+            escalation = self._build_escalation_hint(failure_class, details)
             if escalation:
                 hints.append(escalation)
 
@@ -718,7 +737,7 @@ class TaskProofRuntime:
             fresh.append(hint)
         return fresh
 
-    def _build_escalation_hint(self, failure_class: str) -> str | None:
+    def _build_escalation_hint(self, failure_class: str, details: str = "") -> str | None:
         """Build an escalation hint when the model is stagnating on a failure class."""
         terms = extract_contract_simp_terms(self._task)
         if terms:
@@ -739,6 +758,16 @@ class TaskProofRuntime:
                     f"5. Never use bare `simp [h]` or `unfold ContractName.functionName`"
                 )
         if failure_class == "unknown_identifier":
+            unknown_names = _UNKNOWN_IDENT_RE.findall(details or "")
+            tactic_hits = [n for n in unknown_names if n in _LEAN_TACTIC_NAMES]
+            if tactic_hits:
+                name = tactic_hits[0]
+                return (
+                    f"ESCALATION: `{name}` is a TACTIC, not an identifier to search for. "
+                    f"You are writing `{name}` in term position (after `exact`/`refine`/`apply`/`:=` or "
+                    f"inside `⟨ ⟩`). Either wrap with `by` (e.g. `exact by {name} ...`) or drop the "
+                    f"`exact`/`refine` prefix so `{name}` runs in tactic mode."
+                )
             return (
                 "ESCALATION: Stop guessing identifier names. Use the search_public_defs tool "
                 "to find the exact names from the implementation and specification files."
@@ -1241,11 +1270,23 @@ def _build_check_hints(failure_class: str, details: str) -> list[str]:
         )
         return hints
     if failure_class == "unknown_identifier":
-        if "decide_True" in details or "decide_False" in details:
+        unknown_names = _UNKNOWN_IDENT_RE.findall(details)
+        tactic_hits = [n for n in unknown_names if n in _LEAN_TACTIC_NAMES]
+        if tactic_hits:
+            name = tactic_hits[0]
+            hints.append(
+                f"`{name}` is a TACTIC, not an identifier. Lean reports `unknown identifier "
+                f"'{name}'` when a tactic is written in TERM position (after `exact`, `refine`, "
+                f"`apply`, `:=`, inside `⟨ ⟩`, etc.). Fix: wrap the tactic in `by` — e.g. "
+                f"`exact by {name} ...` or `:= by {name} ...`. If the goal is already in tactic "
+                f"mode, remove the `exact`/`refine` prefix and call `{name}` directly."
+            )
+        elif "decide_True" in details or "decide_False" in details:
             hints.append("CRITICAL: `decide_True` and `decide_False` do not exist. Remove them. Instead, pass precondition hypotheses directly to `simp` - it handles `decide` reduction automatically.")
         else:
             hints.append("Use search_public_defs to find correct names from spec/impl files.")
-        hints.append("Check imports. Standard names: Nat.lt_of_not_ge, Nat.not_le_of_lt.")
+        if not tactic_hits:
+            hints.append("Check imports. Standard names: Nat.lt_of_not_ge, Nat.not_le_of_lt.")
     elif failure_class == "unsolved_goals":
         hints.append("Use inspect_lean_goals with a ?_ hole to see exact goal state.")
         if "if " in details or "match" in details:
