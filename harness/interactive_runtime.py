@@ -747,12 +747,16 @@ def classify_failure(details: str) -> str:
     for pattern in INFRA_ONLY_ERROR_PATTERNS:
         if pattern.search(details):
             return "environment_error"
-    # Missing .olean is infra only when it is a Benchmark.* dependency (which
-    # should have been pre-built). A missing olean for any other path means
-    # the model imported / referenced something that doesn't exist.
+    # Missing .olean is infra only when it is a Benchmark.* dependency *whose
+    # source file actually exists* in the tree -- meaning lake should have
+    # built it but didn't. If the source file is missing too, the model
+    # imported / referenced something that doesn't exist, which is its own
+    # mistake and should go through the normal stagnation/temperature loop.
     missing_module = _missing_olean_module(details)
     if missing_module and missing_module.startswith("Benchmark."):
-        return "environment_error"
+        source_rel = Path(*missing_module.split(".")).with_suffix(".lean")
+        if (ROOT / source_rel).is_file():
+            return "environment_error"
     if "unknown identifier" in lower or "unknown constant" in lower:
         return "unknown_identifier"
     if "unsolved goals" in lower:
