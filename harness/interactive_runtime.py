@@ -1490,6 +1490,48 @@ def _build_check_hints(failure_class: str, details: str) -> list[str]:
             )
         if "if " in details or "match" in details:
             hints.append("If simp leaves `if`/`match` with free variables, use `by_cases` on each unresolved condition BEFORE calling simp. Pass all case hypotheses to simp. Do NOT use `split` after simp or `native_decide`/`decide` on goals with free variables.")
+        # Corpus analysis of 29 failed interactive runs found 11 (38%) ending
+        # with an unsolved_goals error whose goal still carried the UNFOLDED
+        # MONADIC TRACE — markers like `ContractResult.success`/`.revert`,
+        # `Contract.run`, or a wrapper like `Core.Address.ofNat ((match ...))`
+        # around a nested `match` over `getMappingAddr`/storage. Cross-family:
+        # safe/owner_manager_reach (6), zama/erc7984 (2), paladin_votes (1),
+        # kleros/sortition_trees (1), with 0 of 54 passed runs showing the
+        # pattern (clean failure signal). In every case the agent kept adding
+        # more helpers (`ContractResult.success`, `.snd`, `Contract.run`, …)
+        # to its `simp` list without closing the goal, because the remaining
+        # `if <cond>` arms in the trace test PROPOSITIONAL equality while the
+        # available hypotheses are in BEq form (`(x != zeroAddress) = true`).
+        # The existing if/match hint above is too generic — it never tells
+        # the agent to bridge BEq→Prop or to `split_ifs` on the unreduced arms.
+        has_monadic_trace = (
+            "ContractResult.success" in details
+            or "ContractResult.revert" in details
+            or "Contract.run" in details
+        )
+        if has_monadic_trace:
+            hints.append(
+                "Your `simp` unfolded the contract function but the goal "
+                "still carries the UNFOLDED MONADIC TRACE — look for "
+                "`ContractResult.success`/`.revert`, nested `match` arms, "
+                "or wrappers like `Core.Address.ofNat ((match ...))`. Do "
+                "NOT keep adding more definitions (`ContractResult.success`, "
+                "`.revert`, `.snd`, `Contract.run`, …) to your `simp` list; "
+                "those are not the closing rewrites. Two concrete moves: "
+                "(1) `split_ifs` (or `split`) to force case analysis on every "
+                "leftover `if <cond> then ... else ...` inside the trace — "
+                "each branch gives you a propositional hypothesis `h : x = 0` "
+                "or `h : ¬ x = 0` that discharges the arm. "
+                "(2) PRECONVERT any BEq hypothesis to propositional form "
+                "BEFORE re-running simp: e.g. "
+                "`have hNZ : owner ≠ zeroAddress := by simpa using hNotZero`. "
+                "The `if owner = 0 then revert …` branch in the trace tests "
+                "propositional equality, so a bare `(owner != zeroAddress) = "
+                "true` will not discharge it until you bridge the forms. "
+                "After preconverting, `simp_all` (not `simp`) can usually "
+                "close the whole trace in one step because it rewrites the "
+                "Prop-form hypotheses into the goal."
+            )
         if "unused" in details.lower() and ("hBound" in details or "hypothesis" in details.lower()):
             hints.append("If a hypothesis is reported as unused by simp, try `simp_all` instead of `simp`. `simp_all` rewrites hypotheses into the goal, resolving mismatches between spec helper names and unfolded definitions.")
         # Only suggest a fresh by_cases restructure when we're NOT already
