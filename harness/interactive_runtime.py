@@ -818,6 +818,8 @@ def classify_failure(details: str) -> str:
         return "rfl_failed"
     if "invalid" in lower and "conv tactic" in lower:
         return "tactic_misuse"
+    if "omega could not prove the goal" in lower:
+        return "omega_failed"
     return "other"
 
 
@@ -908,6 +910,28 @@ def _build_check_hints(failure_class: str, details: str) -> list[str]:
     elif failure_class == "tactic_misuse":
         hints.append("The tactic was used incorrectly for this goal shape.")
         hints.append("Check the goal state with inspect_lean_goals using a ?_ hole.")
+    elif failure_class == "omega_failed":
+        hints.append(
+            "omega only handles LINEAR integer/natural arithmetic. It cannot close goals "
+            "containing variable * variable, division, or modulus. Look at the "
+            "counterexample section — any term on the RHS of `where` that mixes two "
+            "variables multiplicatively, or uses `/` or `%`, is outside omega's reach."
+        )
+        nonlinear_hints: list[str] = []
+        if "/" in details or "% " in details or " mod " in details:
+            nonlinear_hints.append(
+                "For division/modulus: first rewrite `a / b` and `a % b` via "
+                "`Nat.div_add_mod` / `Nat.mul_div_cancel'` so omega sees a linear form, "
+                "or case-split on whether the divisor is zero and handle each branch."
+            )
+        if "val *" in details or "* ↑" in details:
+            nonlinear_hints.append(
+                "For variable multiplications: introduce helper lemmas that bound the "
+                "product (e.g. `Nat.mul_le_mul`), or try `nlinarith` / `positivity` which "
+                "handle some nonlinear cases. Pure omega will never close a goal whose "
+                "counterexample mentions a product of two symbolic `.val` terms."
+            )
+        hints.extend(nonlinear_hints)
     return hints
 
 
