@@ -820,6 +820,12 @@ def classify_failure(details: str) -> str:
         return "tactic_misuse"
     if "omega could not prove the goal" in lower:
         return "omega_failed"
+    if "tactic 'constructor' failed" in details and "not an inductive datatype" in lower:
+        return "constructor_failed"
+    if "unknown module prefix" in lower:
+        return "module_not_found"
+    if "don't know how to synthesize placeholder" in lower:
+        return "synthesis_failed"
     return "other"
 
 
@@ -932,6 +938,30 @@ def _build_check_hints(failure_class: str, details: str) -> list[str]:
                 "counterexample mentions a product of two symbolic `.val` terms."
             )
         hints.extend(nonlinear_hints)
+    elif failure_class == "constructor_failed":
+        hints.append(
+            "`constructor` only works on inductive-type goals (And, Or, Exists, Sigma, "
+            "structures). The goal you're targeting is an equality, implication, or an "
+            "unreduced expression — not a constructor-shaped type. Either (a) `simp` / "
+            "`unfold` first to expose an inductive head symbol, (b) `intro` pending "
+            "hypotheses if the goal is `A → B`, or (c) use `refine ⟨_, _⟩` / "
+            "`exact ⟨_, _⟩` if you already know the witnesses for an And/Exists."
+        )
+    elif failure_class == "module_not_found":
+        hints.append(
+            "The import path you requested is not available in this workspace. In "
+            "particular, `Mathlib` is NOT a dependency of verity-benchmark — only the "
+            "core Lean 4 prelude, `Batteries`, and the task's own `Benchmark.*` public "
+            "modules are importable. Remove the offending `import` line and reach for "
+            "core Lean / Batteries lemmas, or search_public_defs for existing helpers."
+        )
+    elif failure_class == "synthesis_failed":
+        hints.append(
+            "Lean could not infer a `_` / `?_` placeholder from context. Either (a) "
+            "replace `_` with an explicit term, (b) add a `show <goal type>` line above "
+            "the tactic so Lean knows the expected type, or (c) use `?_` (named hole) "
+            "with `inspect_lean_goals` to see what Lean expected there before filling it."
+        )
     return hints
 
 
