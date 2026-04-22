@@ -1,0 +1,17 @@
+manifest_kind: implementation
+schema_version: 1
+family_id: termmax
+implementation_id: contracts_v2
+display_name: TermMax Contracts V2
+split: active
+status: translated
+upstream_repo: https://github.com/term-structure/termmax-contract-v2
+upstream_commit: 64bd47b98e064c7fb91ab4a59b70520e0ec285d5
+source_language: solidity
+source_artifact_path: contracts/v2/TermMaxOrderV2.sol
+case_ids:
+  - termmax/order_v2_buy_xt_single_segment
+notes: >
+  Active implementation entry for the TermMax V2 contracts repository,
+  currently benchmarking the single-segment `debtToken -> XT` pricing-state
+  transition slice of `TermMaxOrderV2`.
