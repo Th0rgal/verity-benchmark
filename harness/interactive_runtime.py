@@ -302,6 +302,15 @@ class TaskProofRuntime:
                 )
                 command = ["lake", "env", "lean", "--root=.", str(check_path.relative_to(workspace))]
             code, output = lean_run_command(command, cwd=workspace)
+            # Strip the "This simp argument is unused" lint blocks from Lean
+            # output before returning. Corpus analysis of 37 failed-check
+            # detail blobs found 844/846 warnings (~99%) were this single
+            # linter, accounting for ~20 KB of the average 34 KB details
+            # blob. The noise drowns the real errors and trains the model
+            # to ignore the details block. Filtering preserves every real
+            # error and every other warning kind — only the known-useless
+            # linter goes away.
+            output = _strip_noise_warnings(output)
             if code != 0:
                 return {
                     "status": "failed",
@@ -841,6 +850,45 @@ _TERM_POSITION_RE = re.compile(
 )
 _FP_LINE_COL_RE = re.compile(r"CandidateCheck\.lean:\d+:\d+:")
 _FP_WS_RE = re.compile(r"\s+")
+_LEAN_BLOCK_HEADER_RE = re.compile(
+    r"^CandidateCheck\.lean:\d+:\d+:\s*(error|warning|note|info):"
+)
+
+
+def _strip_noise_warnings(output: str) -> str:
+    """Drop `linter.unusedSimpArgs` warning blocks from Lean stdout.
+
+    Lean 4.22 emits a multi-line warning for every simp argument it deems
+    unused. Each block spans the header line, the unused-arg name, a
+    "Hint: Omit it..." directive, a 3–8 line reconstructed simp invocation
+    with strikethrough glyphs, and a "Note: This linter can be disabled
+    with `set_option linter.unusedSimpArgs false`" footer. Across the 37
+    failed-check blocks in the current corpus these blocks account for
+    844/846 total warnings and roughly 20 KB of the average 34 KB
+    details blob — pure noise from the model's point of view because
+    the actual repair work is always driven by errors, not by this lint.
+
+    A block begins at a `CandidateCheck.lean:L:C: warning: This simp
+    argument is unused:` header and ends at the next Lean diagnostic
+    header (error/warning/note/info) or end-of-output. Every other
+    diagnostic kind (including unrelated warnings) is preserved
+    verbatim.
+    """
+    if not output or "This simp argument is unused" not in output:
+        return output
+    lines = output.splitlines(keepends=True)
+    kept: list[str] = []
+    skip = False
+    for line in lines:
+        header = _LEAN_BLOCK_HEADER_RE.match(line)
+        if header:
+            skip = (
+                header.group(1) == "warning"
+                and "This simp argument is unused" in line
+            )
+        if not skip:
+            kept.append(line)
+    return "".join(kept)
 
 
 def _is_term_position_hole(proof: str, hole_start: int) -> bool:
