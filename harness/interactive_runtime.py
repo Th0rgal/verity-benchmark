@@ -260,12 +260,27 @@ class TaskProofRuntime:
                 "tactic": tactic.strip(),
                 "details": "Tactic succeeded. Proof updated.",
             }
-        return {
+        # Produce the same class-based repair_hints as run_lean_check /
+        # write_editable_proof do on failure. Corpus analysis of 83 interactive
+        # runs found 76/76 (100%) of failed try_tactic_at_hole results returned
+        # no hints, even though the failure_class distribution (45 unknown_
+        # identifier, 18 unsolved_goals, 7 type_mismatch, …) maps onto hints
+        # already produced by `_build_check_hints` when the same error comes
+        # from the other two tools. Reusing that helper keeps the advice
+        # consistent across the tool surface and gives the model a concrete
+        # next tactic to try instead of a bare error payload.
+        details = str(evaluation.get("details", ""))
+        failure_class = classify_failure(details)
+        result = {
             "status": "failed",
             "tactic": tactic.strip(),
-            "details": evaluation.get("details", "")[:2000],
-            "failure_class": classify_failure(str(evaluation.get("details", ""))),
+            "details": details[:2000],
+            "failure_class": failure_class,
         }
+        hints = _build_check_hints(failure_class, details)
+        if hints:
+            result["repair_hints"] = hints
+        return result
 
     def evaluate_current(self, *, check_goals: bool = False) -> dict[str, Any]:
         return self.evaluate_candidate(self.current_proof_text, check_goals=check_goals)
