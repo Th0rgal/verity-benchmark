@@ -440,7 +440,15 @@ class TaskProofRuntime:
         # not preflight failures (empty_response, placeholder_detected, etc.)
         is_lean_failure = failure_mode == "lean_check_failed"
         details = str(result.get("details", ""))
-        failure_class = classify_failure(details)
+        # Preflight failures carry English-language details that classify_failure
+        # can't pattern-match, so they all collapse to "other" and the model gets
+        # no targeted hint. Map the failure_mode directly to a class name so the
+        # model sees e.g. "placeholder_detected" instead of "other" and
+        # _build_check_hints can dispatch a specific hint.
+        if not is_lean_failure and failure_mode in _PREFLIGHT_FAILURE_MODES:
+            failure_class = failure_mode
+        else:
+            failure_class = classify_failure(details)
         hints = _build_check_hints(failure_class, details)
         annotated = dict(result)
         annotated["failure_class"] = failure_class
@@ -751,6 +759,18 @@ def _missing_olean_module(details: str) -> str | None:
     return rel.replace("/", ".")
 
 
+# Preflight failure_mode values that preflight_candidate returns. Used by
+# _annotate_check_result to surface these as failure_class directly rather than
+# collapsing them into "other" via English-language classify_failure lookup.
+_PREFLIGHT_FAILURE_MODES = frozenset({
+    "empty_response",
+    "placeholder_detected",
+    "hidden_proof_import_detected",
+    "hidden_case_import_detected",
+    "theorem_statement_mismatch",
+})
+
+
 def classify_failure(details: str) -> str:
     """Classify a Lean checker failure into a coarse category."""
     if not details:
@@ -809,6 +829,43 @@ def _build_check_hints(failure_class: str, details: str) -> list[str]:
             "ENVIRONMENT ERROR (not your fault): a dependency .olean is missing. "
             "The harness is attempting to rebuild it. If this persists, your proof is likely correct; "
             "retry run_lean_check once more."
+        )
+        return hints
+    if failure_class == "placeholder_detected":
+        hints.append(
+            "PREFLIGHT REJECTED: proof contains `sorry` or `admit`. The harness "
+            "will never accept these. Replace every `sorry`/`admit` with a real "
+            "tactic, or use `?_` (unnamed hole) to probe a sub-goal with "
+            "inspect_lean_goals / try_tactic_at_hole."
+        )
+        return hints
+    if failure_class == "theorem_statement_mismatch":
+        hints.append(
+            "PREFLIGHT REJECTED: you changed the editable theorem signature. Only "
+            "the proof body after `:=` is editable. Restore the exact theorem "
+            "declaration from the original editable file (re-read it with "
+            "read_public_file if unsure) and edit only the body."
+        )
+        return hints
+    if failure_class == "hidden_proof_import_detected":
+        hints.append(
+            "PREFLIGHT REJECTED: proof imports a hidden `Benchmark.Cases.*.Proofs` "
+            "module. Reference-solution modules are not part of the public API. "
+            "Remove that import and write the proof yourself."
+        )
+        return hints
+    if failure_class == "hidden_case_import_detected":
+        hints.append(
+            "PREFLIGHT REJECTED: proof imports a non-public `Benchmark.Cases.*` "
+            "module. Only `Benchmark.Cases.*.Specs` (and your own editable file) "
+            "are visible. Remove the blocked import."
+        )
+        return hints
+    if failure_class == "empty_response":
+        hints.append(
+            "PREFLIGHT REJECTED: the proof content was empty. Submit the full "
+            "Lean file including `import`, `namespace`, and the theorem with "
+            "its proof body."
         )
         return hints
     if failure_class == "unknown_identifier":
