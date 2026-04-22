@@ -707,7 +707,14 @@ def extract_contract_simp_terms(task: dict[str, Any]) -> list[str]:
 # pre-built) or the model's fault (imported a module that doesn't exist). We
 # only classify the former as environment_error so stagnation/temperature
 # logic still applies to model-caused import mistakes.
-_MISSING_OLEAN_RE = re.compile(r"object file ['\"]([^'\"]+\.olean)['\"]? does not exist")
+# Lean prints both forms of this diagnostic, depending on context:
+#   object file '<path>.olean' does not exist
+#   object file '<path>.olean' of module <Name> does not exist
+# so accept arbitrary text (incl. "of module <Name>") between the path and
+# the "does not exist" tail.
+_MISSING_OLEAN_RE = re.compile(
+    r"object file ['\"]([^'\"]+\.olean)['\"]?[^\n]*?does not exist"
+)
 INFRA_ONLY_ERROR_PATTERNS = (
     re.compile(r"lean executable .* not found", re.IGNORECASE),
 )

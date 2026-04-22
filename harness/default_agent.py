@@ -1773,17 +1773,25 @@ def execute_interactive_agent_task(
     # of deterministic loops where temperature=0 reproduces byte-identical responses.
     current_temperature = config.temperature
     failure_class_history: list[str] = []
+    # Track how many failures we have already applied the temperature-bump
+    # schedule to, so we don't keep escalating temperature on every iteration
+    # once the trigger condition is first met (it would otherwise run to the
+    # cap within a few turns regardless of intervening search/write activity).
+    temperature_schedule_applied_at = 0
 
     turn = 0
     while proof_attempts < config.max_attempts and turn < max_total_turns:
         turn += 1
-        # Adjust temperature when the last two proof attempts failed with the same class.
+        # Adjust temperature once per new failure entry when the last two
+        # proof attempts failed with the same class.
         if (
-            len(failure_class_history) >= 2
+            len(failure_class_history) > temperature_schedule_applied_at
+            and len(failure_class_history) >= 2
             and failure_class_history[-1] == failure_class_history[-2]
             and failure_class_history[-1] not in ("", "environment_error")
         ):
             current_temperature = min(0.7, max(current_temperature + 0.2, 0.2))
+        temperature_schedule_applied_at = len(failure_class_history)
         response = send_chat_completion(
             config, transcript, tools=runtime.tool_specs(),
             max_tokens_override=token_budget if token_budget != config.max_completion_tokens else None,
