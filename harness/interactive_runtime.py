@@ -109,6 +109,15 @@ class TaskProofRuntime:
         # plus a `cached: true` marker telling the model the call was
         # redundant, saving a full Lean invocation and a round.
         self._last_eval_cache: tuple[str, dict[str, Any]] | None = None
+        # Count of consecutive failed try_tactic_at_hole calls. Corpus analysis
+        # of 83 runs: try_tactic_at_hole has a 0/76 (0%) success rate across
+        # the entire interactive-proxy corpus, but failed runs average 3-7
+        # calls per task (14/29 failed runs have a ≥3-streak of failures)
+        # vs passed runs which max at a 2-streak (and never succeed when
+        # they do call it — they just move on after 1-2 attempts). Firing
+        # a pivot warning at the 3rd consecutive failure catches the stuck-
+        # loop pattern with zero false positives on the passed side.
+        self._try_tactic_failure_streak: int = 0
         # Cache of prior search_public_defs calls keyed by (query, limit).
         # Corpus analysis of 83 runs found failed runs averaged 41.9
         # search_public_defs calls vs 1.5 on passing runs; 94% of those
@@ -335,12 +344,14 @@ class TaskProofRuntime:
             }
         evaluation = self.evaluate_candidate(modified)
         if evaluation.get("status") == "passed":
+            self._try_tactic_failure_streak = 0
             self.current_proof_text = modified
             return {
                 "status": "passed",
                 "tactic": tactic.strip(),
                 "details": "Tactic succeeded. Proof updated.",
             }
+        self._try_tactic_failure_streak += 1
         # Produce the same class-based repair_hints as run_lean_check /
         # write_editable_proof do on failure. Corpus analysis of 83 interactive
         # runs found 76/76 (100%) of failed try_tactic_at_hole results returned
@@ -369,6 +380,31 @@ class TaskProofRuntime:
             "failure_class": failure_class,
         }
         hints = _build_check_hints(failure_class, details)
+        # After 3 consecutive failed try_tactic_at_hole calls, inject a
+        # "pivot" hint. Corpus analysis: passed runs never exceed a 2-streak;
+        # failed runs hit ≥3 in 14/29 (48%) tasks, with some stacking 5-7
+        # attempts of increasingly speculative tactics. The tool has a
+        # 0/76 (0%) corpus-wide success rate, so further attempts on the
+        # same hole are almost certainly wasted budget — the pivot hint
+        # tells the model to switch to write_editable_proof with explicit
+        # multi-step tactics and inspect_lean_goals between steps.
+        if self._try_tactic_failure_streak >= 3:
+            hints = list(hints) if hints else []
+            hints.insert(
+                0,
+                f"You have now run {self._try_tactic_failure_streak} consecutive "
+                "`try_tactic_at_hole` calls with no success. This tool only "
+                "closes a goal when a SINGLE tactic discharges it entirely; "
+                "for goals that need BEq↔Prop bridging, case analysis on "
+                "residual `if`/`match` arms, monadic-trace unfolding, or "
+                "multi-step arithmetic rewriting, no single tactic will "
+                "close them no matter how many more you try. PIVOT: write a "
+                "full multi-line proof body with `write_editable_proof` "
+                "(leaving `?_` ONLY at positions where you then "
+                "`inspect_lean_goals` to see the reduced state), and make "
+                "progress one step at a time. Do NOT continue cycling "
+                "single-tactic guesses here."
+            )
         if hints:
             result["repair_hints"] = hints
         return result
