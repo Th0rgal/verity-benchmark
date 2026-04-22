@@ -1528,7 +1528,40 @@ def _build_check_hints(failure_class: str, details: str) -> list[str]:
     elif failure_class == "no_goals":
         hints.append("Previous simp closed the goal. Remove trailing tactics.")
     elif failure_class == "free_variables":
-        hints.append("Reduce to concrete equalities before decide/native_decide.")
+        # Corpus analysis of 29 failed interactive runs found 3 distinct tasks
+        # (damn_vulnerable_defi side_entrance, kleros sortition_trees, safe
+        # owner_manager_reach add_owner) hitting `expected type must not
+        # contain free variables` with 19 total occurrences across attempts.
+        # Lean's own error text tells the user "Use the '+revert' option to
+        # automatically cleanup and revert free variables" — yet the prior
+        # hint ("Reduce to concrete equalities before decide/native_decide")
+        # didn't mention `revert` at all and pointed agents away from the
+        # exact remedy. The trigger is always `decide` / `native_decide` /
+        # `cases <var>` / `induction <var>` run on a goal that still
+        # mentions local hypotheses (e.g. `hLow`, `hHigh`, `nodeIndex`) or
+        # pattern-bound names (`val✝`, `isLt✝`). Surface `revert` as the
+        # primary fix and list the alternative tactics (`omega`, `simp_all`,
+        # `rcases`) that work on open goals with free hypotheses in scope.
+        hints.append(
+            "Lean rejected the goal because its type still contains FREE "
+            "VARIABLES — local hypotheses or pattern-bound names "
+            "(`val✝`, `isLt✝`, …) the tactic cannot close over. `decide`, "
+            "`native_decide`, `cases <x>`, and `induction <x>` all require "
+            "a closed goal. Two generic remedies: "
+            "(a) `revert <h1> <h2> ... <x>` EVERY local hypothesis and "
+            "variable that appears in the displayed goal, then re-run the "
+            "tactic — this turns the goal into a closed implication. The "
+            "Lean 4 shortcut is `decide +revert` / `native_decide +revert`, "
+            "which Lean's own error hint recommends. "
+            "(b) Replace `decide` / `native_decide` with `omega` (for "
+            "Nat/Int inequalities), `simp_all` (for boolean/equational "
+            "goals), or an explicit `exact` term — these tactics consult "
+            "the local hypothesis context directly and do not require a "
+            "closed goal. For `cases <x>` / `induction <x>` on a "
+            "structure, prefer `rcases x with ⟨...⟩` or destructure inside "
+            "a `have`/`obtain` so you do not leak `val✝`/`isLt✝` into the "
+            "surrounding goal."
+        )
     elif failure_class == "unknown_tactic":
         hints.append("Use standard Lean 4 / Mathlib tactics only.")
     elif failure_class == "simp_no_progress":
