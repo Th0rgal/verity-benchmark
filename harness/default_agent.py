@@ -608,7 +608,7 @@ def build_user_prompt(task: dict[str, Any], *, interactive: bool) -> str:
         "Do NOT re-read them with read_public_file — start working immediately.\n"
         "Workflow: call write_editable_proof with your complete proof file — it returns the Lean check result directly, you do NOT need a separate run_lean_check call afterward.\n"
         "If the check fails, read the failure_class and repair_hints in the result.\n"
-        "For unknown_identifier errors: use search_public_defs to find correct names.\n"
+        "For unknown_identifier errors: read the repair_hints before searching — the missing name may be a tactic in term position (wrap in `by`), a local binder (call inspect_lean_goals instead), or a Mathlib lemma (this workspace has NO Mathlib; use `omega`/`ring`/`simp arith`). Only call search_public_defs for a genuine project-defined name from the implementation or spec file.\n"
         "For unsolved_goals: use inspect_lean_goals with a ?_ hole to see the exact goal, then write targeted tactics.\n"
         "Fix the specific error, write the corrected proof, and re-check. Do not rewrite from scratch unless the approach is fundamentally wrong.\n"
         "Only use read_public_file or search_public_defs if you need a definition not shown below.\n"
