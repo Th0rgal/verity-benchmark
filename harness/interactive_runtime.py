@@ -40,6 +40,11 @@ class TaskProofRuntime:
         self._task = task  # store for hint escalation
         self._best_error_count: int | None = None
         self._best_first_error_line: int | None = None
+        # Fingerprints of hint texts already surfaced this session. Used to
+        # avoid echoing the same repair advice verbatim across consecutive
+        # failures — repeated identical hints are pure noise and train the
+        # model to ignore the list instead of acting on it.
+        self._emitted_hint_keys: set[str] = set()
         self.paths = RuntimePaths(
             editable_rel_path=editable_rel_path,
             theorem_name=str(task["theorem_name"]),
@@ -494,6 +499,23 @@ class TaskProofRuntime:
             if escalation:
                 hints.append(escalation)
 
+        # Dedupe hints we've already shown this session. Repeated-verbatim hints
+        # are noise: corpus analysis of failing tasks showed the same 4-5 hints
+        # echoed across 5+ stagnation events, training the model to skip the
+        # repair_hints list entirely. Only surface *new* advice each time.
+        hints = self._filter_seen_hints(hints)
+        if not hints and same_class_count >= 3:
+            # All the standing advice has already been seen and isn't working.
+            # Issue a one-shot pivot directive rather than sending an empty list,
+            # which the model interprets as "nothing new, carry on".
+            hints = [
+                f"All prior repair hints for '{failure_class}' have now been repeated "
+                f"{same_class_count} times without progress. Stop retrying variations of "
+                f"the same proof. Next move: write a minimal skeleton with a `?_` hole at "
+                f"the first failing step, call `inspect_lean_goals` to read the actual "
+                f"goal state, then use `try_tactic_at_hole` to probe tactics one at a time."
+            ]
+
         if hints:
             annotated["repair_hints"] = hints
 
@@ -530,6 +552,22 @@ class TaskProofRuntime:
                 self._best_first_error_line = first_error
 
         return annotated
+
+    def _filter_seen_hints(self, hints: list[str]) -> list[str]:
+        """Drop hints whose fingerprint has already been surfaced this session.
+
+        Fingerprint = lowercased first 80 non-whitespace chars. Short enough
+        that wording tweaks still dedupe, long enough to distinguish genuinely
+        different hints.
+        """
+        fresh: list[str] = []
+        for hint in hints:
+            key = "".join(hint.lower().split())[:80]
+            if key in self._emitted_hint_keys:
+                continue
+            self._emitted_hint_keys.add(key)
+            fresh.append(hint)
+        return fresh
 
     def _build_escalation_hint(self, failure_class: str) -> str | None:
         """Build an escalation hint when the model is stagnating on a failure class."""
