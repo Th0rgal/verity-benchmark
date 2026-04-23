@@ -1057,8 +1057,17 @@ class TaskProofRuntime:
 
     def _extract_theorem_signature(self, text: str) -> str | None:
         short_name = self.paths.theorem_name.rsplit(".", 1)[-1]
+        # Match any proof style: tactic-mode (`:= by ...`) or term-mode
+        # (`:= rfl`, `:= fun n => ...`, `:= Eq.mpr ...`). Previously the
+        # regex required `:= by`, so a valid term-mode proof returned None
+        # while the expected signature (extracted from an initial `:= by`
+        # file) was a string — the inequality fired a false
+        # `theorem_statement_mismatch` even though the `theorem name : TYPE`
+        # prefix was unchanged. Anchoring on `:=` alone (with the `by`
+        # branch preferred when present, to stay bug-compatible for
+        # tactic-mode) lets both styles produce the same signature string.
         pattern = re.compile(
-            rf"theorem\s+{re.escape(short_name)}\b(?P<signature>.*?):=\s*by\b",
+            rf"theorem\s+{re.escape(short_name)}\b(?P<signature>.*?):=\s*(?:by\b)?",
             re.DOTALL,
         )
         match = pattern.search(text)
