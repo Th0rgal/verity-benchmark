@@ -58,7 +58,8 @@ attribute [grind →] Verity.Core.Uint256.add_right_cancel
 
 /-! ## 2. ListSum — point-update / transfer conservation
 
-Core balance-conservation invariants. The `_eq`/`_ne` countOcc lemmas tag cleanly as `[grind =]`.
+Core balance-conservation invariants. The `_eq` countOcc lemmas tag cleanly as `[grind =]`; the
+conditional `_ne` variants (with an `a ≠ t` antecedent) are forward-only and tagged `[grind →]`.
 The three `map_sum_*` preservation theorems can't be tagged with either `→` (antecedent patterns
 aren't extractable) or `=` (the LHS of the concluding equality doesn't mention every bound
 parameter like `delta`/`src`/`dst`, so grind can't instantiate them from an E-match). Callers
@@ -68,6 +69,8 @@ loud-but-useless global registration. -/
 attribute [grind =]
   Verity.Proofs.Stdlib.ListSum.countOcc_cons_eq
   Verity.Proofs.Stdlib.ListSum.countOccU_cons_eq
+-- Conditional (`a ≠ t → …`) equalities: forward-only per the audit.
+attribute [grind →]
   Verity.Proofs.Stdlib.ListSum.countOcc_cons_ne
   Verity.Proofs.Stdlib.ListSum.countOccU_cons_ne
 
@@ -156,10 +159,9 @@ Groups:
                                  and `→` for bound-producing lemmas).
 -/
 
--- 5a. Nat bridges (hypothesis is a `fits_within` whose pattern grind can't extract, use `=`)
-attribute [grind =]
-  Verity.Proofs.Stdlib.Math.mulDivDown_nat_eq
+-- 5a. Nat bridges (conditional on a `fits_within` hypothesis, forward-only per the audit).
 attribute [grind →]
+  Verity.Proofs.Stdlib.Math.mulDivDown_nat_eq
   Verity.Proofs.Stdlib.Math.mulDivUp_nat_eq
   Verity.Proofs.Stdlib.Math.wMulDown_nat_eq
   Verity.Proofs.Stdlib.Math.wDivUp_nat_eq

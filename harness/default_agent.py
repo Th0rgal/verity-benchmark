@@ -1928,6 +1928,9 @@ def execute_interactive_agent_task(
     # same class entry for the same candidate. Without dedupe the history
     # gets two entries for one actual failure, and the repeated-class
     # temperature bump fires a turn too early.
+    # Scope: reset at the top of each model turn (see loop below) so
+    # cross-turn repeats on an unchanged candidate still register as genuine
+    # failures for the repeated-class temperature escalation.
     _last_history_key: list = [None]  # mutable cell so helper can update
     # Track how many failures we have already applied the temperature-bump
     # schedule to, so we don't keep escalating temperature on every iteration
@@ -1938,6 +1941,13 @@ def execute_interactive_agent_task(
     turn = 0
     while proof_attempts < config.max_attempts and turn < max_total_turns:
         turn += 1
+        # Scope the failure-class dedupe to a single turn. The dedupe exists to
+        # coalesce same-candidate same-class duplicates emitted within one
+        # model turn (e.g. `write_editable_proof` + follow-up `run_lean_check`
+        # on the same candidate); it must not silence genuine cross-turn
+        # repeats where the candidate stays unchanged but the model tries
+        # again. Resetting here bounds the dedupe window to the current turn.
+        _last_history_key[0] = None
         # Adjust temperature once per new failure entry when the last two
         # proof attempts failed with the same class.
         if (
