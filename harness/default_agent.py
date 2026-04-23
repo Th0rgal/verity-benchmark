@@ -1831,6 +1831,16 @@ _PREFLIGHT_FAILURE_MODES = frozenset({
     "hidden_case_import_detected",
 })
 
+# Canonical evaluation-contract keys, matching the top-level `evaluation`
+# object in schemas/agent-run.schema.json (additionalProperties=false over
+# {status, failure_mode, details, command, candidate_workspace}). Whenever
+# the runtime returns a dict that will ultimately become a top-level or
+# per-attempt `evaluation` record, filter it through these keys first so
+# write-time metadata (path, bytes, lines, warnings, write_status,
+# repair_hints) and tool-specific extras (e.g. try_tactic_at_hole's
+# `tactic`) don't leak through and break JSON schema validation.
+_EVAL_KEYS = ("status", "failure_mode", "details", "command", "candidate_workspace")
+
 
 def _failure_history_class(result: dict) -> str:
     """Return the failure-class label to append to temperature history.
@@ -2012,10 +2022,33 @@ def execute_interactive_agent_task(
                 # per no-tool-calls attempt and pushed a spurious entry
                 # onto `_check_history`, which could trigger premature
                 # stagnation/temperature escalation.
-                evaluation = runtime.write_editable_proof(final_candidate)
+                write_result = runtime.write_editable_proof(final_candidate)
                 proof_attempts += 1
+                # `write_editable_proof` returns the full write payload
+                # merged with `run_lean_check` output (path, bytes, lines,
+                # warnings, write_status, repair_hints). These are not part
+                # of the top-level `evaluation` schema (which is strict:
+                # additionalProperties=false over {status, failure_mode,
+                # details, command, candidate_workspace}). Returning the
+                # raw dict upward — as was done before — made `build_result`
+                # forward it to `validate_result_payload` and fail schema
+                # validation with a SystemExit, aborting the entire run
+                # every time the model produced Lean text without tool
+                # calls (including successful proofs). Normalize here so
+                # both the nested `attempts[-1]["evaluation"]` record and
+                # the outward return have the contract shape, while
+                # preserving the rich write-time payload under a separate
+                # per-attempt key for debugging/analytics.
+                evaluation = {
+                    k: write_result[k]
+                    for k in _EVAL_KEYS
+                    if k in write_result
+                }
+                evaluation.setdefault("failure_mode", None)
+                evaluation.setdefault("details", "")
                 attempts[-1]["candidate_file_contents"] = runtime.current_proof_text
                 attempts[-1]["evaluation"] = evaluation
+                attempts[-1]["write_result"] = write_result
                 # Track model-driven failure classes for the temperature
                 # schedule's sliding window. `_failure_history_class` maps
                 # preflight modes (placeholder_detected, hidden_*_import,
@@ -2023,7 +2056,7 @@ def execute_interactive_agent_task(
                 # so they don't all collapse into `other`, and filters out
                 # infra-noise environment errors that would break
                 # same-class detection.
-                fc_entry = _failure_history_class(evaluation)
+                fc_entry = _failure_history_class(write_result)
                 _append_failure_class(
                     failure_class_history,
                     fc_entry,
@@ -2141,7 +2174,7 @@ def execute_interactive_agent_task(
                 # repair_hints) that isn't part of the evaluation contract.
                 _failed_eval = {
                     k: result[k]
-                    for k in ("status", "failure_mode", "details", "command", "candidate_workspace")
+                    for k in _EVAL_KEYS
                     if k in result
                 }
                 _failed_eval.setdefault("failure_mode", None)
@@ -2152,7 +2185,6 @@ def execute_interactive_agent_task(
                 # extra keys like `tactic` that must be stripped, otherwise the
                 # final result fails schema validation (additionalProperties:
                 # false) and the whole task aborts with no result file.
-                _EVAL_KEYS = ("status", "failure_mode", "details", "command", "candidate_workspace")
                 evaluation = {k: result[k] for k in _EVAL_KEYS if k in result}
                 evaluation.setdefault("failure_mode", None)
                 evaluation.setdefault("details", "")
