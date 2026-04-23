@@ -641,7 +641,20 @@ class TaskProofRuntime:
                 result = self._annotate_check_result(result)
             # Cache the fresh evaluation against the current proof text so a
             # follow-up run_lean_check on unchanged content hits the fast path.
-            self._last_eval_cache = (self.current_proof_text, copy.deepcopy(result))
+            # Exception: do NOT cache `environment_error` results. Those are
+            # transient infrastructure failures (missing .olean, lake build
+            # contention) that the heal path above tries to recover from via
+            # `_attempt_lake_build`. Caching them would short-circuit every
+            # subsequent `run_lean_check` on unchanged proof text back to the
+            # stale env error, preventing the heal path from being re-entered
+            # if infra recovers. Re-evaluate every time for env errors so the
+            # heal path keeps getting a chance.
+            is_env_error = (
+                result.get("failure_class") == "environment_error"
+                or result.get("environment_error") is True
+            )
+            if not is_env_error:
+                self._last_eval_cache = (self.current_proof_text, copy.deepcopy(result))
             return result
         if name == "inspect_lean_goals":
             return self.inspect_goals()
