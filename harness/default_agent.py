@@ -1817,7 +1817,14 @@ def execute_strict_agent_task(
 # distinct failure modes into the same temperature-history bucket. Surface
 # each preflight mode as its own history class so the repeated-class bump
 # can fire correctly (and only) when the *same* preflight keeps recurring.
+# NOTE: Kept in sync with the authoritative set in
+# harness/interactive_runtime.py::_PREFLIGHT_FAILURE_MODES. If you add or
+# rename a preflight failure_mode, update both. Missing a value here causes
+# `_failure_history_class` to fall through to classify_failure and record a
+# bare Lean-check class instead of the namespaced `pf:<mode>` label, which
+# corrupts the repeated-class temperature-bump signal.
 _PREFLIGHT_FAILURE_MODES = frozenset({
+    "empty_response",
     "placeholder_detected",
     "theorem_statement_mismatch",
     "hidden_proof_import_detected",
