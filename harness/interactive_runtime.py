@@ -224,7 +224,17 @@ class TaskProofRuntime:
             # (path, bytes, lines, warnings) stays visible in the result so
             # the model still sees format warnings like non_public_imports
             # alongside the Lean verdict.
+            pre_check_status = result["status"]
             result.update(self.execute_tool("run_lean_check", {}))
+            # `run_lean_check` overwrites the `status` field, which drops the
+            # pre-check `ok_with_warnings` verdict. Callers that look for
+            # write-phase warnings (unfilled `?_` holes, non_public_imports,
+            # theorem_statement_mismatch) need a stable signal, so expose the
+            # pre-check verdict on `write_status`. The main `status` still
+            # reflects the Lean check so existing `status == "passed"` and
+            # `status == "failed"` branches keep working unchanged.
+            if pre_check_status != "ok":
+                result["write_status"] = pre_check_status
         return result
 
     def search_public_defs(self, query: str, *, limit: int = 20) -> dict[str, Any]:
