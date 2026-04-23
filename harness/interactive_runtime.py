@@ -1214,7 +1214,7 @@ def extract_contract_simp_terms(task: dict[str, Any]) -> list[str]:
 # Matches at end-of-string after the hole's predecessor text is sliced off.
 _TERM_POSITION_RE = re.compile(
     r"(?:"
-    r"\b(?:exact|refine|apply|show|have|let|suffices|exact?|refine!|exact!|"
+    r"\b(?:exact|refine|apply|show|have|let|suffices|exact\?|refine!|exact!|"
     r"use|calc|from|fun)\s*"  # term-expecting keywords
     r"|[⟨(,\[{]\s*"             # inside anonymous constructors / tuples / lists
     r"|:=\s*"                    # RHS of let / have := ?_
