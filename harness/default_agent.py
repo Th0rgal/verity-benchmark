@@ -1909,9 +1909,16 @@ def execute_interactive_agent_task(
             # Only overwrite the stored proof if the response looks like Lean code,
             # not natural-language explanation.
             if final_candidate.strip() and _looks_like_lean(final_candidate):
-                runtime.write_editable_proof(final_candidate)
+                # `write_editable_proof` already runs the Lean check
+                # internally (check=True default) and returns the merged
+                # write-metadata + run_lean_check result. Reuse that dict
+                # instead of calling `evaluate_current()` again — the
+                # previous double-invocation cost a second `lake env lean`
+                # per no-tool-calls attempt and pushed a spurious entry
+                # onto `_check_history`, which could trigger premature
+                # stagnation/temperature escalation.
+                evaluation = runtime.write_editable_proof(final_candidate)
                 proof_attempts += 1
-                evaluation = runtime.evaluate_current()
                 attempts[-1]["candidate_file_contents"] = runtime.current_proof_text
                 attempts[-1]["evaluation"] = evaluation
                 # Track real model-driven failure classes for the temperature
