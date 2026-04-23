@@ -306,7 +306,7 @@ class TaskProofRuntime:
             return {
                 "status": "unsupported",
                 "reason": "goal_inspection_requires_explicit_hole",
-                "details": "Write the proof with a `?_` or named hole first, then retry goal inspection.",
+                "details": "Write the proof with an unnamed hole `?_` first, then retry goal inspection. Named holes like `?x` are not detected by this tool.",
             }
         evaluation = self.evaluate_current(check_goals=True)
         return {
