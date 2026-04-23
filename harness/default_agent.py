@@ -1866,7 +1866,6 @@ def _append_failure_class(
     """
     if not fc_entry:
         return
-    import hashlib
     candidate_hash = hashlib.sha1(candidate_text.encode("utf-8", "replace")).hexdigest()[:16]
     key = (candidate_hash, fc_entry)
     if last_key and last_key[0] == key:
@@ -2127,7 +2126,20 @@ def execute_interactive_agent_task(
                 # turn's candidate gets recorded and repeated unsuccessful
                 # edits look like zero churn.
                 attempts[-1]["candidate_file_contents"] = runtime.current_proof_text
-                attempts[-1]["evaluation"] = result
+                # Normalize to the evaluation schema (same _EVAL_KEYS filter as
+                # the passed path below) so the nested per-attempt evaluation
+                # records have a consistent shape across passed / failed /
+                # budget-exhausted branches. The raw tool result carries
+                # write-time metadata (path, bytes, lines, warnings,
+                # repair_hints) that isn't part of the evaluation contract.
+                _failed_eval = {
+                    k: result[k]
+                    for k in ("status", "failure_mode", "details", "command", "candidate_workspace")
+                    if k in result
+                }
+                _failed_eval.setdefault("failure_mode", None)
+                _failed_eval.setdefault("details", "")
+                attempts[-1]["evaluation"] = _failed_eval
             elif tool_name in ("run_lean_check", "try_tactic_at_hole", "write_editable_proof") and result.get("status") == "passed":
                 # Normalize to evaluation schema. `try_tactic_at_hole` returns
                 # extra keys like `tactic` that must be stripped, otherwise the
