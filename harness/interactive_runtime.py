@@ -1340,6 +1340,44 @@ def _is_term_position_hole(proof: str, hole_start: int) -> bool:
     return bool(_TERM_POSITION_RE.search(window_r + " "))
 
 
+def _is_fully_paren_wrapped(raw: str) -> bool:
+    """Return True iff `raw` is a single parenthesised expression.
+
+    Correct check: after the opening `(`, parenthesis nesting depth must stay
+    >= 1 for every position up to (but not including) the final char, and
+    return to 0 exactly at the final `)`. Rejects `(a) + (b)`, `(a)(b)`,
+    `(foo) bar (baz)`; accepts `(a)`, `((a + b))`, `(first | a | b)`.
+    Respects Lean string literals so a `(` inside `"..."` doesn't count.
+    """
+    n = len(raw)
+    if n < 2 or raw[0] != "(" or raw[-1] != ")":
+        return False
+    depth = 0
+    in_string = False
+    i = 0
+    while i < n:
+        ch = raw[i]
+        if in_string:
+            if ch == "\\" and i + 1 < n:
+                i += 2
+                continue
+            if ch == '"':
+                in_string = False
+            i += 1
+            continue
+        if ch == '"':
+            in_string = True
+        elif ch == "(":
+            depth += 1
+        elif ch == ")":
+            depth -= 1
+            if depth == 0 and i != n - 1:
+                # Outer group closed before the end -> not a single wrap.
+                return False
+        i += 1
+    return depth == 0
+
+
 def _substitute_holes(proof: str, tactic: str) -> str:
     """Replace every `?_` in `proof` with a context-adapted form of `tactic`.
 
@@ -1352,10 +1390,14 @@ def _substitute_holes(proof: str, tactic: str) -> str:
     raw = tactic.strip()
     # Already a term form? (leading `by `/`by\n`, or fully wrapped in parens)
     starts_by = raw.startswith("by ") or raw.startswith("by\n")
-    fully_paren_wrapped = (
-        raw.startswith("(") and raw.endswith(")") and raw.count("(") == raw.count(")")
-    )
-    is_term_form = starts_by or fully_paren_wrapped
+    # `fully_paren_wrapped` means the outer `(` at position 0 is the partner
+    # of the outer `)` at the end — i.e. the whole string is one parenthesised
+    # expression. A plain depth count (startswith/endswith + balanced totals)
+    # mis-classifies strings like `(a) + (b)` or `(foo) bar (baz)`, which
+    # would get their "term form" left as-is and become invalid when
+    # substituted into a term-position hole. Track nesting depth and confirm
+    # it only returns to zero on the final character.
+    fully_paren_wrapped = _is_fully_paren_wrapped(raw)
     # Precompute the tactic-position form: strip a leading `by ` or `by\n`
     # so substitution at a tactic hole doesn't nest `by`. Leave paren-
     # wrapped forms alone — those often indicate grouping the caller wants
