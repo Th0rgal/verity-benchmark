@@ -4,6 +4,7 @@ import Benchmark.Grindset.Attr
 import Benchmark.Grindset.Monad
 import Benchmark.Grindset.Core
 import Benchmark.Grindset.Tests
+import Benchmark.Grindset.Arith
 
 /-!
 # Benchmark.Grindset — umbrella module
@@ -22,4 +23,6 @@ Contents:
   tagged invariant lemmas across all benchmark contracts.
 - `Grindset.Reach` (A3): reachability lemma pack and the
   `verity_reach_grind` tactic for `safe/owner_manager_reach` chain proofs.
+- `Grindset.Arith` (A4): arithmetic grind pack for `lido/vaulthub_locked`
+  — ceilDiv unfolding, sandwich, monotonicity, Uint256↔Nat wrappers.
 -/
