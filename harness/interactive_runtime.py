@@ -15,6 +15,12 @@ from task_runner import ROOT, run_command as lean_run_command
 PLACEHOLDER_PATTERN = re.compile(r"\b(sorry|admit|axiom)\b")
 # Match standalone `?_` holes only (not `?x` metavariables used in valid tactics).
 HOLE_PATTERN = re.compile(r"(?<!\w)\?_(?!\w)")
+# Detection-only pattern covering both unnamed (`?_`) and named (`?ident`)
+# holes. Used by `inspect_goals` so the model can introspect goals at a
+# named hole too. NOT used by `try_tactic_at_hole` or `_substitute_holes`
+# — blanket substitution of a named hole `?h` can collide with real
+# identifiers, so substitution stays strictly `?_`-scoped.
+ANY_HOLE_PATTERN = re.compile(r"(?<!\w)\?(?:_|[A-Za-z][A-Za-z0-9_']*)(?!\w)")
 DEF_PATTERN = re.compile(r"^\s*(?:def|theorem|lemma|abbrev|opaque)\s+([A-Za-z0-9_'.]+)")
 HIDDEN_PROOF_IMPORT_PATTERN = re.compile(
     r"^\s*(?:import|open|export)\s+Benchmark\.Cases\..*\.Proofs\b", re.MULTILINE
@@ -301,12 +307,16 @@ class TaskProofRuntime:
         return result
 
     def inspect_goals(self) -> dict[str, Any]:
-        holes = sorted(set(HOLE_PATTERN.findall(self.current_proof_text)))
+        # Detect `?_` AND named holes (`?h`, `?foo`). Named-hole detection was
+        # lost when HOLE_PATTERN was tightened for substitution safety; this
+        # tool is read-only so the broader pattern is safe and restores the
+        # recovery path for proofs that use named holes.
+        holes = sorted(set(ANY_HOLE_PATTERN.findall(self.current_proof_text)))
         if not holes:
             return {
                 "status": "unsupported",
                 "reason": "goal_inspection_requires_explicit_hole",
-                "details": "Write the proof with an unnamed hole `?_` first, then retry goal inspection. Named holes like `?x` are not detected by this tool.",
+                "details": "Write the proof with a `?_` or named hole (e.g. `?h`) first, then retry goal inspection.",
             }
         evaluation = self.evaluate_current(check_goals=True)
         return {
