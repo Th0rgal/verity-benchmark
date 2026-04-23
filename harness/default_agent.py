@@ -1215,8 +1215,13 @@ def send_chat_completion(
         # extra_body is schema-free operator input; a truthy non-iterable
         # (bool, int, dict, ...) must not blow up the iteration below.
         raw_fallback = []
+    # Trim each entry: the guard below already gates on `item.strip()`
+    # truthiness, but store the stripped form so leading/trailing whitespace
+    # in a config like `" gpt-4o-mini"` does not survive into the outbound
+    # request body (providers reject model ids they do not recognize, so an
+    # otherwise-valid fallback would fail with a 404 model-not-found).
     fallback_models = [
-        str(item)
+        item.strip()
         for item in raw_fallback
         if isinstance(item, str) and item.strip()
     ]
@@ -1226,6 +1231,15 @@ def send_chat_completion(
     payload.pop("length_retry_token_cap", None)
     models_to_try: list[str] = [config.model, *fallback_models]
     last_exc: _ChatCompletionError | None = None
+    # Status codes that are fatal for the whole chain — every model would
+    # get the same error, so no point in continuing to try fallbacks.
+    # 401 (bad/expired API key) and 403 (forbidden) are auth-level and
+    # apply account-wide; retrying a different model would just produce
+    # the same error. Every other non-transient 4xx is model-specific
+    # (404 model-not-found, 400 model-rejected-payload, 422 bad params
+    # for a model, 429 model-specific quota is in RETRY_STATUS_CODES
+    # already) and should fall through to the next fallback model.
+    _FATAL_AUTH_STATUSES = {401, 403}
     for model in models_to_try:
         try:
             return _post_chat_completion(config, payload, model)
@@ -1234,8 +1248,11 @@ def send_chat_completion(
             # Fall back on the same transient statuses `_post_chat_completion`
             # retries internally (plus status 0 for network/read errors), so a
             # primary that keeps returning 408/409/425/429/5xx gets routed to
-            # the configured fallback chain instead of hard-failing.
-            if exc.status not in RETRY_STATUS_CODES and exc.status != 0:
+            # the configured fallback chain instead of hard-failing. For a
+            # non-transient, non-auth error (e.g. 404 model-not-found on a
+            # typo'd fallback entry) keep trying later models — one bad
+            # fallback should not prevent subsequent configured backups.
+            if exc.status in _FATAL_AUTH_STATUSES:
                 break
             continue
     if last_exc is None:
