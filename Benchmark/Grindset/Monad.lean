@@ -112,4 +112,25 @@ attribute [grind_norm] Verity.msgValue
 attribute [grind_norm] Verity.blockTimestamp Verity.blockNumber Verity.chainid
 attribute [grind_norm] Verity.require
 
+/-! ### `require` branch discharge
+
+The `verity_contract` macro elaborates `require (a <= b) msg` into
+`Verity.require (decide (a ≤ b)) msg`, which after unfolding becomes
+`fun s => if decide (a ≤ b) = true then ContractResult.success () s else …`.
+A proof-side hypothesis `h : a ≤ b` passed into `simp only […, h]` rewrites
+the inner `Prop` to `True`, leaving the residual guard
+`if decide True = true then success … else revert …`. The ground
+`simp only [grind_norm, …]` simp set does not include a rule that collapses
+this guard — without it the enclosing `Verity.bind` / `Contract.run` matches
+cannot commit to their success branch and `grind` is handed a large
+unreduced term whose storage projection it cannot see through.
+
+The lemma below is the missing rewrite. It discharges the `require` in one
+step, unblocking the rest of the monadic normalisation. -/
+
+@[grind_norm, simp]
+theorem ite_decide_True {α : Sort _} (a b : α) :
+    (if decide True = true then a else b) = a := by
+  simp
+
 end Benchmark.Grindset
