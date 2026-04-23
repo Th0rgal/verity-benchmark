@@ -1322,8 +1322,20 @@ def _substitute_holes(proof: str, tactic: str) -> str:
         tactic_form = raw[3:].lstrip()
     else:
         tactic_form = raw
-    # Term-position form: `(by <tac>)` unless caller already passed a term.
-    term_form = raw if is_term_form else f"(by {raw})"
+    # Term-position form: must be a valid term. `(by <tac>)` wraps a raw
+    # tactic. A bare `by <tac>` is also a tactic-block term, but at a
+    # term-position hole like `exact ?_` it produces `exact by <tac>` which
+    # Lean parses as applying `exact` to `by` rather than as an `exact` on a
+    # tactic block — invalid syntax. Wrap `by <tac>` in parentheses in that
+    # case. A fully paren-wrapped value is already a safe term and is left
+    # alone (it may be grouping tactics the caller wants preserved, e.g.
+    # `(first | a | b)`; at a term hole that still reads as a term).
+    if fully_paren_wrapped:
+        term_form = raw
+    elif starts_by:
+        term_form = f"({raw})"
+    else:
+        term_form = f"(by {raw})"
 
     out: list[str] = []
     cursor = 0
