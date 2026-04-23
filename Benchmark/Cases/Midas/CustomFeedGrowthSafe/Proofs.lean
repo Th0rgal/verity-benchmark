@@ -174,6 +174,103 @@ private theorem getDeviation_eval_true_nonneg
   unfold CustomFeedGrowthSafe._getDeviation Verity.require signedDeviationRaw
   simpa [Verity.bind, Bind.bind, Verity.pure, Pure.pure, Contract.run, hNewNZ, hLastNZ, hNeg']
 
+private theorem getDeviation_revert_last_zero
+    (newPrice : Uint256) (validateOnlyUp : Bool) (s : ContractState)
+    (hNewNZ : newPrice ≠ 0) :
+    ((CustomFeedGrowthSafe._getDeviation 0 newPrice validateOnlyUp).run s) =
+      ContractResult.revert "CAG: last price is zero" s := by
+  unfold CustomFeedGrowthSafe._getDeviation Verity.require
+  simp [Verity.bind, Bind.bind, Verity.pure, Pure.pure, Contract.run, hNewNZ]
+
+private theorem getDeviation_eval_zero_price
+    (lastPrice : Uint256) (validateOnlyUp : Bool) (s : ContractState) :
+    ((CustomFeedGrowthSafe._getDeviation lastPrice 0 validateOnlyUp).run s) =
+      ContractResult.success HUNDRED_ONE s := by
+  unfold CustomFeedGrowthSafe._getDeviation Verity.require
+  simp [Verity.bind, Bind.bind, Verity.pure, Pure.pure, Contract.run, HUNDRED_ONE]
+
+private theorem getDeviation_revert_true_neg
+    (lastPrice newPrice : Uint256) (s : ContractState)
+    (hNewNZ : newPrice ≠ 0)
+    (hLastNZ : lastPrice ≠ 0)
+    (hNeg : slt (signedDeviationRaw lastPrice newPrice) 0 = true) :
+    ((CustomFeedGrowthSafe._getDeviation lastPrice newPrice true).run s) =
+      ContractResult.revert "CAG: deviation is negative" s := by
+  have hNeg' : slt (sdiv (mul (mul (sub newPrice lastPrice) ONE) 100) lastPrice) 0 = true := by
+    simpa [signedDeviationRaw] using hNeg
+  unfold CustomFeedGrowthSafe._getDeviation Verity.require
+  simp [Verity.bind, Bind.bind, Verity.pure, Pure.pure, Contract.run, hNewNZ, hLastNZ, hNeg']
+
+private theorem getDeviation_success_implies_specs
+    (lastPrice newPrice : Uint256) (validateOnlyUp : Bool) (s s' : ContractState)
+    (deviation : Uint256)
+    (hRun :
+      ((CustomFeedGrowthSafe._getDeviation lastPrice newPrice validateOnlyUp).run s) =
+        ContractResult.success deviation s') :
+    s' = s ∧
+      deviation = deviationAbsRaw lastPrice newPrice ∧
+      (newPrice ≠ 0 → (lastPrice != 0) = true) ∧
+      (newPrice ≠ 0 → validateOnlyUp = true →
+        slt (signedDeviationRaw lastPrice newPrice) 0 = false) := by
+  by_cases hNewZero : newPrice = 0
+  · unfold CustomFeedGrowthSafe._getDeviation at hRun
+    simp [hNewZero, Verity.pure, Pure.pure, Contract.run, HUNDRED_ONE] at hRun
+    rcases hRun with ⟨hDev, hState⟩
+    subst deviation
+    subst s'
+    simp [deviationAbsRaw, hNewZero, HUNDRED_ONE]
+  · by_cases hLastZero : lastPrice = 0
+    · unfold CustomFeedGrowthSafe._getDeviation Verity.require at hRun
+      simp [hNewZero, hLastZero, Verity.bind, Bind.bind, Verity.pure, Pure.pure, Contract.run] at hRun
+    · have hLastNZBool : (lastPrice != 0) = true := by
+        simpa [hLastZero]
+      cases hValidate : validateOnlyUp
+      · by_cases hNeg : slt (signedDeviationRaw lastPrice newPrice) 0 = true
+        · unfold CustomFeedGrowthSafe._getDeviation Verity.require at hRun
+          have hNegRaw :
+              slt (sdiv (mul (mul (sub newPrice lastPrice) ONE) 100) lastPrice) 0 = true := by
+            simpa [signedDeviationRaw] using hNeg
+          simp [hNewZero, hLastZero, hLastNZBool, hValidate, hNegRaw,
+            Verity.bind, Bind.bind, Verity.pure, Pure.pure, Contract.run] at hRun
+          rcases hRun with ⟨hDev, hState⟩
+          subst deviation
+          subst s'
+          simp [deviationAbsRaw, absSignedWord, signedDeviationRaw, hNewZero, hNeg, hNegRaw,
+            hLastNZBool]
+        · have hNegFalse : slt (signedDeviationRaw lastPrice newPrice) 0 = false := by
+            cases hBool : slt (signedDeviationRaw lastPrice newPrice) 0 <;> simp [hBool] at hNeg ⊢
+          unfold CustomFeedGrowthSafe._getDeviation Verity.require at hRun
+          have hNegRawFalse :
+              slt (sdiv (mul (mul (sub newPrice lastPrice) ONE) 100) lastPrice) 0 = false := by
+            simpa [signedDeviationRaw] using hNegFalse
+          simp [hNewZero, hLastZero, hLastNZBool, hValidate, hNegRawFalse,
+            Verity.bind, Bind.bind, Verity.pure, Pure.pure, Contract.run] at hRun
+          rcases hRun with ⟨hDev, hState⟩
+          subst deviation
+          subst s'
+          simp [deviationAbsRaw, absSignedWord, signedDeviationRaw, hNewZero, hNegFalse,
+            hNegRawFalse, hLastNZBool]
+      · by_cases hNeg : slt (signedDeviationRaw lastPrice newPrice) 0 = true
+        · unfold CustomFeedGrowthSafe._getDeviation Verity.require at hRun
+          have hNegRaw :
+              slt (sdiv (mul (mul (sub newPrice lastPrice) ONE) 100) lastPrice) 0 = true := by
+            simpa [signedDeviationRaw] using hNeg
+          simp [hNewZero, hLastZero, hLastNZBool, hValidate, hNegRaw,
+            Verity.bind, Bind.bind, Verity.pure, Pure.pure, Contract.run] at hRun
+        · have hNegFalse : slt (signedDeviationRaw lastPrice newPrice) 0 = false := by
+            cases hBool : slt (signedDeviationRaw lastPrice newPrice) 0 <;> simp [hBool] at hNeg ⊢
+          unfold CustomFeedGrowthSafe._getDeviation Verity.require at hRun
+          have hNegRawFalse :
+              slt (sdiv (mul (mul (sub newPrice lastPrice) ONE) 100) lastPrice) 0 = false := by
+            simpa [signedDeviationRaw] using hNegFalse
+          simp [hNewZero, hLastZero, hLastNZBool, hValidate, hNegRawFalse,
+            Verity.bind, Bind.bind, Verity.pure, Pure.pure, Contract.run] at hRun
+          rcases hRun with ⟨hDev, hState⟩
+          subst deviation
+          subst s'
+          simp [deviationAbsRaw, absSignedWord, signedDeviationRaw, hNewZero, hNegFalse,
+            hNegRawFalse, hLastNZBool]
+
 private theorem bind_run_success_same_state
     {α β : Type} (c : Contract α) (f : α → Contract β) (s : ContractState) (a : α)
     (h : c.run s = ContractResult.success a s) :
@@ -181,6 +278,14 @@ private theorem bind_run_success_same_state
   have hc : c s = ContractResult.success a s := Contract.eq_of_run_success h
   unfold Contract.run Verity.bind
   simp [hc]
+
+private theorem bind_isSuccess_right_same_state
+    {α β : Type} (c : Contract α) (f : α → Contract β) (s : ContractState) (a : α)
+    (hRun : c.run s = ContractResult.success a s)
+    (hSuccess : ((Verity.bind c f).run s).isSuccess = true) :
+    ((f a).run s).isSuccess = true := by
+  rw [bind_run_success_same_state c f s a hRun] at hSuccess
+  exact hSuccess
 
 private theorem bind_run_revert_same_state
     {α β : Type} (c : Contract α) (f : α → Contract β) (s : ContractState) (msg : String)
@@ -192,6 +297,57 @@ private theorem bind_run_revert_same_state
   · simp [Verity.bind, hC] at h ⊢
     cases h
     rfl
+
+private def setRoundDataSafeTimeTail
+    {α : Type} (_lastUpdatedAt dataTimestamp blockTimestamp : Uint256) (k : Unit → Contract α) :
+    Contract α := do
+  require (_lastUpdatedAt <= blockTimestamp) "CAG: timestamp underflow"
+  require (sub blockTimestamp _lastUpdatedAt > 3600) "CAG: not enough time passed"
+  let __do_lift ← CustomFeedGrowthSafe.lastStartedAt
+  require (dataTimestamp > __do_lift) "CAG: timestamp <= last startedAt"
+  k ()
+
+private def setRoundDataSafeOnlyUpTail
+    {α : Type} (_onlyUp _lastUpdatedAt dataTimestamp growthApr blockTimestamp : Uint256)
+    (k : Unit → Contract α) : Contract α := do
+  if _onlyUp != 0 then
+    if slt growthApr 0 then
+      let _y ← require false "CAG: negative apr"
+      setRoundDataSafeTimeTail _lastUpdatedAt dataTimestamp blockTimestamp k
+    else
+      let _y ← (Pure.pure () : Contract Unit)
+      setRoundDataSafeTimeTail _lastUpdatedAt dataTimestamp blockTimestamp k
+  else
+    let _y ← (Pure.pure () : Contract Unit)
+    setRoundDataSafeTimeTail _lastUpdatedAt dataTimestamp blockTimestamp k
+
+private def setRoundDataSafeHistoryTail
+    {α : Type} (_onlyUp _lastUpdatedAt data dataTimestamp growthApr blockTimestamp : Uint256)
+    (k : Unit → Contract α) : Contract α := do
+  if _lastUpdatedAt != 0 then
+    let __do_lift ← CustomFeedGrowthSafe.lastAnswer blockTimestamp
+    let __do_lift_1 ← CustomFeedGrowthSafe.applyGrowth data growthApr dataTimestamp blockTimestamp
+    let deviation ← CustomFeedGrowthSafe._getDeviation __do_lift __do_lift_1 (_onlyUp != 0)
+    let maxAnswerDeviation_ ← getStorage CustomFeedGrowthSafe.maxAnswerDeviation
+    let _y ← require (deviation <= maxAnswerDeviation_) "CAG: !deviation"
+    setRoundDataSafeOnlyUpTail _onlyUp _lastUpdatedAt dataTimestamp growthApr blockTimestamp k
+  else
+    let _y ← (Pure.pure () : Contract Unit)
+    setRoundDataSafeOnlyUpTail _onlyUp _lastUpdatedAt dataTimestamp growthApr blockTimestamp k
+
+private def setRoundDataSafeWithTail
+    {α : Type} (data dataTimestamp growthApr blockTimestamp : Uint256) (k : Unit → Contract α) :
+    Contract α := do
+  let _onlyUp ← getStorage CustomFeedGrowthSafe.onlyUp
+  let _lastUpdatedAt ← CustomFeedGrowthSafe.lastTimestamp
+  setRoundDataSafeHistoryTail _onlyUp _lastUpdatedAt data dataTimestamp growthApr blockTimestamp k
+
+private theorem setRoundDataSafe_eq_with_tail
+    (data dataTimestamp growthApr blockTimestamp : Uint256) :
+    CustomFeedGrowthSafe.setRoundDataSafe data dataTimestamp growthApr blockTimestamp =
+      setRoundDataSafeWithTail data dataTimestamp growthApr blockTimestamp
+        (fun _ => CustomFeedGrowthSafe.setRoundData data dataTimestamp growthApr blockTimestamp) := by
+  rfl
 
 private theorem applyGrowth_revert
     (answer growthApr timestampFrom blockTimestamp : Uint256) (s : ContractState)
@@ -230,6 +386,396 @@ private theorem lastAnswer_revert
   rw [bind_run_success_same_state _ _ _ _ hLastGrowthAprEval]
   rw [bind_run_success_same_state _ _ _ _ hLastStartedAtEval]
   exact hApplyGrowthRevert
+
+private theorem applyGrowth_success_implies_time
+    (answer growthApr timestampFrom blockTimestamp : Uint256) (s : ContractState)
+    (hSuccess :
+      ((CustomFeedGrowthSafe.applyGrowth answer growthApr timestampFrom blockTimestamp).run s).isSuccess =
+        true) :
+    timestampFrom ≤ blockTimestamp := by
+  by_cases hTime : timestampFrom ≤ blockTimestamp
+  · exact hTime
+  · have hRevert := applyGrowth_revert answer growthApr timestampFrom blockTimestamp s hTime
+    rw [hRevert] at hSuccess
+    simp [ContractResult.isSuccess] at hSuccess
+
+private theorem lastAnswer_success_implies_time
+    (blockTimestamp : Uint256) (s : ContractState)
+    (hSuccess : ((CustomFeedGrowthSafe.lastAnswer blockTimestamp).run s).isSuccess = true) :
+    lastStartedAtOf s ≤ blockTimestamp := by
+  by_cases hTime : lastStartedAtOf s ≤ blockTimestamp
+  · exact hTime
+  · have hRevert := lastAnswer_revert blockTimestamp s hTime
+    rw [hRevert] at hSuccess
+    simp [ContractResult.isSuccess] at hSuccess
+
+private theorem setRoundDataSafeTimeTail_success_implies
+    {α : Type} (_lastUpdatedAt dataTimestamp blockTimestamp : Uint256) (s : ContractState)
+    (k : Unit → Contract α)
+    (hSuccess : ((setRoundDataSafeTimeTail _lastUpdatedAt dataTimestamp blockTimestamp k).run s).isSuccess =
+      true) :
+    _lastUpdatedAt <= blockTimestamp ∧
+      sub blockTimestamp _lastUpdatedAt > 3600 ∧
+      dataTimestamp > lastStartedAtOf s ∧
+      ((k ()).run s).isSuccess = true := by
+  have hBase := hSuccess
+  unfold setRoundDataSafeTimeTail at hBase
+  simp only [Bind.bind] at hBase
+  have hFirstSuccess :
+      ((require (decide (_lastUpdatedAt <= blockTimestamp)) "CAG: timestamp underflow").run s).isSuccess =
+        true :=
+    Verity.Proofs.Stdlib.Automation.bind_isSuccess_left _ _ _ hBase
+  have hFirstCond :
+      decide (_lastUpdatedAt <= blockTimestamp) = true :=
+    Verity.Proofs.Stdlib.Automation.require_success_implies_cond
+      (decide (_lastUpdatedAt <= blockTimestamp)) "CAG: timestamp underflow" s hFirstSuccess
+  have hTimeOrder : _lastUpdatedAt <= blockTimestamp := by
+    simpa using hFirstCond
+  have hFirstRun :
+      (require (decide (_lastUpdatedAt <= blockTimestamp)) "CAG: timestamp underflow").run s =
+        ContractResult.success () s := by
+    simp [Verity.require, hTimeOrder, Contract.run]
+  have hAfterFirst :
+      ((Verity.bind
+            (require (decide (sub blockTimestamp _lastUpdatedAt > 3600))
+              "CAG: not enough time passed")
+            (fun _ =>
+              Verity.bind CustomFeedGrowthSafe.lastStartedAt fun __do_lift =>
+                Verity.bind
+                  (require (decide (dataTimestamp > __do_lift)) "CAG: timestamp <= last startedAt")
+                  (fun _ => k ()))).run s).isSuccess =
+        true :=
+    bind_isSuccess_right_same_state
+      (require (decide (_lastUpdatedAt <= blockTimestamp)) "CAG: timestamp underflow")
+      (fun _ =>
+        Verity.bind
+          (require (decide (sub blockTimestamp _lastUpdatedAt > 3600))
+            "CAG: not enough time passed")
+          (fun _ =>
+            Verity.bind CustomFeedGrowthSafe.lastStartedAt fun __do_lift =>
+              Verity.bind
+                (require (decide (dataTimestamp > __do_lift)) "CAG: timestamp <= last startedAt")
+                (fun _ => k ())))
+      s () hFirstRun hBase
+  have hSecondSuccess :
+      ((require (decide (sub blockTimestamp _lastUpdatedAt > 3600))
+          "CAG: not enough time passed").run s).isSuccess =
+        true :=
+    Verity.Proofs.Stdlib.Automation.bind_isSuccess_left _ _ _ hAfterFirst
+  have hSecondCond :
+      decide (sub blockTimestamp _lastUpdatedAt > 3600) = true :=
+    Verity.Proofs.Stdlib.Automation.require_success_implies_cond
+      (decide (sub blockTimestamp _lastUpdatedAt > 3600)) "CAG: not enough time passed" s hSecondSuccess
+  have hGap : sub blockTimestamp _lastUpdatedAt > 3600 := by
+    simpa using hSecondCond
+  have hSecondRun :
+      (require (decide (sub blockTimestamp _lastUpdatedAt > 3600))
+          "CAG: not enough time passed").run s =
+        ContractResult.success () s := by
+    simp [Verity.require, hGap, Contract.run]
+  have hAfterSecond :
+      ((Verity.bind CustomFeedGrowthSafe.lastStartedAt fun __do_lift =>
+          Verity.bind
+            (require (decide (dataTimestamp > __do_lift)) "CAG: timestamp <= last startedAt")
+            (fun _ => k ())).run s).isSuccess =
+        true :=
+    bind_isSuccess_right_same_state
+      (require (decide (sub blockTimestamp _lastUpdatedAt > 3600))
+        "CAG: not enough time passed")
+      (fun _ =>
+        Verity.bind CustomFeedGrowthSafe.lastStartedAt fun __do_lift =>
+          Verity.bind
+            (require (decide (dataTimestamp > __do_lift)) "CAG: timestamp <= last startedAt")
+            (fun _ => k ()))
+      s () hSecondRun hAfterFirst
+  have hLastStartedEval :
+      (CustomFeedGrowthSafe.lastStartedAt.run s) =
+        ContractResult.success (lastStartedAtOf s) s := by
+    exact lastStartedAt_eval s
+  have hAfterLastStarted :
+      ((Verity.bind
+          (require (decide (dataTimestamp > lastStartedAtOf s)) "CAG: timestamp <= last startedAt")
+          (fun _ => k ())).run s).isSuccess =
+        true :=
+    bind_isSuccess_right_same_state
+      CustomFeedGrowthSafe.lastStartedAt
+      (fun __do_lift =>
+        Verity.bind
+          (require (decide (dataTimestamp > __do_lift)) "CAG: timestamp <= last startedAt")
+          (fun _ => k ()))
+      s (lastStartedAtOf s) hLastStartedEval hAfterSecond
+  have hThirdSuccess :
+      ((require (decide (dataTimestamp > lastStartedAtOf s))
+          "CAG: timestamp <= last startedAt").run s).isSuccess =
+        true :=
+    Verity.Proofs.Stdlib.Automation.bind_isSuccess_left _ _ _ hAfterLastStarted
+  have hThirdCond :
+      decide (dataTimestamp > lastStartedAtOf s) = true :=
+    Verity.Proofs.Stdlib.Automation.require_success_implies_cond
+      (decide (dataTimestamp > lastStartedAtOf s)) "CAG: timestamp <= last startedAt" s hThirdSuccess
+  have hStarted : dataTimestamp > lastStartedAtOf s := by
+    simpa using hThirdCond
+  have hThirdRun :
+      (require (decide (dataTimestamp > lastStartedAtOf s)) "CAG: timestamp <= last startedAt").run s =
+        ContractResult.success () s := by
+    simp [Verity.require, hStarted, Contract.run]
+  have hAfterThird :
+      ((k ()).run s).isSuccess = true :=
+    bind_isSuccess_right_same_state
+      (require (decide (dataTimestamp > lastStartedAtOf s)) "CAG: timestamp <= last startedAt")
+      (fun _ => k ())
+      s () hThirdRun hAfterLastStarted
+  exact ⟨hTimeOrder, hGap, hStarted, hAfterThird⟩
+
+private theorem setRoundDataSafeOnlyUpTail_success_implies
+    {α : Type} (_onlyUp _lastUpdatedAt dataTimestamp growthApr blockTimestamp : Uint256)
+    (s : ContractState) (k : Unit → Contract α)
+    (hSuccess :
+      ((setRoundDataSafeOnlyUpTail _onlyUp _lastUpdatedAt dataTimestamp growthApr blockTimestamp k).run s).isSuccess =
+        true) :
+    ((_onlyUp != 0) = true → slt growthApr 0 = false) ∧
+      _lastUpdatedAt <= blockTimestamp ∧
+      sub blockTimestamp _lastUpdatedAt > 3600 ∧
+      dataTimestamp > lastStartedAtOf s ∧
+      ((k ()).run s).isSuccess = true := by
+  have hTimeTailSuccess :
+      ((setRoundDataSafeTimeTail _lastUpdatedAt dataTimestamp blockTimestamp k).run s).isSuccess =
+        true := by
+    unfold setRoundDataSafeOnlyUpTail at hSuccess
+    by_cases hOnlyUp : (_onlyUp != 0) = true
+    · by_cases hNeg : slt growthApr 0 = true
+      · simp [hOnlyUp, hNeg, Verity.require, Verity.bind, Bind.bind, Contract.run,
+          ContractResult.isSuccess] at hSuccess
+      · simpa [hOnlyUp, hNeg, Verity.bind, Bind.bind, Verity.pure, Pure.pure, Contract.run] using
+          hSuccess
+    · simpa [hOnlyUp, Verity.bind, Bind.bind, Verity.pure, Pure.pure, Contract.run] using hSuccess
+  have hTime := setRoundDataSafeTimeTail_success_implies _lastUpdatedAt dataTimestamp blockTimestamp s k
+    hTimeTailSuccess
+  have hOnlyUpApr : (_onlyUp != 0) = true → slt growthApr 0 = false := by
+    intro hOnlyUp
+    by_cases hNeg : slt growthApr 0 = true
+    · have hBad := hSuccess
+      unfold setRoundDataSafeOnlyUpTail at hBad
+      simp [hOnlyUp, hNeg, Verity.require, Verity.bind, Bind.bind, Contract.run,
+        ContractResult.isSuccess] at hBad
+    · cases hBool : slt growthApr 0 <;> simp [hBool] at hNeg ⊢
+  exact ⟨hOnlyUpApr, hTime.1, hTime.2.1, hTime.2.2.1, hTime.2.2.2⟩
+
+private theorem setRoundDataSafeHistoryTail_success_implies
+    {α : Type} (data dataTimestamp growthApr blockTimestamp : Uint256) (s : ContractState)
+    (k : Unit → Contract α)
+    (hSuccess :
+      ((setRoundDataSafeHistoryTail (onlyUpWordOf s) (lastTimestampOf s)
+          data dataTimestamp growthApr blockTimestamp k).run s).isSuccess =
+        true) :
+    historyChecksPass data dataTimestamp growthApr blockTimestamp s ∧
+      ((onlyUpWordOf s != 0) = true → slt growthApr 0 = false) ∧
+      lastTimestampOf s <= blockTimestamp ∧
+      sub blockTimestamp (lastTimestampOf s) > 3600 ∧
+      dataTimestamp > lastStartedAtOf s ∧
+      ((k ()).run s).isSuccess = true := by
+  by_cases hNoHistory : lastTimestampOf s = 0
+  · have hNoHistoryBranch :
+        ¬ ((lastTimestampOf s != 0) = true) := by
+      simpa [hNoHistory]
+    have hTailSuccess :
+        ((setRoundDataSafeOnlyUpTail (onlyUpWordOf s) (lastTimestampOf s) dataTimestamp growthApr
+            blockTimestamp k).run s).isSuccess =
+          true := by
+      unfold setRoundDataSafeHistoryTail at hSuccess
+      simpa [hNoHistoryBranch, Verity.bind, Bind.bind, Verity.pure, Pure.pure, Contract.run] using
+        hSuccess
+    have hTail :=
+      setRoundDataSafeOnlyUpTail_success_implies (onlyUpWordOf s) (lastTimestampOf s)
+        dataTimestamp growthApr blockTimestamp s k hTailSuccess
+    have hHistoryChecks : historyChecksPass data dataTimestamp growthApr blockTimestamp s := by
+      unfold historyChecksPass hasHistory
+      intro hHistory
+      simpa [hNoHistory] using hHistory
+    exact ⟨hHistoryChecks, hTail.1, hTail.2.1, hTail.2.2.1, hTail.2.2.2.1, hTail.2.2.2.2⟩
+  · have hHasHistory : ((lastTimestampOf s != 0) = true) := by
+      simpa using hNoHistory
+    have hBase := hSuccess
+    unfold setRoundDataSafeHistoryTail at hBase
+    rw [if_pos hHasHistory] at hBase
+    have hLastAnswerSuccess :
+        ((CustomFeedGrowthSafe.lastAnswer blockTimestamp).run s).isSuccess = true :=
+      Verity.Proofs.Stdlib.Automation.bind_isSuccess_left _ _ _ hBase
+    have hPrevStarted := lastAnswer_success_implies_time blockTimestamp s hLastAnswerSuccess
+    have hLastAnswerEval := lastAnswer_eval blockTimestamp s hPrevStarted
+    have hAfterLastAnswer :
+        ((Verity.bind (CustomFeedGrowthSafe.applyGrowth data growthApr dataTimestamp blockTimestamp)
+            (fun __do_lift_1 =>
+              Verity.bind
+                (CustomFeedGrowthSafe._getDeviation (lastAnswerOf s blockTimestamp) __do_lift_1
+                  (onlyUpWordOf s != 0))
+                (fun deviation =>
+                  Verity.bind (getStorage CustomFeedGrowthSafe.maxAnswerDeviation)
+                    (fun maxAnswerDeviation_ =>
+                      Verity.bind (require (decide (deviation <= maxAnswerDeviation_)) "CAG: !deviation")
+                        (fun _ =>
+                          setRoundDataSafeOnlyUpTail (onlyUpWordOf s) (lastTimestampOf s)
+                            dataTimestamp growthApr blockTimestamp k))))).run s).isSuccess =
+          true :=
+      bind_isSuccess_right_same_state
+        (CustomFeedGrowthSafe.lastAnswer blockTimestamp)
+        (fun __do_lift =>
+          Verity.bind (CustomFeedGrowthSafe.applyGrowth data growthApr dataTimestamp blockTimestamp)
+            (fun __do_lift_1 =>
+              Verity.bind
+                (CustomFeedGrowthSafe._getDeviation __do_lift __do_lift_1 (onlyUpWordOf s != 0))
+                (fun deviation =>
+                  Verity.bind (getStorage CustomFeedGrowthSafe.maxAnswerDeviation)
+                    (fun maxAnswerDeviation_ =>
+                      Verity.bind (require (decide (deviation <= maxAnswerDeviation_)) "CAG: !deviation")
+                        (fun _ =>
+                          setRoundDataSafeOnlyUpTail (onlyUpWordOf s) (lastTimestampOf s)
+                            dataTimestamp growthApr blockTimestamp k)))))
+        s (lastAnswerOf s blockTimestamp) hLastAnswerEval hBase
+    have hCandidateSuccess :
+        ((CustomFeedGrowthSafe.applyGrowth data growthApr dataTimestamp blockTimestamp).run s).isSuccess =
+          true :=
+      Verity.Proofs.Stdlib.Automation.bind_isSuccess_left _ _ _ hAfterLastAnswer
+    have hDataTsLe := applyGrowth_success_implies_time data growthApr dataTimestamp blockTimestamp s
+      hCandidateSuccess
+    have hCandidateEval :
+        ((CustomFeedGrowthSafe.applyGrowth data growthApr dataTimestamp blockTimestamp).run s) =
+          ContractResult.success (candidateLivePrice data dataTimestamp growthApr blockTimestamp) s := by
+      simpa [candidateLivePrice, applyGrowthNowRaw] using
+        (applyGrowth_eval data growthApr dataTimestamp blockTimestamp s hDataTsLe)
+    have hAfterCandidate :
+        ((Verity.bind
+            (CustomFeedGrowthSafe._getDeviation (lastAnswerOf s blockTimestamp)
+              (candidateLivePrice data dataTimestamp growthApr blockTimestamp) (onlyUpWordOf s != 0))
+            (fun deviation =>
+              Verity.bind (getStorage CustomFeedGrowthSafe.maxAnswerDeviation)
+                (fun maxAnswerDeviation_ =>
+                  Verity.bind (require (decide (deviation <= maxAnswerDeviation_)) "CAG: !deviation")
+                    (fun _ =>
+                      setRoundDataSafeOnlyUpTail (onlyUpWordOf s) (lastTimestampOf s)
+                        dataTimestamp growthApr blockTimestamp k)))).run s).isSuccess =
+          true :=
+      bind_isSuccess_right_same_state
+        (CustomFeedGrowthSafe.applyGrowth data growthApr dataTimestamp blockTimestamp)
+        (fun __do_lift_1 =>
+          Verity.bind
+            (CustomFeedGrowthSafe._getDeviation (lastAnswerOf s blockTimestamp) __do_lift_1
+              (onlyUpWordOf s != 0))
+            (fun deviation =>
+              Verity.bind (getStorage CustomFeedGrowthSafe.maxAnswerDeviation)
+                (fun maxAnswerDeviation_ =>
+                  Verity.bind (require (decide (deviation <= maxAnswerDeviation_)) "CAG: !deviation")
+                    (fun _ =>
+                      setRoundDataSafeOnlyUpTail (onlyUpWordOf s) (lastTimestampOf s)
+                        dataTimestamp growthApr blockTimestamp k))))
+        s (candidateLivePrice data dataTimestamp growthApr blockTimestamp) hCandidateEval
+        hAfterLastAnswer
+    have hDeviationSuccess :
+        ((CustomFeedGrowthSafe._getDeviation (lastAnswerOf s blockTimestamp)
+            (candidateLivePrice data dataTimestamp growthApr blockTimestamp)
+            (onlyUpWordOf s != 0)).run s).isSuccess =
+          true :=
+      Verity.Proofs.Stdlib.Automation.bind_isSuccess_left _ _ _ hAfterCandidate
+    cases hDeviationRun :
+        ((CustomFeedGrowthSafe._getDeviation (lastAnswerOf s blockTimestamp)
+            (candidateLivePrice data dataTimestamp growthApr blockTimestamp)
+            (onlyUpWordOf s != 0)).run s) with
+    | success deviation sDev =>
+        have hDeviationSpecs :=
+          getDeviation_success_implies_specs (lastAnswerOf s blockTimestamp)
+            (candidateLivePrice data dataTimestamp growthApr blockTimestamp) (onlyUpWordOf s != 0)
+            s sDev deviation hDeviationRun
+        have hDeviationState : sDev = s := hDeviationSpecs.1
+        cases hDeviationState
+        have hAfterDeviation :
+            ((Verity.bind (getStorage CustomFeedGrowthSafe.maxAnswerDeviation)
+                (fun maxAnswerDeviation_ =>
+                  Verity.bind (require (decide (deviation <= maxAnswerDeviation_)) "CAG: !deviation")
+                    (fun _ =>
+                      setRoundDataSafeOnlyUpTail (onlyUpWordOf s) (lastTimestampOf s)
+                        dataTimestamp growthApr blockTimestamp k))).run s).isSuccess =
+              true :=
+          bind_isSuccess_right_same_state
+            (CustomFeedGrowthSafe._getDeviation (lastAnswerOf s blockTimestamp)
+              (candidateLivePrice data dataTimestamp growthApr blockTimestamp) (onlyUpWordOf s != 0))
+            (fun deviation =>
+              Verity.bind (getStorage CustomFeedGrowthSafe.maxAnswerDeviation)
+                (fun maxAnswerDeviation_ =>
+                  Verity.bind (require (decide (deviation <= maxAnswerDeviation_)) "CAG: !deviation")
+                    (fun _ =>
+                      setRoundDataSafeOnlyUpTail (onlyUpWordOf s) (lastTimestampOf s)
+                        dataTimestamp growthApr blockTimestamp k)))
+            s deviation hDeviationRun hAfterCandidate
+        have hMaxEval :
+            (getStorage CustomFeedGrowthSafe.maxAnswerDeviation).run s =
+              ContractResult.success (maxAnswerDeviationOf s) s := by
+          simp [maxAnswerDeviationOf, maxAnswerDeviationSlot, getStorage, Contract.run]
+        have hAfterMax :
+            ((Verity.bind (require (decide (deviation <= maxAnswerDeviationOf s)) "CAG: !deviation")
+                (fun _ =>
+                  setRoundDataSafeOnlyUpTail (onlyUpWordOf s) (lastTimestampOf s)
+                    dataTimestamp growthApr blockTimestamp k)).run s).isSuccess =
+              true :=
+          bind_isSuccess_right_same_state
+            (getStorage CustomFeedGrowthSafe.maxAnswerDeviation)
+            (fun maxAnswerDeviation_ =>
+              Verity.bind (require (decide (deviation <= maxAnswerDeviation_)) "CAG: !deviation")
+                (fun _ =>
+                  setRoundDataSafeOnlyUpTail (onlyUpWordOf s) (lastTimestampOf s)
+                    dataTimestamp growthApr blockTimestamp k))
+            s (maxAnswerDeviationOf s) hMaxEval hAfterDeviation
+        have hCapRequireSuccess :
+            ((require (decide (deviation <= maxAnswerDeviationOf s)) "CAG: !deviation").run s).isSuccess =
+              true :=
+          Verity.Proofs.Stdlib.Automation.bind_isSuccess_left _ _ _ hAfterMax
+        have hCapCond : decide (deviation <= maxAnswerDeviationOf s) = true :=
+          Verity.Proofs.Stdlib.Automation.require_success_implies_cond
+            (decide (deviation <= maxAnswerDeviationOf s)) "CAG: !deviation" s hCapRequireSuccess
+        have hCap : deviation <= maxAnswerDeviationOf s := by
+          simpa using hCapCond
+        have hCapRun :
+            (require (decide (deviation <= maxAnswerDeviationOf s)) "CAG: !deviation").run s =
+              ContractResult.success () s := by
+          simp [Verity.require, hCap, Contract.run]
+        have hOnlyUpTailSuccess :
+            ((setRoundDataSafeOnlyUpTail (onlyUpWordOf s) (lastTimestampOf s)
+                dataTimestamp growthApr blockTimestamp k).run s).isSuccess =
+              true :=
+          bind_isSuccess_right_same_state
+            (require (decide (deviation <= maxAnswerDeviationOf s)) "CAG: !deviation")
+            (fun _ =>
+              setRoundDataSafeOnlyUpTail (onlyUpWordOf s) (lastTimestampOf s)
+                dataTimestamp growthApr blockTimestamp k)
+            s () hCapRun hAfterMax
+        have hTail :=
+          setRoundDataSafeOnlyUpTail_success_implies (onlyUpWordOf s) (lastTimestampOf s)
+            dataTimestamp growthApr blockTimestamp s k hOnlyUpTailSuccess
+        have hWithin : withinDeviationBound data dataTimestamp growthApr blockTimestamp s := by
+          unfold withinDeviationBound deviationOfSafeCall
+          rw [← hDeviationSpecs.2.1]
+          exact hCap
+        have hLastNZ :
+            candidateLivePrice data dataTimestamp growthApr blockTimestamp ≠ 0 →
+              (lastAnswerOf s blockTimestamp != 0) = true := by
+          intro hCandidateNZ
+          exact hDeviationSpecs.2.2.1 hCandidateNZ
+        have hOnlyUpDeviation :
+            candidateLivePrice data dataTimestamp growthApr blockTimestamp ≠ 0 →
+              respectsOnlyUp data dataTimestamp growthApr blockTimestamp s := by
+          intro hCandidateNZ
+          unfold respectsOnlyUp
+          intro hOnlyUp
+          exact hDeviationSpecs.2.2.2 hCandidateNZ hOnlyUp
+        have hHistoryChecks : historyChecksPass data dataTimestamp growthApr blockTimestamp s := by
+          unfold historyChecksPass
+          intro _hHistory
+          exact ⟨hWithin, hLastNZ, hOnlyUpDeviation⟩
+        exact
+          ⟨hHistoryChecks, hTail.1, hTail.2.1, hTail.2.2.1, hTail.2.2.2.1,
+            hTail.2.2.2.2⟩
+    | _ msg sDev =>
+        rw [hDeviationRun] at hDeviationSuccess
+        simp [ContractResult.isSuccess] at hDeviationSuccess
 
 private theorem setRoundDataSafe_zero_history_onlyup_off_writes
     (data dataTimestamp growthApr blockTimestamp : Uint256) (s : ContractState)
@@ -2216,6 +2762,153 @@ private theorem safeRejected_snd_eq
   unfold safeCallResult Contract.run at hRejected ⊢
   cases hRaw : CustomFeedGrowthSafe.setRoundDataSafe data dataTimestamp growthApr blockTimestamp s <;>
     simp [ContractResult.isSuccess, hRaw] at hRejected ⊢
+
+private theorem setRoundData_success_implies_inputs
+    (data dataTimestamp growthApr blockTimestamp : Uint256) (s : ContractState)
+    (hAccepted :
+      ((CustomFeedGrowthSafe.setRoundData data dataTimestamp growthApr blockTimestamp).run s).isSuccess =
+        true) :
+    answerInRange data s ∧
+      aprInRange growthApr s ∧
+      submittedTimestampBeforeCurrentTime dataTimestamp blockTimestamp := by
+  have hMinEval :
+      (getStorage CustomFeedGrowthSafe.minAnswer).run s =
+        ContractResult.success (minAnswerOf s) s := by
+    simp [minAnswerOf, minAnswerSlot, getStorage, Contract.run]
+  have hMaxEval :
+      (getStorage CustomFeedGrowthSafe.maxAnswer).run s =
+        ContractResult.success (maxAnswerOf s) s := by
+    simp [maxAnswerOf, maxAnswerSlot, getStorage, Contract.run]
+  have hMinGrowthEval :
+      (getStorage CustomFeedGrowthSafe.minGrowthApr).run s =
+        ContractResult.success (minGrowthAprOf s) s := by
+    simp [minGrowthAprOf, minGrowthAprSlot, getStorage, Contract.run]
+  have hMaxGrowthEval :
+      (getStorage CustomFeedGrowthSafe.maxGrowthApr).run s =
+        ContractResult.success (maxGrowthAprOf s) s := by
+    simp [maxGrowthAprOf, maxGrowthAprSlot, getStorage, Contract.run]
+  have hLatestEval :
+      (getStorage CustomFeedGrowthSafe.latestRound).run s =
+        ContractResult.success (latestRoundOf s) s := by
+    simp [latestRoundOf, latestRoundSlot, getStorage, Contract.run]
+  have hBase := hAccepted
+  unfold CustomFeedGrowthSafe.setRoundData at hBase
+  simp only [Bind.bind] at hBase
+  rw [bind_run_success_same_state _ _ _ _ hMinEval] at hBase
+  rw [bind_run_success_same_state _ _ _ _ hMaxEval] at hBase
+  rw [bind_run_success_same_state _ _ _ _ hMinGrowthEval] at hBase
+  rw [bind_run_success_same_state _ _ _ _ hMaxGrowthEval] at hBase
+  rw [bind_run_success_same_state _ _ _ _ hLatestEval] at hBase
+
+  have hDataLo : slt data (minAnswerOf s) = false := by
+    by_cases hLo : slt data (minAnswerOf s) = true
+    · have hBranch := hBase
+      rw [hLo] at hBranch
+      simp [Verity.bind, Bind.bind, Verity.pure, Pure.pure, Verity.require, Contract.run] at hBranch
+    · cases hBool : slt data (minAnswerOf s) <;> simp [hBool] at hLo ⊢
+
+  have hAfterDataLo := hBase
+  rw [hDataLo] at hAfterDataLo
+  simp [Verity.bind, Bind.bind, Verity.pure, Pure.pure, Contract.run] at hAfterDataLo
+
+  have hDataHi : sgt data (maxAnswerOf s) = false := by
+    by_cases hHi : sgt data (maxAnswerOf s) = true
+    · have hBranch := hAfterDataLo
+      rw [hHi] at hBranch
+      simp [Verity.bind, Bind.bind, Verity.pure, Pure.pure, Verity.require, Contract.run] at hBranch
+    · cases hBool : sgt data (maxAnswerOf s) <;> simp [hBool] at hHi ⊢
+
+  have hAfterDataHi := hAfterDataLo
+  rw [hDataHi] at hAfterDataHi
+  simp [Verity.bind, Bind.bind, Verity.pure, Pure.pure, Contract.run] at hAfterDataHi
+
+  have hGrowthLo : slt growthApr (minGrowthAprOf s) = false := by
+    by_cases hLo : slt growthApr (minGrowthAprOf s) = true
+    · have hBranch := hAfterDataHi
+      rw [hLo] at hBranch
+      simp [Verity.bind, Bind.bind, Verity.pure, Pure.pure, Verity.require, Contract.run] at hBranch
+    · cases hBool : slt growthApr (minGrowthAprOf s) <;> simp [hBool] at hLo ⊢
+
+  have hAfterGrowthLo := hAfterDataHi
+  rw [hGrowthLo] at hAfterGrowthLo
+  simp [Verity.bind, Bind.bind, Verity.pure, Pure.pure, Contract.run] at hAfterGrowthLo
+
+  have hGrowthHi : sgt growthApr (maxGrowthAprOf s) = false := by
+    by_cases hHi : sgt growthApr (maxGrowthAprOf s) = true
+    · have hBranch := hAfterGrowthLo
+      rw [hHi] at hBranch
+      simp [Verity.bind, Bind.bind, Verity.pure, Pure.pure, Verity.require, Contract.run] at hBranch
+    · cases hBool : sgt growthApr (maxGrowthAprOf s) <;> simp [hBool] at hHi ⊢
+
+  have hDataTsLt : dataTimestamp < blockTimestamp := by
+    by_cases hLt : dataTimestamp < blockTimestamp
+    · exact hLt
+    · have hBranch := hAfterGrowthLo
+      rw [hGrowthHi] at hBranch
+      have hLtVal : ¬ dataTimestamp.val < blockTimestamp.val := by
+        simpa using hLt
+      have hCondFalse : decide (dataTimestamp.val < blockTimestamp.val) = false := by
+        simp [hLtVal]
+      simp [hCondFalse, Verity.bind, Bind.bind, Verity.pure, Pure.pure, Verity.require, Contract.run] at hBranch
+
+  unfold answerInRange aprInRange submittedTimestampBeforeCurrentTime
+  exact ⟨⟨hDataLo, hDataHi⟩, ⟨⟨hGrowthLo, hGrowthHi⟩, hDataTsLt⟩⟩
+
+private theorem setRoundDataSafe_success_implies_safeInputsOk
+    (data dataTimestamp growthApr blockTimestamp : Uint256) (s : ContractState)
+    (hAccepted : safeAccepted data dataTimestamp growthApr blockTimestamp s) :
+    safeInputsOk data dataTimestamp growthApr blockTimestamp s := by
+  have hRun := hAccepted
+  unfold safeAccepted safeCallResult at hRun
+  rw [setRoundDataSafe_eq_with_tail data dataTimestamp growthApr blockTimestamp] at hRun
+  have hOnlyUpEval :
+      (getStorage CustomFeedGrowthSafe.onlyUp).run s =
+        ContractResult.success (onlyUpWordOf s) s := by
+    simp [onlyUpWordOf, onlyUpSlot, getStorage, Contract.run]
+  have hLastUpdatedEval :
+      (CustomFeedGrowthSafe.lastTimestamp.run s) =
+        ContractResult.success (lastTimestampOf s) s :=
+    lastTimestamp_eval s
+  unfold setRoundDataSafeWithTail at hRun
+  simp only [Bind.bind] at hRun
+  rw [bind_run_success_same_state _ _ _ _ hOnlyUpEval] at hRun
+  rw [bind_run_success_same_state _ _ _ _ hLastUpdatedEval] at hRun
+  have hHist :=
+    setRoundDataSafeHistoryTail_success_implies data dataTimestamp growthApr blockTimestamp s
+      (fun _ => CustomFeedGrowthSafe.setRoundData data dataTimestamp growthApr blockTimestamp)
+      hRun
+  have hInnerInputs :=
+    setRoundData_success_implies_inputs data dataTimestamp growthApr blockTimestamp s
+      hHist.2.2.2.2.2
+  have hTimeGapSpec : respectsTimeGap blockTimestamp s := by
+    unfold respectsTimeGap
+    have hTimeOrderNat : (lastTimestampOf s : Nat) ≤ (blockTimestamp : Nat) := by
+      simpa using hHist.2.2.1
+    have hGapNat : ((sub blockTimestamp (lastTimestampOf s) : Uint256) : Nat) > 3600 := by
+      simpa using hHist.2.2.2.1
+    rw [Verity.EVM.Uint256.sub_eq_of_le hTimeOrderNat] at hGapNat
+    simpa using hGapNat
+  exact
+    ⟨hHist.1, (by
+        unfold onlyUpAprNonnegative
+        exact hHist.2.1),
+      hHist.2.2.1, hTimeGapSpec, hHist.2.2.2.2.1, hInnerInputs.2.2, hInnerInputs.1,
+      hInnerInputs.2.1⟩
+
+theorem setRoundDataSafe_rejects_outside_guardrails
+    (data dataTimestamp growthApr blockTimestamp : Uint256) (s : ContractState) :
+    setRoundDataSafe_rejects_outside_guardrails_spec
+      data dataTimestamp growthApr blockTimestamp s := by
+  unfold setRoundDataSafe_rejects_outside_guardrails_spec
+  intro hNotSafe
+  cases setRoundDataSafe_accepted_or_rejected data dataTimestamp growthApr blockTimestamp s with
+  | inl hAccepted =>
+      have hSafe :=
+        setRoundDataSafe_success_implies_safeInputsOk
+          data dataTimestamp growthApr blockTimestamp s hAccepted
+      exact False.elim (hNotSafe hSafe)
+  | inr hRejected =>
+      exact hRejected
 
 private theorem setRoundDataSafe_projected_writes_of_safe_inputs
     (data dataTimestamp growthApr blockTimestamp : Uint256) (s : ContractState)
