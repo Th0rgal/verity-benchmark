@@ -173,6 +173,15 @@ class TaskProofRuntime:
 
     def write_editable_proof(self, content: str, *, check: bool = True) -> dict[str, Any]:
         self.current_proof_text = content if content.endswith("\n") else f"{content}\n"
+        # Invalidate the run_lean_check fast-path cache. The cache is keyed on
+        # `current_proof_text`, so a repeat write of identical content (common
+        # during stagnation loops) would otherwise hit a stale cached
+        # evaluation and return `cached: true` with a note claiming this was
+        # a redundant `run_lean_check` follow-up — even though the model's
+        # intent is a fresh write. Drop the cache unconditionally here; the
+        # downstream `execute_tool("run_lean_check", ...)` call re-populates
+        # it for genuine no-op follow-ups.
+        self._last_eval_cache = None
         warnings: list[dict[str, str]] = []
         if not self.current_proof_text.strip():
             warnings.append({"kind": "empty_content", "detail": "candidate is empty"})
@@ -637,7 +646,21 @@ class TaskProofRuntime:
             # redundant via the `cached: true` marker + note.
             if self._last_eval_cache is not None:
                 cached_text, cached_result = self._last_eval_cache
-                if cached_text == self.current_proof_text:
+                # Never serve an `environment_error` from cache. The write-
+                # side guard below already refuses to cache env errors, but
+                # treat the read side defensively too: if an env error ever
+                # ends up in the cache (e.g. via a future refactor), we
+                # must still re-run `evaluate_current` so `_attempt_lake_build`
+                # can retry the heal path instead of pinning the task to
+                # a stale infra failure that may have recovered.
+                cached_is_env_error = (
+                    isinstance(cached_result, dict)
+                    and (
+                        cached_result.get("failure_class") == "environment_error"
+                        or cached_result.get("environment_error") is True
+                    )
+                )
+                if cached_text == self.current_proof_text and not cached_is_env_error:
                     reused = copy.deepcopy(cached_result)
                     reused["cached"] = True
                     reused["note"] = (

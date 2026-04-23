@@ -23,6 +23,7 @@ from interactive_runtime import (
     extract_contract_simp_terms,
     prebuild_task_modules,
     tool_result_json,
+    _PREFLIGHT_FAILURE_MODES as _RUNTIME_PREFLIGHT_FAILURE_MODES,
 )
 from task_runner import ROOT, load_task_record, resolve_task_manifest
 
@@ -1817,19 +1818,13 @@ def execute_strict_agent_task(
 # distinct failure modes into the same temperature-history bucket. Surface
 # each preflight mode as its own history class so the repeated-class bump
 # can fire correctly (and only) when the *same* preflight keeps recurring.
-# NOTE: Kept in sync with the authoritative set in
-# harness/interactive_runtime.py::_PREFLIGHT_FAILURE_MODES. If you add or
-# rename a preflight failure_mode, update both. Missing a value here causes
-# `_failure_history_class` to fall through to classify_failure and record a
-# bare Lean-check class instead of the namespaced `pf:<mode>` label, which
-# corrupts the repeated-class temperature-bump signal.
-_PREFLIGHT_FAILURE_MODES = frozenset({
-    "empty_response",
-    "placeholder_detected",
-    "theorem_statement_mismatch",
-    "hidden_proof_import_detected",
-    "hidden_case_import_detected",
-})
+# Authoritative preflight failure-mode set lives in
+# harness/interactive_runtime.py::_PREFLIGHT_FAILURE_MODES and is re-exported
+# here so `_failure_history_class` can't drift out of sync with the runtime
+# that actually produces these modes. An earlier duplicate definition lost
+# `empty_response` during a refactor; importing removes that whole class of
+# bug entirely.
+_PREFLIGHT_FAILURE_MODES = _RUNTIME_PREFLIGHT_FAILURE_MODES
 
 # Canonical evaluation-contract keys, matching the top-level `evaluation`
 # object in schemas/agent-run.schema.json (additionalProperties=false over
@@ -1951,7 +1946,14 @@ def execute_interactive_agent_task(
             and failure_class_history[-1] == failure_class_history[-2]
             and failure_class_history[-1] not in ("", "environment_error")
         ):
-            current_temperature = min(0.7, max(current_temperature + 0.2, 0.2))
+            # Escalate toward 0.7 to break deterministic loops, but never
+            # DECREASE below the configured base temperature. A run with
+            # `config.temperature = 1.0` should stay at 1.0 (or higher)
+            # rather than dropping to 0.7 on the first stagnation trigger —
+            # the cap exists only to stop unbounded growth, not to override
+            # an operator who explicitly asked for a hotter sampler.
+            escalated = max(current_temperature + 0.2, 0.2)
+            current_temperature = max(min(0.7, escalated), config.temperature)
         temperature_schedule_applied_at = len(failure_class_history)
         response = send_chat_completion(
             config, transcript, tools=runtime.tool_specs(),
@@ -2087,13 +2089,39 @@ def execute_interactive_agent_task(
                     repair_msg += "\nUse write_editable_proof to write a corrected proof (it runs the Lean check automatically; no separate run_lean_check needed)."
                     transcript.append({"role": "assistant", "content": response_text or ""})
                     transcript.append({"role": "user", "content": repair_msg})
-                elif failure_mode in ("placeholder_detected", "theorem_statement_mismatch"):
+                elif failure_mode in (
+                    "placeholder_detected",
+                    "theorem_statement_mismatch",
+                    "hidden_proof_import_detected",
+                    "hidden_case_import_detected",
+                ):
+                    # Preflight rejections (placeholder_detected,
+                    # theorem_statement_mismatch, hidden_*_import_detected) are
+                    # all recoverable by the model: the candidate file made it
+                    # through the write path but was rejected before Lean saw
+                    # it. Surface the rejection and give the model another
+                    # turn to produce a clean candidate, instead of bailing
+                    # out on the first hidden-import mistake.
+                    extra_hint = ""
+                    if failure_mode == "hidden_proof_import_detected":
+                        extra_hint = (
+                            "\nRemove any `import`, `open`, or `export` of a "
+                            "`Benchmark.Cases.*.Proofs` module — those hold "
+                            "held-out ground truth and are not available to "
+                            "the model."
+                        )
+                    elif failure_mode == "hidden_case_import_detected":
+                        extra_hint = (
+                            "\nOnly the public specification / implementation "
+                            "modules for this task may be imported. Drop any "
+                            "other `Benchmark.Cases.*` imports."
+                        )
                     retry_msg = (
                         f"Your response did not produce a valid proof candidate (proof attempt {proof_attempts} of {config.max_attempts}, "
                         f"failure: {failure_mode}).\n"
                         "Use the write_editable_proof tool to submit the complete editable Lean proof file "
                         "(it runs the Lean check automatically; no separate run_lean_check needed).\n"
-                        "Do not explain or analyze. Use the tools directly.\n"
+                        "Do not explain or analyze. Use the tools directly." + extra_hint + "\n"
                     )
                     transcript.append({"role": "assistant", "content": response_text})
                     transcript.append({"role": "user", "content": retry_msg})

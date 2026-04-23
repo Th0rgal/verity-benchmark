@@ -255,24 +255,51 @@ def main() -> int:
             result_path = result_file_for(profile, task_ref)
             if result_path.exists():
                 r = read_result(result_path)
-                status = (r or {}).get("evaluation", {}).get("status", "unknown")
-                print(f"[runner]   [{idx:>2}/{len(tasks)}] {task_ref} -> SKIP (exists, status={status})")
-                append_progress(
-                    run_dir,
-                    {
-                        "event": "task_skip_existing",
-                        "ts": utc_now(),
-                        "profile": profile_name,
-                        "task": task_ref,
-                        "status": status,
-                    },
-                )
-                profile_skipped_existing += 1
-                if status == "passed":
-                    profile_passed += 1
+                # Treat unreadable/corrupted artifacts as missing rather than
+                # silently marking the task as SKIP. A previous run may have
+                # been interrupted mid-write, leaving a truncated JSON file
+                # that `read_result` returns None for. If we trusted the
+                # existence check alone, a resumed matrix would silently
+                # skip the task and finish with stale `unknown` status
+                # entries — the whole point of resume is to fill those gaps,
+                # so delete the corrupt artifact and fall through to RUN.
+                if r is None:
+                    try:
+                        result_path.unlink()
+                    except OSError:
+                        pass
+                    print(
+                        f"[runner]   [{idx:>2}/{len(tasks)}] {task_ref} -> "
+                        f"RERUN (existing artifact was unreadable; deleted)"
+                    )
+                    append_progress(
+                        run_dir,
+                        {
+                            "event": "task_unreadable_rerun",
+                            "ts": utc_now(),
+                            "profile": profile_name,
+                            "task": task_ref,
+                        },
+                    )
                 else:
-                    profile_failed += 1
-                continue
+                    status = r.get("evaluation", {}).get("status", "unknown")
+                    print(f"[runner]   [{idx:>2}/{len(tasks)}] {task_ref} -> SKIP (exists, status={status})")
+                    append_progress(
+                        run_dir,
+                        {
+                            "event": "task_skip_existing",
+                            "ts": utc_now(),
+                            "profile": profile_name,
+                            "task": task_ref,
+                            "status": status,
+                        },
+                    )
+                    profile_skipped_existing += 1
+                    if status == "passed":
+                        profile_passed += 1
+                    else:
+                        profile_failed += 1
+                    continue
 
             if args.dry_run:
                 print(f"[runner]   [{idx:>2}/{len(tasks)}] {task_ref} -> DRY (would run)")
