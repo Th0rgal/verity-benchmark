@@ -1811,6 +1811,71 @@ def execute_strict_agent_task(
     return response, response_text, evaluation, attempts
 
 
+# Set of failure_modes produced by write_editable_proof's preflight checks
+# (before Lean ever runs). These are deterministic formatting/import/semantic
+# rejects whose human-readable `details` classify as `other`, collapsing
+# distinct failure modes into the same temperature-history bucket. Surface
+# each preflight mode as its own history class so the repeated-class bump
+# can fire correctly (and only) when the *same* preflight keeps recurring.
+_PREFLIGHT_FAILURE_MODES = frozenset({
+    "placeholder_detected",
+    "theorem_statement_mismatch",
+    "hidden_proof_import_detected",
+    "hidden_case_import_detected",
+})
+
+
+def _failure_history_class(result: dict) -> str:
+    """Return the failure-class label to append to temperature history.
+
+    Empty string means "do not append" (no failure, or infra noise we filter).
+    Preflight failure_modes are surfaced with a `pf:` prefix so e.g.
+    `pf:placeholder_detected` does not collide with Lean-check classes like
+    `type_error`, while still allowing the repeated-class same-value
+    comparison to trigger when the same preflight recurs.
+    """
+    if not isinstance(result, dict) or result.get("status") != "failed":
+        return ""
+    failure_mode = result.get("failure_mode") or ""
+    if failure_mode in _PREFLIGHT_FAILURE_MODES:
+        return f"pf:{failure_mode}"
+    # Lean-check failure (or any unclassified failure): derive from details.
+    fc = result.get("failure_class") or classify_failure(str(result.get("details", "")))
+    fc = str(fc)
+    # Environment errors are infra noise that would break the sliding-window
+    # same-class check (["type_error","environment_error","type_error"] looks
+    # like a class change). Filter out.
+    if fc == "environment_error":
+        return ""
+    return fc
+
+
+def _append_failure_class(
+    history: list,
+    fc_entry: str,
+    candidate_text: str,
+    last_key: list,
+) -> None:
+    """Append `fc_entry` to `history` unless it's empty or a same-candidate duplicate.
+
+    Dedupe guards against double-counting when a single turn fires both
+    `write_editable_proof` (which now runs the Lean check internally) and a
+    follow-up `run_lean_check` against the same failed candidate — that
+    would push two identical entries for one actual failure and prematurely
+    trigger the same-class temperature bump.
+    """
+    if not fc_entry:
+        return
+    import hashlib
+    candidate_hash = hashlib.sha1(candidate_text.encode("utf-8", "replace")).hexdigest()[:16]
+    key = (candidate_hash, fc_entry)
+    if last_key and last_key[0] == key:
+        return
+    history.append(fc_entry)
+    last_key[0] = key
+
+
+
 def execute_interactive_agent_task(
     config: ResolvedAgentConfig,
     task: dict[str, Any],
@@ -1846,6 +1911,13 @@ def execute_interactive_agent_task(
     # of deterministic loops where temperature=0 reproduces byte-identical responses.
     current_temperature = config.temperature
     failure_class_history: list[str] = []
+    # Dedupe key for `failure_class_history` appends: (candidate_hash, class).
+    # When a model does write_editable_proof then run_lean_check in the same
+    # turn against the same (failed) candidate, both tool calls produce the
+    # same class entry for the same candidate. Without dedupe the history
+    # gets two entries for one actual failure, and the repeated-class
+    # temperature bump fires a turn too early.
+    _last_history_key: list = [None]  # mutable cell so helper can update
     # Track how many failures we have already applied the temperature-bump
     # schedule to, so we don't keep escalating temperature on every iteration
     # once the trigger condition is first met (it would otherwise run to the
@@ -1938,18 +2010,20 @@ def execute_interactive_agent_task(
                 proof_attempts += 1
                 attempts[-1]["candidate_file_contents"] = runtime.current_proof_text
                 attempts[-1]["evaluation"] = evaluation
-                # Track real model-driven failure classes for the temperature
-                # schedule's sliding window. Environment errors are infra noise
-                # that would break same-class detection (e.g. ["type_error",
-                # "environment_error", "type_error"] looks like a class change)
-                # so they are filtered out of the history.
-                fc_entry = (
-                    classify_failure(str(evaluation.get("details", "")))
-                    if evaluation.get("status") == "failed"
-                    else ""
+                # Track model-driven failure classes for the temperature
+                # schedule's sliding window. `_failure_history_class` maps
+                # preflight modes (placeholder_detected, hidden_*_import,
+                # theorem_statement_mismatch) to distinct `pf:<mode>` labels
+                # so they don't all collapse into `other`, and filters out
+                # infra-noise environment errors that would break
+                # same-class detection.
+                fc_entry = _failure_history_class(evaluation)
+                _append_failure_class(
+                    failure_class_history,
+                    fc_entry,
+                    runtime.current_proof_text,
+                    _last_history_key,
                 )
-                if fc_entry != "environment_error":
-                    failure_class_history.append(fc_entry)
                 if evaluation["status"] == "passed":
                     return response, response_text, runtime.current_proof_text, evaluation, attempts, tool_calls_used
                 # Failed candidate without tool calls: feed error back
@@ -1995,7 +2069,6 @@ def execute_interactive_agent_task(
                 "tool_calls": tool_calls,
             }
         )
-        saw_lean_failure = False
         turn_had_proof_action = False
         for tool_call in tool_calls:
             if tool_calls_used >= config.max_tool_calls:
@@ -2032,13 +2105,29 @@ def execute_interactive_agent_task(
                     "result": result,
                 }
             )
-            if tool_name in ("run_lean_check", "write_editable_proof") and result.get("failure_mode") == "lean_check_failed":
-                saw_lean_failure = True
-                fc = result.get("failure_class") or classify_failure(str(result.get("details", "")))
-                # Skip environment errors: they are infra noise that would
-                # break the temperature schedule's same-class sliding window.
-                if str(fc) != "environment_error":
-                    failure_class_history.append(str(fc))
+            if tool_name in ("run_lean_check", "write_editable_proof") and result.get("status") == "failed":
+                # Track any write/check failure (Lean-check *and* preflight
+                # failures like placeholder_detected /
+                # hidden_case_import_detected). Previously only
+                # `failure_mode == "lean_check_failed"` was recorded, so a run
+                # stuck on repeated preflight failures never tripped the
+                # same-class temperature bump and stayed at deterministic
+                # temperature until attempt exhaustion.
+                fc_entry = _failure_history_class(result)
+                _append_failure_class(
+                    failure_class_history,
+                    fc_entry,
+                    runtime.current_proof_text,
+                    _last_history_key,
+                )
+                # Persist candidate state even for failed proof-tool turns so
+                # `build_run_analysis` can hash intermediate drafts for the
+                # candidate_change_count / distinct_candidate_count analytics.
+                # Without this, only the last (passed or budget-exhausted)
+                # turn's candidate gets recorded and repeated unsuccessful
+                # edits look like zero churn.
+                attempts[-1]["candidate_file_contents"] = runtime.current_proof_text
+                attempts[-1]["evaluation"] = result
             elif tool_name in ("run_lean_check", "try_tactic_at_hole", "write_editable_proof") and result.get("status") == "passed":
                 # Normalize to evaluation schema. `try_tactic_at_hole` returns
                 # extra keys like `tactic` that must be stripped, otherwise the
