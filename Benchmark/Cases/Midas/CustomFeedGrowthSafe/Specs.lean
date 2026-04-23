@@ -139,7 +139,7 @@ def setRoundDataSafe_accepts_and_writes_submitted_round_spec
 
 /--
   Human-readable target spec for the rejection path.
-  This is intentionally broader than what is fully proved today.
+  If any modeled safe-input guardrail fails, the safe setter rejects.
 -/
 def setRoundDataSafe_rejects_outside_guardrails_spec
     (data dataTimestamp growthApr blockTimestamp : Uint256) (s : ContractState) : Prop :=
