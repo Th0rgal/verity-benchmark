@@ -2022,7 +2022,15 @@ def execute_interactive_agent_task(
                 # per no-tool-calls attempt and pushed a spurious entry
                 # onto `_check_history`, which could trigger premature
                 # stagnation/temperature escalation.
-                write_result = runtime.write_editable_proof(final_candidate)
+                # NOTE: local name is `write_payload` (not `write_result`)
+                # because `write_result` is a module-level function at
+                # line ~1530 (`write_result(task_ref, config, payload)`),
+                # and shadowing it with a local would silently break any
+                # future code in this function that tried to call the
+                # file-writer. The on-trace attempts record still exposes
+                # this payload under the `"write_result"` key for
+                # backward-compatible tooling.
+                write_payload = runtime.write_editable_proof(final_candidate)
                 proof_attempts += 1
                 # `write_editable_proof` returns the full write payload
                 # merged with `run_lean_check` output (path, bytes, lines,
@@ -2040,15 +2048,15 @@ def execute_interactive_agent_task(
                 # preserving the rich write-time payload under a separate
                 # per-attempt key for debugging/analytics.
                 evaluation = {
-                    k: write_result[k]
+                    k: write_payload[k]
                     for k in _EVAL_KEYS
-                    if k in write_result
+                    if k in write_payload
                 }
                 evaluation.setdefault("failure_mode", None)
                 evaluation.setdefault("details", "")
                 attempts[-1]["candidate_file_contents"] = runtime.current_proof_text
                 attempts[-1]["evaluation"] = evaluation
-                attempts[-1]["write_result"] = write_result
+                attempts[-1]["write_result"] = write_payload
                 # Track model-driven failure classes for the temperature
                 # schedule's sliding window. `_failure_history_class` maps
                 # preflight modes (placeholder_detected, hidden_*_import,
@@ -2056,7 +2064,7 @@ def execute_interactive_agent_task(
                 # so they don't all collapse into `other`, and filters out
                 # infra-noise environment errors that would break
                 # same-class detection.
-                fc_entry = _failure_history_class(write_result)
+                fc_entry = _failure_history_class(write_payload)
                 _append_failure_class(
                     failure_class_history,
                     fc_entry,
