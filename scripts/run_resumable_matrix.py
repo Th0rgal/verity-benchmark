@@ -69,8 +69,11 @@ def run_one(
     env = os.environ.copy()
     if extra_env:
         env.update(extra_env)
-    # Ensure lake is on PATH.
-    env["PATH"] = f"/root/.elan/bin:{env.get('PATH', '')}"
+    # Ensure lake is on PATH. Use the invoking user's HOME rather than a
+    # hard-coded "/root/.elan/bin" so non-root shells (local dev, CI runners)
+    # still pick up elan-installed toolchains.
+    elan_bin = os.path.join(env.get("HOME") or os.path.expanduser("~"), ".elan", "bin")
+    env["PATH"] = f"{elan_bin}:{env.get('PATH', '')}"
     cmd = [
         "bash",
         "scripts/exec_with_dotenvx.sh",
@@ -264,6 +267,14 @@ def main() -> int:
                 # entries — the whole point of resume is to fill those gaps,
                 # so delete the corrupt artifact and fall through to RUN.
                 if r is None:
+                    # Keep dry-run read-only: never unlink artifacts when
+                    # --dry-run is set; report what a real run would do.
+                    if args.dry_run:
+                        print(
+                            f"[runner]   [{idx:>2}/{len(tasks)}] {task_ref} -> "
+                            f"DRY (existing artifact unreadable; would delete and rerun)"
+                        )
+                        continue
                     try:
                         result_path.unlink()
                     except OSError:
