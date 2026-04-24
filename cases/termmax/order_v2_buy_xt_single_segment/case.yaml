@@ -5,10 +5,10 @@ schema_version: 1
 split: active
 family_id: termmax
 implementation_id: contracts_v2
-stage: proof_partial
+stage: build_green
 translation_status: translated
 spec_status: frozen
-proof_status: in_progress
+proof_status: complete
 upstream_repo: https://github.com/term-structure/termmax-contract-v2
 upstream_commit: 64bd47b98e064c7fb91ab4a59b70520e0ec285d5
 original_contract_path: contracts/v2/TermMaxOrderV2.sol
