@@ -590,7 +590,7 @@
       "failure_reason": null,
       "notes": "ERC-4337 EntryPoint control-flow invariant slice: the operation execution path is reached if and only if validation passed. This is not a full proof of arbitrary account/paymaster EVM behavior or `innerHandleOp` calldata effects; it proves the selected two-loop model for all possible validation outcomes.",
       "buildable": true,
-      "verity_commit": "b6859954d9187f49e30642977cde83d2350d741c",
+      "verity_commit": "de9377951c00bbd5fbf72e85d56fe50b8ff40d0c",
       "lean_toolchain": "leanprover/lean4:v4.22.0",
       "abstraction_level": "protocol_slice",
       "abstraction_tags": [
@@ -5265,5 +5265,5 @@
       }
     }
   ],
-  "generated_at": "2026-04-24T16:33:04.263756+00:00"
+  "generated_at": "2026-04-24T16:41:47.930494+00:00"
 }
