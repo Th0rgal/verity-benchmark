@@ -1,53 +1,37 @@
 ---
 name: verity-prove-invariant
 description: >
-  Three-phase workflow for adding a new Verity benchmark case: research the protocol
-  and confirm the invariant, audit how close a line-by-line Verity translation can
-  stay to the Solidity source, model the contract in Lean with explicit acknowledged
-  simplifications, then prove a chosen invariant (or delegate modeling/proving to
-  another agent). Trigger terms: verity prove, new benchmark case, prove invariant,
-  formally verify, add verity case, verify protocol, model contract in verity, lean
-  contract verification.
+  Four-phase workflow for adding a new Verity benchmark case: (1) research the protocol
+  and confirm the invariant, (2) modelize in Verity as close to Solidity as possible
+  with agent + human verification, (3) prove the invariant in a persistent loop with
+  intellectual honesty checks, (4) write a case study article for lfglabs.dev.
+  Trigger terms: verity prove, new benchmark case, prove invariant, formally verify,
+  add verity case, verify protocol, model contract in verity, lean contract verification.
 ---
 
 # Verity Prove Invariant
 
-Add a new formal-verification case to the Verity benchmark. The workflow has three
+Add a new formal-verification case to the Verity benchmark. The workflow has four
 phases, each **gated by explicit user acknowledgement** — never cross a phase boundary
 silently.
-
-Default modeling bias:
-
-- Preserve **semantics always**.
-- Subject to that, preserve the Solidity source shape as closely as possible:
-  function boundaries, helper names, branch structure, slot comments, packed-layout
-  intent, and external-call boundaries.
-- Do **not** jump to a high-level abstraction if a near line-by-line Verity
-  translation is available.
-- If you must simplify or structurally rewrite, identify it before modeling and
-  explain whether the reason is:
-  1. no Verity issue, just a cleaner equivalent expression
-  2. proof-coverage gap only
-  3. Verity ergonomics / feature gap that should probably be fixed
-  4. hard blocker
-
-## When to use
-
-- User asks to formally verify a Solidity contract with Lean/Verity
-- User wants to add a new case to this repo's benchmark
-- User says "let's prove X on protocol Y", "model Z in Verity"
-
-## When NOT to use
-
-- Scoping / outreach / lead work (that's `verity-scoping`)
-- Only reading existing proofs without adding a new one
 
 ---
 
 ## Phase 1 — Research, invariant alignment, and translation audit (before any code)
 
-Output ONE text response covering all of the following, then **stop and wait for user
-acknowledgement**. Do not proceed to Phase 2 until the user explicitly confirms.
+You will receive an entry point: a Solidity contract address, a GitHub repository, a
+protocol name, or similar. Your first job is to find and read the actual Solidity source
+code.
+
+**Research the protocol first.** Use web fetches to read:
+- The protocol's documentation and website
+- The actual Solidity source on GitHub (raw.githubusercontent.com)
+- Read enough source to identify the require checks, state variables, storage layout
+  decisions, loops / queues, and external calls
+
+Once you have done this research, output ONE text response covering all of the
+following, then **stop and wait for user acknowledgement**. Do not proceed to Phase 2
+until the user explicitly confirms.
 
 1. **What the protocol does.** One-paragraph plain-English summary. Include: what it's
    for, who uses it, what's the unit of value at risk, and what function(s) the user
@@ -68,37 +52,27 @@ acknowledgement**. Do not proceed to Phase 2 until the user explicitly confirms.
    - the closest Verity surface you would use
    - the classification: no issue / proof-gap-only / Verity-gap / hard blocker
    - whether this changes syntax only, or also risks changing semantics
+
+   To assess Verity capabilities, check in this order:
+   - the current local package at `.lake/packages/verity/`
+   - any repo-local or user-provided Verity fork (e.g. `.context/lfglabs-verity`)
+   - the Verity documentation at [veritylang.com](https://veritylang.com)
+
+   Distinguish clearly between "cannot express", "can express but proof story is
+   incomplete", and "can express cleanly".
 5. **Draft simplifications before code.** List every simplification you currently
    expect to make, or explicitly say "none yet". If a simplification is driven by
    Verity limitations, say whether:
    - there is a workaround in the current local package
    - there is a workaround in a repo-local or user-provided Verity fork
    - this should probably become a Verity issue
-6. **Delegation option.** If the user wants another agent to do the implementation,
-   say you can emit a full modeling+proof prompt in the format described in
-   `references/delegated-model-and-prove-prompt.md`.
-7. **Wait.** End with: "Confirm you're aligned on this invariant, the line-by-line
+6. **Wait.** End with: "Confirm you're aligned on this invariant, the line-by-line
    modeling plan, and the listed simplifications / Verity gaps, and I'll start
    modelling."
 
-Research the protocol using web fetches of its docs + the actual Solidity source
-(raw.githubusercontent.com). Read enough source to identify the require checks, state
-variables, storage layout decisions, loops / queues, and external calls you'll need
-to decide about modelling fidelity.
-
-Before you claim a Verity limitation, check in this order:
-
-1. the current local package at `.lake/packages/verity/`
-2. any repo-local or user-provided Verity fork (for example `.context/lfglabs-verity`)
-3. [veritylang.com](https://veritylang.com)
-
-Do not report a construct as unsupported if it is actually present but only has
-partial proof coverage. Distinguish clearly between "cannot express", "can express but
-proof story is incomplete", and "can express cleanly".
-
 ---
 
-## Phase 2 — Line-by-line model scaffold & delegation
+## Phase 2 — Modelize in Verity
 
 Only start after the user acknowledges Phase 1.
 
@@ -127,67 +101,60 @@ families/<family>/
 Inversion warning: the reference proof goes in `Cases/.../Proofs.lean`, NOT in the
 `Generated/.../Tasks/*.lean` placeholder. The placeholder stays `exact ?_` forever.
 
-### 2b. Translation policy before the first edit
+### 2b. Write the Verity model as close to Solidity as possible
 
-Use the following order of preference:
+The goal is a near line-by-line translation of the Solidity source into Verity. Every
+deviation from the source structure must be justified by a concrete Verity limitation.
 
-1. near line-by-line Verity translation that preserves source structure and semantics
-2. syntax-close rewrite that preserves semantics and leaves the source mapping obvious
-3. narrower semantic model with explicit acknowledged simplifications
+**Translation preference order:**
 
-Do not silently switch from (1) to (3).
+1. Line-by-line Verity translation preserving function boundaries, branch structure,
+   helper names, slot layout, and external-call boundaries.
+2. Syntax-close rewrite that preserves semantics and keeps the source mapping obvious.
+3. Narrower semantic model with explicit acknowledged simplifications — only as a last
+   resort.
 
-If you discover a new simplification after Phase 1 that was not previously disclosed,
-stop and tell the user before baking it into the model.
+Do not silently jump from (1) to (3).
 
-### 2c. Write Contract.lean with an explicit simplifications block
+**If you discover a new simplification** that was not listed in Phase 1, do not stop.
+Use your judgment to decide whether it makes sense, continue writing the model, but
+**mention the new simplification at the end** when presenting the model to the user.
 
-Put a doc-comment at the top listing every simplification you make, in two columns:
-"what was simplified" and "why (concretely: the Verity feature that's missing, or the
-semantics that would be lost)". Be honest — do not call something a simplification if
-you can model it faithfully.
+Before claiming any Verity limitation, verify it against the actual Verity surface:
+- `.lake/packages/verity/` (the local package)
+- any repo-local or user-provided Verity fork (e.g. `.context/lfglabs-verity`)
+- the Verity documentation at [veritylang.com](https://veritylang.com)
 
-**Before you declare something unsupported, verify it against the current Verity
-surface.** Verity evolves across branches. Check:
+**Write Contract.lean** with a doc-comment at the top listing every simplification in
+two columns: "what was simplified" and "why (the concrete Verity limitation or semantic
+reason)". Do not call something a simplification if you can model it faithfully.
 
-- `.lake/packages/verity/`
-- any repo-local or user-provided Verity fork
-- [veritylang.com](https://veritylang.com)
+**Write Specs.lean** with each property as a `def foo_spec (... : ContractState) : Prop`.
+Keep specs minimal — one clear sentence of English each. Use `balanceOf`, `supply`, and
+similar helpers to hide storage-slot indices from the spec surface.
 
-Current Verity gotchas as of this writing (re-check each time — these dated):
-- **Lean reserved keywords** inside `verity_contract` parameter lists: `from`, `until`,
-  `if`, `then`, `else`, `match`. Rename to `holder`, `expiry`, etc.
-- **Allowed DSL bind sources**: `getStorage` / `getStorageAddr` / `getMapping` /
-  `getMappingAddr` / `getMapping2` / `getMappingUint` / `msgSender` / `msgValue` /
-  `tload` / `ecrecover` / `ecmCall`. **Do not assume `blockTimestamp` is absent**:
-  support differs across branches, so verify the actual package/fork before threading
-  it as a function parameter.
-- **Nested mappings ARE supported** via `Address → Address → Uint256 := slot N` and
-  `getMapping2` / `setMapping2`. Don't claim otherwise.
-- **No `let (a, b) := pair` destructuring** inside a `verity_contract` function body.
-  Inline the tuple fields instead, or compute them outside and pass them in.
-- **External calls** often require ECMs, bounded low-level surfaces, or trusted
-  boundaries. Preserve the call site structurally where possible; if you must abstract
-  it away, say so explicitly.
-- **Packed-slot / inline-assembly storage logic** may be representable semantically
-  without preserving the exact source write shape. If you rewrite packed writes into
-  ordinary fields, keep the original slot/bit-layout intent visible in comments or
-  helper definitions.
-
-### 2d. Write Specs.lean
-
-State each property as a `def foo_spec (... : ContractState) : Prop`. Keep specs
-minimal — each spec should be one clear sentence of English. Use `balanceOf`, `supply`,
-and similar helpers to hide storage-slot indices from the spec surface.
-
-### 2e. Write Generated placeholders + YAMLs
-
-For each theorem, create:
+**Write Generated placeholders + YAMLs** for each theorem:
 - `Benchmark/Generated/<Project>/<Case>/Tasks/<Name>.lean` ending in `exact ?_`
 - `cases/<project>/<case>/tasks/<name>.yaml` pointing at that file
 - Matching entry in `case.yaml` selected_functions + abstraction_tags
 
-### 2f. Verify the scaffold builds
+### 2c. Proposed Verity issues
+
+For every place where the model had to deviate from the Solidity source, produce a
+section listing **proposed** Verity issues. For each:
+
+- **What construct** could not be expressed (exact Solidity snippet + file path).
+- **What you did instead** (the workaround in the model).
+- **Proposed Verity improvement** — what the language/framework should support so that
+  future models don't need this workaround.
+- **Severity**: nice-to-have / proof-gap-only / blocks-faithful-modeling.
+
+Group by theme (e.g. "missing DSL bind source", "packed storage", "external calls").
+
+**Do not create issues on the Verity repository.** These are proposals only. The user
+will review them in 2e and decide which ones to actually file.
+
+### 2d. Build the scaffold
 
 ```bash
 lake build Benchmark.Cases.<Project>.<Case>.Contract
@@ -195,63 +162,78 @@ lake build Benchmark.Cases.<Project>.<Case>.Specs
 lake build   # default target builds Cases/ only, skips Generated placeholders
 ```
 
-All three must be green BEFORE you move to the proving step. A scaffold that
-doesn't compile wastes every minute of proving time downstream.
+All three must be green BEFORE moving to verification.
 
-### 2g. Delegated modeling+proof prompt (optional)
+### 2e. Verification
 
-If the user wants to hand the whole task to another agent **before** or **instead of**
-doing the implementation yourself, emit a prompt in the format described in
-`references/delegated-model-and-prove-prompt.md`.
+This is a two-part gate. Both parts must pass before moving to Phase 3.
 
-That prompt must include:
+#### Part A — Agent verification
 
-- absolute workspace path
-- pinned upstream source links / commit
-- approved invariant
-- instruction to preserve source structure line-by-line where possible
-- known Verity capability notes and possible simplification pressure points
-- required file layout and build commands
-- the same persistence rule used for proofs in this skill
+Spawn a verification agent (or do it yourself in a separate pass) that independently
+checks:
 
-### 2h. Hand over to the proving step
+1. **Are the claimed Verity gaps legitimate?** For each gap listed in 2c, verify by
+   reading the actual Verity source in `.lake/packages/verity/`, any repo-local or
+   user-provided fork (e.g. `.context/lfglabs-verity`), and
+   [veritylang.com](https://veritylang.com). Also check open issues and PRs on the
+   Verity repo — the feature may already be in progress.
+2. **Is semantics preserved?** Compare the Verity model against the Solidity source
+   function-by-function. Flag any place where behavior differs (missing revert path,
+   different overflow semantics, dropped external call, etc.).
+3. **Is the Verity model as close to the Solidity as possible?** Flag any unnecessary
+   abstraction or structural deviation that could have been avoided.
 
-Ask the user:
+Report findings as a checklist: each gap either confirmed or disputed, each semantic
+deviation either justified or flagged.
 
-> "The scaffold builds. For each theorem, do you want me to (1) write the proof now,
-> or (2) give you a prompt to run in a separate agent? For small theorems I can batch;
-> for hard ones you probably want to parallelize across agents."
+#### Part B — Human review
 
-If (1), proceed to Phase 3 inline. If (2), emit the prompt in `references/proving-prompt.md`
-format (see below), then stop.
+Present the modelization to the user so they can confirm it matches the Solidity source.
+Make it easy to review:
+
+- **Side-by-side snippets**: for each key function, show the Solidity source next to the
+  Verity translation. Highlight where they differ and why.
+- **File pointers**: give the user the exact file paths to open for comparison, e.g.:
+  > Compare `contracts/src/Vault.sol:L42-L78` (Solidity) with
+  > `Benchmark/Cases/Protocol/Case/Contract.lean:L15-L45` (Verity)
+- **Simplification summary**: restate each simplification from the Contract.lean
+  doc-comment in plain English, so the user doesn't need to parse Lean to evaluate them.
+- **Proposed Verity issues**: present each proposed issue from 2c for the user to
+  confirm or reject. Only confirmed issues should be filed on the Verity repository.
+
+End with:
+
+> "Does this modelization faithfully capture the Solidity logic? Which of the proposed
+> Verity issues should we file? If anything looks off, point it out and I'll adjust
+> before we move to proving."
+
+Do not proceed to Phase 3 until the user confirms.
 
 ---
 
 ## Phase 3 — Proving (persistent loop)
 
-Whoever is proving — you or a delegated agent — follows these rules:
+Write `Proofs.lean` and do not come back until you reach one of three terminal
+conditions. This is a loop — keep trying tactics, reading goal states, and making
+progress. Never return with "I tried X and it didn't work".
 
-### The persistence rule
+### Terminal conditions
 
-Do not stop until one of three terminal conditions holds:
+1. **PROOF**: `lake build Benchmark.Cases.<Project>.<Case>.Proofs` succeeds and there
+   is no `sorry` in the file.
+2. **COUNTER-EXAMPLE**: a concrete `ContractState` + inputs that satisfy the hypotheses
+   AND falsify the conclusion. Write it out as a `#eval` or as a comment with exact
+   values.
+3. **AXIOM**: an `axiom` added to `Proofs.lean` that closes the gap, with a doc-comment
+   explaining (a) what exactly the axiom assumes, (b) whether the assumption is true of
+   the real contract, (c) why you couldn't discharge it mechanically.
 
-1. **PROOF**: the theorem compiles with `lake build Benchmark.Cases.<Project>.<Case>.Proofs`
-   and there is no `sorry` in the file.
-2. **COUNTER-EXAMPLE**: you have a concrete `ContractState` + inputs that satisfy the
-   hypotheses AND falsify the conclusion. Write it out as a `#eval` or as a comment
-   showing the exact values.
-3. **AXIOM**: you add an `axiom` to `Proofs.lean` that closes the gap, with a doc
-   comment explaining (a) what exactly the axiom assumes, (b) whether the assumption
-   is true of the real contract, (c) why you couldn't discharge it mechanically.
-
-Never return "I tried simp and it didn't close the goal". That is not a terminal
-condition. Look at the remaining goal state, identify the missing algebraic fact or
-missing unfolding, and make progress. If truly stuck, add the axiom — don't hide it
+If `simp` leaves a residual goal, read the goal state, identify the missing algebraic
+fact or unfolding, and make progress. If truly stuck, add the axiom — don't hide it
 behind `sorry`.
 
 ### Proving prompt template (for delegated agents)
-
-Emit this when the user picks option (2):
 
 > **Task: Prove `<theorem_name>` in `Benchmark/Cases/<Project>/<Case>/Proofs.lean`**
 >
@@ -277,26 +259,32 @@ Emit this when the user picks option (2):
 > Do not return "I got stuck". If `simp` leaves a residual goal, read the goal and
 > pick a tactic for that specific shape. If that fails, axiomatize with justification.
 
-If the user instead wants a delegated agent to handle both the modeling and the proof,
-use the separate template in `references/delegated-model-and-prove-prompt.md`, not the
-proof-only prompt above.
+### 3a. Verification — intellectual honesty check
 
-### Post-proof review (mandatory)
+Once the proof lands, run a verification pass (spawn an agent or do it yourself in a
+separate pass) that checks:
 
-Once any proof lands, write a short report back to the user:
-1. Which hypotheses were actually USED (vs declared-but-unused, which the linter flags).
-2. Any **non-obvious hypothesis** and what it rules out — e.g. `hToNoWrap` excludes
-   the case where `balanceOf[to] + amount` wraps at 2^64.
-3. Any **axiom added**, repeated verbatim with its justification.
-4. One sentence: what the proof guarantees about the real contract, and what it
-   doesn't.
+1. **Are axioms abusive?** For each axiom in `Proofs.lean`, assess whether it is a
+   reasonable trust boundary or whether it smuggles in the conclusion. An axiom that
+   restates the theorem in different words is abusive. An axiom that captures a
+   well-known EVM property (e.g. "msg.value is paid by the caller") is reasonable.
+   Flag any axiom that is doing too much work.
+2. **Is every spec actually proven?** Cross-check the theorems in `Proofs.lean` against
+   the specs in `Specs.lean`. Every spec must have a corresponding proof. Flag any
+   missing coverage.
+3. **Is there any `sorry`?** Grep the entire `Proofs.lean` for `sorry`. If any remain,
+   the proof is not done — send it back to the proving loop.
 
-**Do not mark the case as done until the user confirms they understand each of those
-four points.** Completion = user ack, not green CI.
+Report findings to the user. If any check fails, the proof goes back into the loop.
 
----
+### 3b. Open a PR on the verity-benchmark repository
 
-## Quick reference: proving recipe that works for this repo
+Once the proof passes verification, open a pull request on
+`https://github.com/lfglabs-dev/verity-benchmark` with the new case (Contract.lean,
+Specs.lean, Proofs.lean, Compile.lean, Generated placeholders, YAMLs). Use `gh pr create`
+with `--base main`.
+
+### Quick reference: proving recipe
 
 For state-transition theorems on monadic contracts, the proof skeleton is almost
 always:
@@ -324,10 +312,173 @@ If it involves `sub + add` cancellation, use `Verity.Core.Uint256.sub_add_cancel
 
 ---
 
+## Phase 4 — Article
+
+Write a case study article following the format used on
+[lfglabs.dev](https://github.com/lfglabs-dev/lfglabs.dev). The article is a JSX page
+in `pages/research/` with a corresponding entry in `data/research.js`.
+
+### 4a. Learn the existing components and patterns (mandatory before writing)
+
+Before writing a single line of the article, **clone or fetch the lfglabs.dev repo**
+and study the existing case studies to learn the exact components, props, and page
+structure. Do not guess or improvise component APIs.
+
+Read these files from `https://github.com/lfglabs-dev/lfglabs.dev`:
+
+1. **Existing case study pages** — read at least 2–3 complete pages in `pages/research/`
+   to understand the structure, section ordering, and tone. Good examples:
+   - `pages/research/lido-vault-solvency.jsx`
+   - `pages/research/safe-owner-reachability.jsx`
+   - `pages/research/nexus-mutual-book-value.jsx`
+
+2. **Reusable components** — read the source of each component in `components/research/`
+   to learn the exact props, expected children, and rendering behavior:
+   - `Guarantee.jsx` — how the English/math toggle works, how KaTeX formulas are passed
+   - `Hypothesis.jsx` — the `name`, `constraint`, `source` props and how body text is
+     rendered
+   - `Disclosure.jsx` — collapsible sections, how title and children work
+   - `CodeBlock.jsx` — code display for verification commands
+   - `ExternalLink.jsx` — link styling
+   - Any protocol-specific guarantee components (e.g. `SafeGuarantee.jsx`,
+     `NexusMutualGuarantee.jsx`) to see how custom variants are built
+
+3. **Data model** — read `data/research.js` to see the metadata structure (slug, title,
+   subtitle, description, date, tag).
+
+4. **Layout and shared components** — check how pages import shared layout, navigation
+   (`ResearchCard`, back links), and head/meta tags.
+
+**Do not write the article until you have read all of the above.** Your article must use
+the same components with the same prop signatures — not approximations from memory.
+
+### 4b. Specs readability check (before writing the article)
+
+The article will display the invariant both in English and in math notation mirroring
+`Specs.lean`. **The math part shown in the article must closely match what is in
+`Specs.lean`** — they should be recognizably the same thing.
+
+If the raw spec definition is too complex for a human to parse at a glance, **go back
+and refactor `Specs.lean`** to introduce helper definitions that name sub-expressions.
+The helpers become the vocabulary the article uses.
+
+Example: instead of showing `state.balances[a] + state.balances[b] + state.balances[c]`
+inline in the invariant, define a helper like:
+
+```lean
+def totalHeld (s : ContractState) (a b c : Address) : Uint256 :=
+  balanceOf s a + balanceOf s b + balanceOf s c
+```
+
+Then the spec becomes `totalHeld s a b c ≤ supply s`, which is readable both in Lean
+and in the article's math rendering.
+
+**Rule:** if the article's math notation would need to diverge from `Specs.lean` to be
+readable, that is a signal to improve `Specs.lean` first — not to show a simplified
+version that doesn't match the actual code.
+
+### 4c. Writing style
+
+The article must sound human and concise. Follow these rules:
+
+- **No em dashes.** Use commas, periods, parentheses, or colons instead.
+- **No filler phrases.** Cut "it's worth noting that", "importantly", "in order to",
+  "it should be noted", "essentially", "fundamentally". Just say the thing.
+- **No inflated language.** Say "checks" not "validates", "uses" not "leverages",
+  "shows" not "demonstrates". Prefer short everyday words.
+- **No rule of three.** Don't list three adjectives or three parallel phrases for
+  rhetorical effect. One specific detail beats three vague ones.
+- **Short sentences.** If a sentence has more than one comma, split it.
+- **Active voice.** "The proof shows X" not "X is shown by the proof".
+- **Be specific.** "An attacker could drain the vault" not "security could be
+  compromised".
+
+After writing the article, re-read it and strip anything that sounds like it was
+generated by an AI. If in doubt, cut it.
+
+### 4d. Article structure
+
+The article page must include these sections, in order. Use the exact components you
+learned in 4a — match the prop signatures and patterns from the existing case studies.
+
+1. **The Guarantee** — the invariant displayed with a `<Guarantee>` component (or a
+   protocol-specific variant if the invariant needs custom visualization). Show both:
+   - **English legend**: one sentence a non-technical reader can understand.
+   - **Math notation**: KaTeX rendering that matches `Specs.lean` (using the same
+     helper names if any were introduced in 4b).
+
+2. **Context** — short explanation of the protocol and the specific contract/function
+   being verified. What does it do, who uses it, what is the unit of value at risk.
+   Keep it to 2–3 paragraphs max.
+
+3. **Why This Matters** — what failure mode this invariant prevents. Be concrete: "If
+   this invariant were violated, an attacker could mint tokens without depositing
+   collateral" — not "this ensures correctness". Use `<Disclosure>` components for
+   deeper technical details.
+
+4. **How This Was Modeled & Proven** — explain the Verity modeling approach:
+   - Link to the Contract.lean and Proofs.lean files on GitHub.
+   - Briefly describe the proof strategy (induction, case split, etc.).
+   - Include a `<CodeBlock>` with the `lake build` verification command.
+   - Include a `<Disclosure>` "Verify it yourself" section with clone + build
+     instructions.
+
+5. **Proof Status** — one of:
+   - "Proven" — all specs have corresponding proofs, no `sorry`, no abusive axioms.
+   - "Proven with assumptions" — proofs complete but rely on axioms (list them).
+   - "In progress" — some specs are not yet proven.
+
+   If there are multiple theorems, show a table (function name / theorem / status).
+
+6. **Assumptions** — list every axiom and hypothesis using `<Hypothesis>` components.
+   For each:
+   - `name`: the Lean hypothesis name (e.g. `hMaxLS`)
+   - `constraint`: the human-readable constraint (e.g. `maxLiabilityShares ≥ liabilityShares`)
+   - `source`: where this assumption comes from (audit report, EVM spec, contract invariant)
+   - Body text: why this assumption is reasonable, and what breaks if it doesn't hold.
+
+### 4e. Metadata entry
+
+Add an entry to `data/research.js`:
+
+```javascript
+{
+  slug: '<protocol>-<invariant-short-name>',
+  title: '<Protocol> <What Was Proven>',
+  subtitle: '<One sentence describing the formal verification>',
+  description: '<2-3 sentence description for meta tags>',
+  date: '<YYYY-MM-DD>',
+  tag: 'Case study'
+}
+```
+
+### 4f. Verification
+
+Before marking the article as done:
+
+- Confirm the math notation in the article matches `Specs.lean` (same helper names,
+  same structure).
+- Confirm every assumption listed in the article appears as a hypothesis or axiom in
+  the proof.
+- Confirm the proof status accurately reflects the state of `Proofs.lean`.
+- Confirm you are using the real component APIs from the lfglabs.dev repo (not guessed
+  prop names or invented components).
+- Confirm there are no em dashes anywhere in the article text.
+- Re-read the article and strip anything that sounds AI-generated (filler, inflated
+  language, rhetorical patterns).
+- Run the dev server and visually check the page renders correctly, KaTeX formulas
+  display, and `<Disclosure>` / `<Hypothesis>` components work.
+
+### 4g. Open a PR on the lfglabs.dev repository
+
+Once the article passes verification, open a pull request on
+`https://github.com/lfglabs-dev/lfglabs.dev` with the new case study page, any new
+components, and the `data/research.js` entry. Use `gh pr create` with `--base main`.
+
+---
+
 ## Anti-patterns — do not do these
 
-- Claiming a Verity feature is unsupported without checking the current package first.
-- Claiming a Verity feature is unsupported when it is really only a proof-coverage gap.
 - Starting `Contract.lean` before explicitly listing the expected simplifications and
   Verity friction points to the user.
 - Writing the proof inside `Generated/.../Tasks/*.lean`. That file stays `exact ?_`.
@@ -339,6 +490,12 @@ If it involves `sub + add` cancellation, use `Verity.Core.Uint256.sub_add_cancel
   protocol summary + evaluate the invariant before you touch code.
 - Prematurely abstracting the Solidity into a high-level toy model when a closer
   source-structured translation is available.
-- Publishing an article, readme, or PR saying "all N functions covered" when the
-  theorem count doesn't actually cover them. Count proofs against the public function
-  surface before claiming coverage.
+- Publishing an article saying "all N functions covered" when the theorem count
+  doesn't actually cover them. Count proofs against the public function surface before
+  claiming coverage.
+- Showing math notation in the article that diverges from `Specs.lean`. If the spec
+  is too complex to show directly, refactor `Specs.lean` with helpers first.
+- Creating issues on the Verity repository without explicit user confirmation.
+- Using em dashes in article text. Use commas, periods, or colons instead.
+- Writing article prose that sounds AI-generated (filler phrases, inflated language,
+  rhetorical rule-of-three patterns).
