@@ -6,3 +6,4 @@ import Benchmark.Cases.DamnVulnerableDeFi
 import Benchmark.Cases.Lido
 import Benchmark.Cases.TermMax
 import Benchmark.Cases.Zama
+import Benchmark.Cases.Wildcat
