@@ -1,0 +1,70 @@
+manifest_kind: case
+project: termmax
+case_id: order_v2_buy_xt_single_segment
+schema_version: 1
+split: active
+family_id: termmax
+implementation_id: contracts_v2
+stage: build_green
+translation_status: translated
+spec_status: frozen
+proof_status: complete
+upstream_repo: https://github.com/term-structure/termmax-contract-v2
+upstream_commit: 64bd47b98e064c7fb91ab4a59b70520e0ec285d5
+original_contract_path: contracts/v2/TermMaxOrderV2.sol
+source_ref: https://github.com/term-structure/termmax-contract-v2@64bd47b98e064c7fb91ab4a59b70520e0ec285d5:contracts/v2/TermMaxOrderV2.sol
+lean_target: Benchmark.Cases.TermMax.OrderV2BuyXtSingleSegment.Compile
+spec_target: Benchmark.Cases.TermMax.OrderV2BuyXtSingleSegment.Specs
+proof_target: Benchmark.Cases.TermMax.OrderV2BuyXtSingleSegment.Proofs
+selected_functions:
+  - swapExactTokenToToken
+  - _swapAndUpdateReserves
+  - _buyToken
+  - _buyXt
+  - _buyXtStep
+  - buyXt
+  - cutsReverseIter
+  - calcIntervalProps
+  - plusInt256
+source_language: solidity
+verity_version: 4ebe4931d25e5a1594fcd3f43ff040ecc3c4225a
+lean_toolchain: leanprover/lean4:v4.22.0
+abstraction_level: protocol_slice
+abstraction_tags:
+  - exact_in_xt_only
+  - single_segment_slice
+  - direct_curvecut_params
+  - helper_stack_restored
+  - higher_order_helper_specialized
+  - callbacks_elided
+  - transfer_rebalance_elided
+  - int256_native_offset
+  - named_errors
+  - nonreentrant_modeled
+abstraction_notes: >
+  This benchmark isolates the exact-input `debtToken -> XT` pricing/state-update
+  path of `TermMaxOrderV2`. The model keeps the Solidity helper stack
+  structurally visible (`calcIntervalProps`, `cutsReverseIter`, `_buyXtStep`,
+  `_buyToken`, `_buyXt`, `_swapAndUpdateReserves`), with each storage read
+  happening in the same caller as in the Solidity source. The curve cut offset
+  is now carried as a native `Int256` parameter, and `MathLib.plusInt256` is
+  inlined as the same `if (b < 0) ... else ...` shape Solidity uses. Solidity
+  custom errors (`UnexpectedAmount`, `InsufficientLiquidity`, `XtReserveTooHigh`)
+  are mirrored as named Verity errors, and the entry function carries the
+  `nonreentrant(nonReentrancyLock)` modifier. Remaining DSL gaps: `CurveCut[]`
+  cannot exist as a parameter or storage field (Verity#1003/#1745 — nested
+  arrays / storage struct arrays), and Solidity function-pointer parameters of
+  `_buyToken` / `_swapAndUpdateReserves` cannot be passed in Verity, so they
+  are specialized to the concrete `_buyXtStep` / `_buyXt` path. Token
+  transfers, callbacks, pool/GT rebalancing, deadline/sameToken/onlyOpen
+  modifiers, and event emission are omitted because they do not affect
+  `virtualXtReserve` (and reentry is blocked by the `nonreentrant` modifier).
+unsupported_feature_codes:
+  - array_of_struct_param_unsupported
+  - higher_order_function_param_specialized
+  - external_lean_helper_call_unsupported
+notes: >
+  TermMax range-order AMM slice for pricing-state transition correctness. The
+  proof target is the highest-signal easy theorem in this family: on the
+  successful single-segment `debtToken -> XT` exact-input path, the stored
+  `virtualXtReserve` decreases by exactly the XT amount implied by the curve.
