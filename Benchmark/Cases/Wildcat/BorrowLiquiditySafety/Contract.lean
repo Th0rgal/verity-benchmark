@@ -138,19 +138,26 @@ verity_contract BorrowLiquiditySafety where
     hookAllowsBorrow : Uint256 := slot 10
 
   /-
-    Models the successful path of Wildcat `borrow(uint256 amount)`:
-      1. sanctioned-borrower guard
-      2. updated state materialization
-      3. closed-market guard
-      4. borrowable-assets check
-      5. hook boundary
-      6. transfer boundary
-      7. state write
+    Models the successful path of Wildcat `borrow(uint256 amount)`.
+
+    Solidity correspondence:
+      if (_isFlaggedByChainalysis(borrower)) revert_BorrowWhileSanctioned();
+      MarketState memory state = _getUpdatedState();
+      if (state.isClosed) revert_BorrowFromClosedMarket();
+      uint256 borrowable = state.borrowableAssets(totalAssets());
+      if (amount > borrowable) revert_BorrowAmountTooHigh();
+      hooks.onBorrow(amount, state);
+      asset.safeTransfer(msg.sender, amount);
+      _writeState(state);
+      emit_Borrow(amount);
   -/
   function borrow (amount : Uint256) : Unit := do
+    -- if (_isFlaggedByChainalysis(borrower)) revert_BorrowWhileSanctioned();
     let borrowerFlagged_ ← getStorage borrowerFlagged
     require (borrowerFlagged_ == 0) "BorrowWhileSanctioned"
 
+    -- MarketState memory state = _getUpdatedState();
+    -- totalAssets() is represented by the trusted totalAssetsStored mirror.
     let totalAssets_ ← getStorage totalAssetsStored
     let isClosed_ ← getStorage isClosed
     let accruedProtocolFees_ ← getStorage accruedProtocolFees
@@ -167,8 +174,10 @@ verity_contract BorrowLiquiditySafety where
       (safeAdd accruedProtocolFees_ pendingProtocolFeeDelta_)
       "ProtocolFeeOverflow"
 
+    -- if (state.isClosed) revert_BorrowFromClosedMarket();
     require (isClosed_ == 0) "BorrowFromClosedMarket"
 
+    -- uint256 borrowable = state.borrowableAssets(totalAssets());
     let scaledOutstandingSupply_ ← requireSomeUint
       (safeSub scaledTotalSupply_ scaledPendingWithdrawals_)
       "OutstandingSupplyUnderflow"
@@ -194,12 +203,17 @@ verity_contract BorrowLiquiditySafety where
       "LiquidityRequirementOverflow"
 
     let borrowable_ := ite (totalAssets_ > liquidityRequired_) (sub totalAssets_ liquidityRequired_) 0
+    -- if (amount > borrowable) revert_BorrowAmountTooHigh();
     require (amount <= borrowable_) "BorrowAmountTooHigh"
 
+    -- hooks.onBorrow(amount, state);
     require (hookAllowsBorrow_ != 0) "BorrowHookFailed"
 
+    -- asset.safeTransfer(msg.sender, amount);
+    -- _writeState(state);
     setStorage totalAssetsStored (sub totalAssets_ amount)
     setStorage accruedProtocolFees updatedAccruedProtocolFees_
     setStorage pendingProtocolFeeDelta 0
+    -- emit_Borrow(amount) is event-only and does not affect this state invariant.
 
 end Benchmark.Cases.Wildcat.BorrowLiquiditySafety
