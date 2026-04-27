@@ -8,54 +8,54 @@ open Verity.EVM.Uint256
 open Verity.Stdlib.Math
 
 /-- Trusted mirror of Wildcat `totalAssets()`. -/
-def totalAssetsOf (s : ContractState) : Uint256 := s.storage 0
+def totalAssetsOf (state : ContractState) : Uint256 := state.storage 0
 
 /-- Encoded `MarketState.isClosed` flag. -/
-def isClosedOf (s : ContractState) : Uint256 := s.storage 1
+def isClosedOf (state : ContractState) : Uint256 := state.storage 1
 
 /-- `MarketState.accruedProtocolFees`. -/
-def accruedProtocolFeesOf (s : ContractState) : Uint256 := s.storage 2
+def accruedProtocolFeesOf (state : ContractState) : Uint256 := state.storage 2
 
 /-- `MarketState.normalizedUnclaimedWithdrawals`. -/
-def normalizedUnclaimedWithdrawalsOf (s : ContractState) : Uint256 := s.storage 3
+def normalizedUnclaimedWithdrawalsOf (state : ContractState) : Uint256 := state.storage 3
 
 /-- `MarketState.scaledTotalSupply`. -/
-def scaledTotalSupplyOf (s : ContractState) : Uint256 := s.storage 4
+def scaledTotalSupplyOf (state : ContractState) : Uint256 := state.storage 4
 
 /-- `MarketState.scaledPendingWithdrawals`. -/
-def scaledPendingWithdrawalsOf (s : ContractState) : Uint256 := s.storage 5
+def scaledPendingWithdrawalsOf (state : ContractState) : Uint256 := state.storage 5
 
 /-- `MarketState.reserveRatioBips`. -/
-def reserveRatioBipsOf (s : ContractState) : Uint256 := s.storage 6
+def reserveRatioBipsOf (state : ContractState) : Uint256 := state.storage 6
 
 /-- `MarketState.scaleFactor`. -/
-def scaleFactorOf (s : ContractState) : Uint256 := s.storage 7
+def scaleFactorOf (state : ContractState) : Uint256 := state.storage 7
 
 /-- Compressed `_getUpdatedState()` fee accrual input. -/
-def pendingProtocolFeeDeltaOf (s : ContractState) : Uint256 := s.storage 8
+def pendingProtocolFeeDeltaOf (state : ContractState) : Uint256 := state.storage 8
 
 /-- Trusted `_isFlaggedByChainalysis(borrower)` result. -/
-def borrowerFlaggedOf (s : ContractState) : Uint256 := s.storage 9
+def borrowerFlaggedOf (state : ContractState) : Uint256 := state.storage 9
 
 /-- Trusted `hooks.onBorrow` success bit. -/
-def hookAllowsBorrowOf (s : ContractState) : Uint256 := s.storage 10
+def hookAllowsBorrowOf (state : ContractState) : Uint256 := state.storage 10
 
 /-- Borrow-check state after the compressed `_getUpdatedState()` fee accrual. -/
-def updatedAccruedProtocolFeesOf (s : ContractState) : Uint256 :=
-  accruedProtocolFeesOf s + pendingProtocolFeeDeltaOf s
+def updatedAccruedProtocolFeesOf (preState : ContractState) : Uint256 :=
+  accruedProtocolFeesOf preState + pendingProtocolFeeDeltaOf preState
 
 /-- Portion of supply not already pending withdrawal. -/
-def scaledOutstandingSupplyOf (s : ContractState) : Uint256 :=
-  outstandingSupply (scaledTotalSupplyOf s) (scaledPendingWithdrawalsOf s)
+def scaledOutstandingSupplyOf (preState : ContractState) : Uint256 :=
+  outstandingSupply (scaledTotalSupplyOf preState) (scaledPendingWithdrawalsOf preState)
 
 /-- Reserve-ratio-backed outstanding supply plus 100% pending withdrawals. -/
-def scaledRequiredReservesOf (s : ContractState) : Uint256 :=
-  bipMulHalfUp (scaledOutstandingSupplyOf s) (reserveRatioBipsOf s) +
-    scaledPendingWithdrawalsOf s
+def scaledRequiredReservesOf (preState : ContractState) : Uint256 :=
+  bipMulHalfUp (scaledOutstandingSupplyOf preState) (reserveRatioBipsOf preState) +
+    scaledPendingWithdrawalsOf preState
 
 /-- Normalized reserve-ratio-backed liquidity requirement. -/
-def normalizedRequiredReservesOf (s : ContractState) : Uint256 :=
-  normalizeAmount (scaledRequiredReservesOf s) (scaleFactorOf s)
+def normalizedRequiredReservesOf (preState : ContractState) : Uint256 :=
+  normalizeAmount (scaledRequiredReservesOf preState) (scaleFactorOf preState)
 
 /--
   Required liquidity for the already-updated state used by the borrow guard.
@@ -66,25 +66,29 @@ def normalizedRequiredReservesOf (s : ContractState) : Uint256 :=
   - paid but unclaimed withdrawals
   - accrued protocol fees (after the compressed update step)
 -/
-def requiredLiquidityAfterUpdate (s : ContractState) : Uint256 :=
+def requiredLiquidityAfterUpdate (preState : ContractState) : Uint256 :=
   liquidityRequiredFromFields
-    (scaledTotalSupplyOf s)
-    (scaledPendingWithdrawalsOf s)
-    (normalizedUnclaimedWithdrawalsOf s)
-    (updatedAccruedProtocolFeesOf s)
-    (reserveRatioBipsOf s)
-    (scaleFactorOf s)
+    (scaledTotalSupplyOf preState)
+    (scaledPendingWithdrawalsOf preState)
+    (normalizedUnclaimedWithdrawalsOf preState)
+    (updatedAccruedProtocolFeesOf preState)
+    (reserveRatioBipsOf preState)
+    (scaleFactorOf preState)
 
 /-- Borrowable liquidity after the compressed update step. -/
-def borrowableAssetsAfterUpdate (s : ContractState) : Uint256 :=
+def borrowableAssetsAfterUpdate (preState : ContractState) : Uint256 :=
   borrowableAssetsFromFields
-    (totalAssetsOf s)
-    (scaledTotalSupplyOf s)
-    (scaledPendingWithdrawalsOf s)
-    (normalizedUnclaimedWithdrawalsOf s)
-    (updatedAccruedProtocolFeesOf s)
-    (reserveRatioBipsOf s)
-    (scaleFactorOf s)
+    (totalAssetsOf preState)
+    (scaledTotalSupplyOf preState)
+    (scaledPendingWithdrawalsOf preState)
+    (normalizedUnclaimedWithdrawalsOf preState)
+    (updatedAccruedProtocolFeesOf preState)
+    (reserveRatioBipsOf preState)
+    (scaleFactorOf preState)
+
+/-- Post-state returned by executing the modeled `borrow(amount)` function. -/
+def runBorrow (amount : Uint256) (preState : ContractState) : ContractState :=
+  ((BorrowLiquiditySafety.borrow amount).run preState).snd
 
 /--
   Preconditions for the successful `borrow(amount)` path in this benchmark slice.
@@ -93,29 +97,29 @@ def borrowableAssetsAfterUpdate (s : ContractState) : Uint256 :=
   behavior of the Solidity helpers that Wildcat uses while computing the updated
   liquidity requirement.
 -/
-def borrow_succeeds_preconditions (amount : Uint256) (s : ContractState) : Prop :=
-  borrowerFlaggedOf s = 0 ∧
-  isClosedOf s = 0 ∧
-  hookAllowsBorrowOf s != 0 ∧
-  scaledPendingWithdrawalsOf s <= scaledTotalSupplyOf s ∧
-  (accruedProtocolFeesOf s : Nat) + (pendingProtocolFeeDeltaOf s : Nat) <= MAX_UINT256 ∧
-  (scaledOutstandingSupplyOf s : Nat) * (reserveRatioBipsOf s : Nat) + (HALF_BIP : Nat)
+def borrow_succeeds_preconditions (amount : Uint256) (preState : ContractState) : Prop :=
+  borrowerFlaggedOf preState = 0 ∧
+  isClosedOf preState = 0 ∧
+  hookAllowsBorrowOf preState != 0 ∧
+  scaledPendingWithdrawalsOf preState <= scaledTotalSupplyOf preState ∧
+  (accruedProtocolFeesOf preState : Nat) + (pendingProtocolFeeDeltaOf preState : Nat) <= MAX_UINT256 ∧
+  (scaledOutstandingSupplyOf preState : Nat) * (reserveRatioBipsOf preState : Nat) + (HALF_BIP : Nat)
     <= MAX_UINT256 ∧
-  (scaledRequiredReservesOf s : Nat) * (scaleFactorOf s : Nat) + (HALF_RAY : Nat)
+  (scaledRequiredReservesOf preState : Nat) * (scaleFactorOf preState : Nat) + (HALF_RAY : Nat)
     <= MAX_UINT256 ∧
-  (normalizedRequiredReservesOf s : Nat) + (updatedAccruedProtocolFeesOf s : Nat)
+  (normalizedRequiredReservesOf preState : Nat) + (updatedAccruedProtocolFeesOf preState : Nat)
     <= MAX_UINT256 ∧
-  (normalizedRequiredReservesOf s : Nat) + (updatedAccruedProtocolFeesOf s : Nat) +
-      (normalizedUnclaimedWithdrawalsOf s : Nat) <= MAX_UINT256 ∧
-  amount <= borrowableAssetsAfterUpdate s
+  (normalizedRequiredReservesOf preState : Nat) + (updatedAccruedProtocolFeesOf preState : Nat) +
+      (normalizedUnclaimedWithdrawalsOf preState : Nat) <= MAX_UINT256 ∧
+  amount <= borrowableAssetsAfterUpdate preState
 
 /--
   Approved invariant: for a successful positive borrow, the market still has at
   least the required liquidity left after the assets leave the contract.
 -/
 def positive_borrow_preserves_required_liquidity_spec
-    (amount : Uint256) (s s' : ContractState) : Prop :=
-  totalAssetsOf s' = totalAssetsOf s - amount ∧
-  totalAssetsOf s' >= requiredLiquidityAfterUpdate s
+    (amount : Uint256) (preState postState : ContractState) : Prop :=
+  totalAssetsOf postState = totalAssetsOf preState - amount ∧
+  totalAssetsOf postState >= requiredLiquidityAfterUpdate preState
 
 end Benchmark.Cases.Wildcat.BorrowLiquiditySafety

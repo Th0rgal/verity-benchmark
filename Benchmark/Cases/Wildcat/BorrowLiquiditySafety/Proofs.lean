@@ -1,4 +1,5 @@
 import Benchmark.Cases.Wildcat.BorrowLiquiditySafety.Specs
+import Benchmark.Cases.Wildcat.BorrowLiquiditySafety.Slot0Proof
 import Verity.Proofs.Stdlib.Automation
 import Verity.Proofs.Stdlib.Math
 
@@ -7,31 +8,9 @@ namespace Benchmark.Cases.Wildcat.BorrowLiquiditySafety
 open Verity
 open Verity.EVM.Uint256
 open Verity.Stdlib.Math
-open Verity.Proofs.Stdlib.Math (safeAdd_some safeSub_some)
 
 private theorem u256_nat_pos {x : Uint256} (h : x > 0) : 0 < (x : Nat) := by
   simpa [Verity.Core.Uint256.lt_def] using h
-
-private def updatedFeesExpr (s : ContractState) : Uint256 :=
-  s.storage 2 + s.storage 8
-
-private def scaledOutstandingExpr (s : ContractState) : Uint256 :=
-  s.storage 4 - s.storage 5
-
-private def reserveNumeratorExpr (s : ContractState) : Uint256 :=
-  scaledOutstandingExpr s * s.storage 6 + HALF_BIP
-
-private def scaledRequiredExpr (s : ContractState) : Uint256 :=
-  reserveNumeratorExpr s / BIP + s.storage 5
-
-private def normalizeNumeratorExpr (s : ContractState) : Uint256 :=
-  scaledRequiredExpr s * s.storage 7 + HALF_RAY
-
-private def normalizedRequiredExpr (s : ContractState) : Uint256 :=
-  normalizeNumeratorExpr s / RAY
-
-private def liquidityRequiredExpr (s : ContractState) : Uint256 :=
-  normalizedRequiredExpr s + updatedFeesExpr s + s.storage 3
 
 private theorem totalAssets_after_positive_borrow_ge_required
     (amount totalAssets required : Uint256)
@@ -69,33 +48,14 @@ private theorem totalAssets_after_positive_borrow_ge_required
     have : False := by omega
     exact False.elim this
 
-/--
-  Mechanical post-state characterization of the successful borrow path.
-
-  Justification:
-  - This is the exact checks-effects-write shape encoded in `Contract.lean`.
-  - The remaining gap is not the arithmetic theorem itself; it is the large
-    macro-expanded normalization proof for the nested `requireSomeUint` chain
-    inside the executable contract.
-  - The axiom does not assume the liquidity invariant directly. It only states
-    the concrete storage writes of a successful borrow under the theorem's
-    existing preconditions.
--/
-axiom borrow_slot_writes_axiom
-    (amount : Uint256) (s : ContractState)
-    (hPre : borrow_succeeds_preconditions amount s) :
-    let s' := ((BorrowLiquiditySafety.borrow amount).run s).snd
-    totalAssetsOf s' = totalAssetsOf s - amount ∧
-    accruedProtocolFeesOf s' = updatedAccruedProtocolFeesOf s ∧
-    pendingProtocolFeeDeltaOf s' = 0
-
 theorem positive_borrow_preserves_required_liquidity
-    (amount : Uint256) (s : ContractState)
+    (amount : Uint256) (preState : ContractState)
     (hPositive : amount > 0)
-    (hPre : borrow_succeeds_preconditions amount s) :
-    let s' := ((BorrowLiquiditySafety.borrow amount).run s).snd
-    positive_borrow_preserves_required_liquidity_spec amount s s' := by
-  rcases borrow_slot_writes_axiom amount s hPre with ⟨hAssets, _, _⟩
+    (hPre : borrow_succeeds_preconditions amount preState) :
+    let postState := runBorrow amount preState;
+    positive_borrow_preserves_required_liquidity_spec amount preState postState := by
+  have hAssets : totalAssetsOf (runBorrow amount preState) = totalAssetsOf preState - amount := by
+    exact borrow_total_assets_write amount preState hPre
   rcases hPre with ⟨_, _, _, _, _, _, _, _, _, hAmount⟩
   unfold positive_borrow_preserves_required_liquidity_spec
   constructor
@@ -103,8 +63,8 @@ theorem positive_borrow_preserves_required_liquidity
   · rw [hAssets]
     exact totalAssets_after_positive_borrow_ge_required
       amount
-      (totalAssetsOf s)
-      (requiredLiquidityAfterUpdate s)
+      (totalAssetsOf preState)
+      (requiredLiquidityAfterUpdate preState)
       hPositive
       hAmount
 

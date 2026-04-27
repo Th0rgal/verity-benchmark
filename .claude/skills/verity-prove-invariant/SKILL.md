@@ -1,18 +1,19 @@
 ---
 name: verity-prove-invariant
 description: >
-  Three-phase workflow for adding a new Verity benchmark case: research the protocol,
-  model the contract in Lean with explicit simplifications, then prove a chosen
-  invariant (or delegate that step to another agent). Trigger terms: verity prove,
-  new benchmark case, prove invariant, formally verify, add verity case, verify
-  protocol, model contract in verity, lean contract verification.
+  Four-phase workflow for adding a new Verity benchmark case: research the protocol,
+  model the contract in Lean with explicit simplifications, prove a chosen invariant
+  (or delegate that step to another agent), then publish the case-study article on
+  lfglabs.dev. Trigger terms: verity prove, new benchmark case, prove invariant,
+  formally verify, add verity case, verify protocol, model contract in verity, lean
+  contract verification.
 ---
 
 # Verity Prove Invariant
 
-Add a new formal-verification case to the Verity benchmark. The workflow has three
-phases, each **gated by explicit user acknowledgement** — never cross a phase boundary
-silently.
+Add a new formal-verification case to the Verity benchmark and publish its case-study
+article on lfglabs.dev. The workflow has four phases, each **gated by explicit user
+acknowledgement** — never cross a phase boundary silently.
 
 ## When to use
 
@@ -202,7 +203,76 @@ Once any proof lands, write a short report back to the user:
    doesn't.
 
 **Do not mark the case as done until the user confirms they understand each of those
-four points.** Completion = user ack, not green CI.
+four points.** Completion of Phase 3 = user ack, not green CI.
+
+---
+
+## Phase 4 — Case-study article on lfglabs.dev (olympia)
+
+Only start after the user acknowledges the Phase 3 post-proof report. Do not skip to
+this silently — ask first, because the user may want to draft the article themselves.
+
+### 4a. Prerequisite: olympia must be writeable from this session
+
+Olympia lives at `/Users/benjaminflores/conductor/workspaces/lfglabs.dev/olympia`. If
+the path isn't already in Claude Code's allowed directories, prompt the user:
+
+> "To publish the article I need access to olympia. Either run
+> `/add-dir /Users/benjaminflores/conductor/workspaces/lfglabs.dev/olympia` in this
+> chat, or add it to `additionalDirectories` in `.claude/settings.local.json`."
+
+Do not attempt writes to olympia before this is confirmed.
+
+### 4b. File layout and template
+
+Case-study articles live at `pages/research/<slug>.jsx` in olympia — JSX pages, not
+markdown. Use the most recent sibling article as your template (as of this writing:
+`wildcat-borrow-liquidity.jsx`). Match its structure exactly:
+
+- `BENCHMARK_COMMIT` — the actual commit on `main` where the proof landed. Get it
+  with `git log -1 --format=%H` in the benchmark worktree after the PR merges; do
+  NOT invent it or use a branch tip that may be rebased.
+- `VERIFY_COMMAND` — clone + `git checkout <commit>` + `lake build
+  Benchmark.Cases.<Project>.<Case>.Compile`. The reader must be able to copy-paste
+  and reproduce the proof.
+- Upstream contract link pinned to the protocol's commit (not `main`).
+- `CONTRACT_LINK`, `SPECS_LINK`, `PROOFS_LINK`, `CASE_LINK` all built from
+  `BENCHMARK_COMMIT`.
+- Standard sections: protocol summary, invariant statement, simplifications
+  (pulled from Contract.lean's doc comment), proof narrative, "what the proof
+  guarantees (and doesn't)", reproduction steps.
+
+### 4c. Draft from the Phase 3 report, not from scratch
+
+The Phase 3 post-proof report already has the "hypotheses used / non-obvious
+hypotheses / axioms / what the proof guarantees" content in the right shape. Lift
+from there. If the report didn't cover something the article needs, go back and add
+it to the report first — do not invent details to pad the article.
+
+### 4d. Branch, commit, open PR — all from this session
+
+```bash
+cd /Users/benjaminflores/conductor/workspaces/lfglabs.dev/olympia
+git checkout -b research/<slug>
+# write pages/research/<slug>.jsx
+git add pages/research/<slug>.jsx
+git commit -m "research: add <protocol> <case> case study"
+git push -u origin HEAD
+gh pr create --base main --title "Research: <protocol> <case>" --body "<summary + link to benchmark PR>"
+```
+
+Return the PR URL to the user. The case is not fully shipped until this PR merges —
+do not claim completion on the benchmark PR alone.
+
+### 4e. Anti-patterns specific to Phase 4
+
+- Writing the article before the benchmark PR has merged to `main`. The
+  `BENCHMARK_COMMIT` must be a permanent commit, not a branch head.
+- Claiming "all N functions covered" when theorem count doesn't match the public
+  function surface. Count first.
+- Copy-pasting another article's `BENCHMARK_COMMIT` because you forgot to update it.
+- Editing the article in this repo and manually mirroring it. Write directly to
+  olympia's path via `/add-dir`; there is no sync step.
 
 ---
 
