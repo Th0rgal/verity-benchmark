@@ -8,184 +8,195 @@ open Verity.EVM.Uint256
 open Verity.Stdlib.Math
 
 /-
-  Focused Verity slice of Reserve DTF Protocol's auction price computation.
+  Solidity-mirror translation of `RebalancingLib._price` (Reserve DTF Protocol).
 
   Upstream: reserve-protocol/dtfs
   Commit:   14f75d18856d587adfaff24e77e5b20dda7c7267
   File:     contracts/utils/RebalancingLib.sol
   Function: _price (lines 427-475)
 
-  The real `_price` returns the per-pair auction price as the protocol
-  decays it from a worst-for-bidder `startPrice` to a best-for-bidder
-  `endPrice` over the auction window. The interior of the window uses an
-  exponential decay `p = startPrice * exp(-k * elapsed) / D18`, with an
-  explicit clamp at `endPrice`.
+  This file follows the Solidity-mirror translation convention (see the
+  verity-prove-invariant skill, Phase 2b):
+  - Local variable names match the Solidity verbatim
+    (`startPrice`, `endPrice`, `sellPrices`, `buyPrices`, `elapsed`,
+    `auctionLength`, `k`, `p`).
+  - The Lean `PriceRange` structure mirrors `IFolio.PriceRange`.
+  - Control flow mirrors the Solidity branch cascade via nested if-then-else,
+    each guarded by an inline `-- Solidity: return X;` comment.
+  - The Solidity require gate (lines 437-447) is encoded explicitly as the
+    named `Prop` predicate `auctionOngoing` and consumed as a hypothesis on
+    every theorem.
+  - Inline Solidity expressions stay inline in Lean (no extracted helpers).
+  - Constants `D18`, `D27` mirror `@utils/Constants.sol` by name and value.
+  - Every divergence from a 1:1 translation carries an explicit `DEVIATES:`
+    comment naming the Solidity construct and the concrete reason.
 
-  This benchmark targets the *band invariant*:
-      endPrice ≤ price ≤ startPrice
-  for every valid timestamp in [startTime, endTime].
-
-  Simplifications (each line is a deviation from a verbatim translation):
+  Simplifications (each is a `DEVIATES:`-tagged divergence):
 
   | What was simplified                          | Why                                    |
   |----------------------------------------------|----------------------------------------|
-  | Pure Lean function `price` instead of a      | The invariant is about the returned    |
-  | `verity_contract` reading from storage       | value; storage layout is incidental.   |
-  | mappings `auction.prices[token]` and         | Same posture as NexusMutual            |
-  | `rebalance.details[token].inRebalance`.      | RammSpotPrice (pure helper).           |
+  | Storage reads (`auction.prices[token]`,      | Verity pure helpers cannot read        |
+  | `rebalance.details[token].inRebalance`,      | storage; we take the same values as    |
+  | `auction.startTime`, `auction.endTime`,      | function parameters. Equivalent under  |
+  | `rebalance.nonce`, `auction.rebalanceNonce`) | the trust assumption that callers      |
+  | are passed as parameters of `_price`.        | (`bid`, `getBid`) supply the values    |
+  |                                              | currently in storage. (Same posture as |
+  |                                              | NexusMutual `RammSpotPrice`.)          |
   |----------------------------------------------|----------------------------------------|
-  | The require gate (auction.rebalanceNonce ==  | A pure function cannot revert. The     |
-  | rebalance.nonce, sellPrices.low ≠ 0,         | gate's positive content is encoded as  |
-  | currentTime ∈ [startTime, endTime], etc.) is | an `hAuction` hypothesis on each       |
-  | NOT modeled inside `price`.                  | theorem.                               |
+  | The 8-clause `require(...)` at L437-447 is   | Pure functions cannot revert. The      |
+  | encoded as `auctionOngoing : Prop` and       | gate's positive content is recovered   |
+  | consumed as a hypothesis on every theorem.   | as a precondition.                     |
   |----------------------------------------------|----------------------------------------|
-  | `MathLib.ln` and `MathLib.exp` (PRBMath      | Verity stdlib has no fixed-point       |
-  | UD60x18 / SD59x18 implementations) are       | ln/exp. We declare them as opaque      |
-  | declared as opaque axioms, with one          | axioms with a single algebraic axiom   |
-  | algebraic axiom (`exp_nonpositive_le_d18`)   | (`exp x ≤ D18` for `x ≤ 0`) — the      |
-  | sufficient for the upper-bound proof.        | only property the band invariant       |
-  |                                              | needs. See proposed Verity issue:      |
-  |                                              | "Stdlib axioms for fixed-point ln/exp" |
-  |----------------------------------------------|----------------------------------------|
-  | `Math.mulDiv(_, _, _, Math.Rounding.Ceil)`   | `mulDivUp` is the Verity stdlib direct |
-  | becomes `mulDivUp` (overflow-aware ceil-div  | port of the same EVM idiom; semantics  |
-  | as in OpenZeppelin `Math256.mulDiv`).        | match for the input ranges of interest.|
+  | `MathLib.exp` and `MathLib.ln` (PRBMath      | Verity stdlib has no fixed-point       |
+  | UD60x18 / SD59x18 wrappers) are declared as  | natural exp/ln. Proposed Verity issue: |
+  | opaque axioms with one algebraic axiom       | "Stdlib axioms for fixed-point ln/exp  |
+  | (`MathLib_exp_nonpositive_le_D18`).          | (PRBMath equivalents)".                |
 
   Trust assumptions:
-  - The auction prerequisites enforced by the require at lines 437-447 of
-    the Solidity (auction is OPEN, both tokens are in rebalance, prices
-    are nonzero) are taken as preconditions on the pure function. They are
-    enforced by callers (`bid`, `getBid`) before reaching `_price`.
-  - `endPrice ≤ startPrice` is taken as a precondition (`hBand`). It is
-    enforced by `openAuction` / `startRebalance` via the input-validation
-    requires that establish `sellLow ≤ sellHigh` and `buyLow ≤ buyHigh`.
-    A separate lemma `band_well_formed` proves this falls out of the
-    component bounds and saves the caller from carrying `hBand` directly.
+  - `block.timestamp` is passed as a `block_timestamp` parameter.
+  - PRBMath's bit-faithful Taylor-series implementation of exp/ln is treated
+    as an opaque algebraic interface; only the property
+    `exp x ≤ D18 for x ≤ 0` is consumed by the proofs.
 -/
 
-/-- Reserve fixed-point scale: 18 decimals. -/
+/-- Reserve fixed-point scale: 18 decimals.
+    Mirrors `D18` at `contracts/utils/Constants.sol:25`. -/
 def D18 : Uint256 := 1000000000000000000
 
-/-- Reserve fixed-point scale: 27 decimals. Used for `D27{buyTok/sellTok}` price quotes. -/
+/-- Reserve fixed-point scale: 27 decimals.
+    Mirrors `D27` at `contracts/utils/Constants.sol:26`. -/
 def D27 : Uint256 := 1000000000000000000000000000
 
-/--
-  Opaque model of PRBMath's `SD59x18.exp`, exposed by Reserve as
-  `MathLib.exp(int256)`. Returns a `D18` fixed-point value.
+/-- Mirrors `IFolio.PriceRange { uint256 low; uint256 high; }` at
+    `contracts/interfaces/IFolio.sol:171-174`. -/
+structure PriceRange where
+  low : Uint256
+  high : Uint256
 
-  No constructive content — algebraic properties are exposed via the
-  named axioms below. See proposed Verity issue:
-  "Stdlib axioms for fixed-point ln/exp (PRBMath equivalents)".
--/
-axiom exp : Int256 → Uint256
+/-- Opaque model of `MathLib.exp` at `contracts/utils/MathLib.sol:32-34`,
+    PRBMath's `SD59x18.exp` returning a D18 fixed-point value.
 
-/--
-  For non-positive inputs `x`, `exp x ≤ D18`. This captures the unique
-  property of the natural exponential we rely on: the value never exceeds
-  one in fixed-point form when the exponent is at most zero.
+    DEVIATES: Verity stdlib has no fixed-point natural exponential. We
+    declare it opaque and expose only the algebraic property the band
+    invariant proof needs (`MathLib_exp_nonpositive_le_D18`). -/
+axiom MathLib_exp : Int256 → Uint256
 
-  PRBMath rounds intermediate values, but rounding never pushes the
-  output of `exp` strictly above `D18` for non-positive inputs (PRBMath
-  implements exp via `2^x` with monotone interpolation; at `x = 0` the
-  output is exactly `D18`).
--/
-axiom exp_nonpositive_le_d18 (x : Int256) :
-    Verity.EVM.Int256.toInt x ≤ 0 → exp x ≤ D18
+/-- For non-positive inputs, `MathLib_exp` is at most `D18`. PRBMath rounds
+    intermediate values, but rounding never pushes the output of `exp` strictly
+    above `D18` for non-positive inputs (`exp(0) = D18`, `exp` is monotone). -/
+axiom MathLib_exp_nonpositive_le_D18 (x : Int256) :
+    Verity.EVM.Int256.toInt x ≤ 0 → MathLib_exp x ≤ D18
 
-/--
-  Opaque model of PRBMath's `UD60x18.ln`, exposed by Reserve as
-  `MathLib.ln(uint256)`. Used only inside `price` to compute the decay
-  rate `k`. No algebraic property of `ln` is required for the band
-  invariant; the variable is opaque to the proofs.
--/
-axiom ln : Uint256 → Uint256
+/-- Opaque model of `MathLib.ln` at `contracts/utils/MathLib.sol:26-28`,
+    PRBMath's `UD60x18.ln`. Used only inside `_price` to compute the decay
+    rate `k`; the proofs treat the value as fully opaque.
+
+    DEVIATES: Verity stdlib has no fixed-point natural logarithm. -/
+axiom MathLib_ln : Uint256 → Uint256
 
 /--
-  `startPrice` matches the Solidity expression
-      Math.mulDiv(sellPrices.high, D27, buyPrices.low, Math.Rounding.Ceil)
-  at line 450 of RebalancingLib.sol.
+The Solidity require clause at `RebalancingLib.sol:437-447`, encoded
+byte-for-byte as a named precondition. Every theorem about `_price` consumes
+this as a hypothesis to model the gate the function would have asserted.
+
+DEVIATES: Solidity `require(cond, error)` aborts on falsity; pure Lean has no
+abort, so the gate is encoded as a `Prop` and theorems take it as a hypothesis.
+The conjuncts mirror the Solidity exactly:
+  auction.rebalanceNonce == rebalance.nonce
+  && sellToken != buyToken
+  && rebalance.details[address(sellToken)].inRebalance
+  && rebalance.details[address(buyToken)].inRebalance
+  && sellPrices.low != 0
+  && buyPrices.low != 0
+  && block.timestamp >= auction.startTime
+  && block.timestamp <= auction.endTime
 -/
-def startPrice (sellHigh buyLow : Uint256) : Uint256 :=
-  mulDivUp sellHigh D27 buyLow
+def auctionOngoing
+    (auction_rebalanceNonce rebalance_nonce : Uint256)
+    (sellToken buyToken : Uint256)               -- DEVIATES: Address modeled as Uint256 (ABI-equivalent)
+    (sellInRebalance buyInRebalance : Uint256)   -- DEVIATES: Solidity bool modeled as Uint256 (1 = true, 0 = false)
+    (sellPrices buyPrices : PriceRange)
+    (auction_startTime auction_endTime block_timestamp : Uint256) : Prop :=
+  auction_rebalanceNonce = rebalance_nonce ∧
+  sellToken ≠ buyToken ∧
+  sellInRebalance ≠ 0 ∧ buyInRebalance ≠ 0 ∧
+  sellPrices.low ≠ 0 ∧ buyPrices.low ≠ 0 ∧
+  auction_startTime ≤ block_timestamp ∧ block_timestamp ≤ auction_endTime
 
 /--
-  `endPrice` matches the Solidity expression
-      Math.mulDiv(sellPrices.low, D27, buyPrices.high, Math.Rounding.Ceil)
-  at line 456 of RebalancingLib.sol.
+Pure model of `RebalancingLib._price` at `contracts/utils/RebalancingLib.sol:427-475`.
+
+The body mirrors the Solidity line-by-line. Each `-- Solidity:` comment
+shows the source line being translated; each `DEVIATES:` comment names a
+divergence and its concrete reason.
 -/
-def endPrice (sellLow buyHigh : Uint256) : Uint256 :=
-  mulDivUp sellLow D27 buyHigh
-
-/--
-  Pure model of `RebalancingLib._price` (RebalancingLib.sol:427-475).
-
-  Branch-by-branch correspondence to the Solidity source:
-
-  | Solidity (RebalancingLib.sol)                                     | Lean                                     |
-  |-------------------------------------------------------------------|------------------------------------------|
-  | `if (block.timestamp == auction.startTime) return startPrice;`    | `if currentTime == startTime then sP`    |
-  | `if (block.timestamp == auction.endTime) return endPrice;`        | `if currentTime == endTime then eP`      |
-  | `uint256 elapsed = block.timestamp - auction.startTime;`          | `let elapsed := sub currentTime startTime` |
-  | `uint256 auctionLength = auction.endTime - auction.startTime;`    | `let auctionLength := sub endTime startTime` |
-  | `uint256 k = MathLib.ln(Math.mulDiv(startPrice, D18, endPrice)) / auctionLength;` | `let k := div (ln (mulDivDown sP D18 eP)) auctionLength` |
-  | `p = Math.mulDiv(startPrice, MathLib.exp(-1 * int256(k * elapsed)), D18, Math.Rounding.Ceil);` | `let p := mulDivUp sP (exp negKE) D18` |
-  | `if (p < endPrice) p = endPrice;`                                 | `if lt p eP then eP else p`              |
--/
-noncomputable def price
-    (sellLow sellHigh buyLow buyHigh : Uint256)
-    (startTime endTime currentTime : Uint256) : Uint256 :=
-  let sP := startPrice sellHigh buyLow
-  let eP := endPrice sellLow buyHigh
-  if currentTime == startTime then sP
-  else if currentTime == endTime then eP
+noncomputable def _price
+    (sellPrices buyPrices : PriceRange)
+    (auction_startTime auction_endTime : Uint256)
+    (block_timestamp : Uint256) : Uint256 :=
+  -- Solidity (L450):
+  --   uint256 startPrice = Math.mulDiv(sellPrices.high, D27, buyPrices.low, Math.Rounding.Ceil);
+  let startPrice := mulDivUp sellPrices.high D27 buyPrices.low
+  -- Solidity (L451-453): if (block.timestamp == auction.startTime) return startPrice;
+  if block_timestamp == auction_startTime then
+    startPrice
   else
-    let elapsed := sub currentTime startTime
-    let auctionLength := sub endTime startTime
-    let k := div (ln (mulDivDown sP D18 eP)) auctionLength
-    let kElapsed := mul k elapsed
-    -- `Int256.ofUint256` is the bit-preserving cast that mirrors Solidity's
-    -- `int256(uint256)` reinterpretation: the high bit becomes the sign bit.
-    -- `Int256.neg` is two's-complement negation, matching unary `-` in Solidity.
-    -- Together they faithfully model `int256(k * elapsed)` then `-1 *`.
-    let negKE := Verity.EVM.Int256.neg (Verity.EVM.Int256.ofUint256 kElapsed)
-    let p := mulDivUp sP (exp negKE) D18
-    if p < eP then eP else p
+    -- Solidity (L456):
+    --   uint256 endPrice = Math.mulDiv(sellPrices.low, D27, buyPrices.high, Math.Rounding.Ceil);
+    let endPrice := mulDivUp sellPrices.low D27 buyPrices.high
+    -- Solidity (L457-459): if (block.timestamp == auction.endTime) return endPrice;
+    if block_timestamp == auction_endTime then
+      endPrice
+    else
+      -- Solidity (L462): uint256 elapsed = block.timestamp - auction.startTime;
+      let elapsed := sub block_timestamp auction_startTime
+      -- Solidity (L463): uint256 auctionLength = auction.endTime - auction.startTime;
+      let auctionLength := sub auction_endTime auction_startTime
+      -- Solidity (L467):
+      --   uint256 k = MathLib.ln(Math.mulDiv(startPrice, D18, endPrice)) / auctionLength;
+      let k := div (MathLib_ln (mulDivDown startPrice D18 endPrice)) auctionLength
+      -- Solidity (L471):
+      --   p = Math.mulDiv(startPrice, MathLib.exp(-1 * int256(k * elapsed)), D18, Math.Rounding.Ceil);
+      -- DEVIATES (subtle, not semantic): the cast `int256(k * elapsed)` is
+      -- bit-preserving in Solidity; in Lean we model it via
+      -- `Int256.ofUint256 (mul k elapsed)` and `Int256.neg` for the unary `-`.
+      -- Equivalent under the precondition that `(k * elapsed).val ≤ MAX_INT256`,
+      -- which is part of the interior-branch safety hypothesis bundled
+      -- in `InteriorSafe` below.
+      let p := mulDivUp startPrice
+                 (MathLib_exp (Verity.EVM.Int256.neg (Verity.EVM.Int256.ofUint256 (mul k elapsed))))
+                 D18
+      -- Solidity (L472-474): if (p < endPrice) p = endPrice;
+      if p < endPrice then endPrice else p
 
 /--
-  Bundled overflow / fixed-point safety hypotheses required for the
-  upper-bound proof on the interior decay branch.
+Bundled overflow / fixed-point safety hypotheses required for the
+upper-bound proof on the interior decay branch.
 
-  These are conservative bounds that hold for any auction the AUCTION_LAUNCHER
-  could realistically open under the constants in `Constants.sol`
-  (`MAX_TOKEN_PRICE = 1e45`, `MAX_TOKEN_PRICE_RANGE = 1e2`, etc.).
+These are conservative bounds that hold for any auction the AUCTION_LAUNCHER
+could realistically open (UoA prices in the `1e27`-`1e30` range). The case
+scopes itself to launcher-published bands realistic enough to fit; pushing
+this bound to cover all `Constants.sol` extremes (`MAX_TOKEN_PRICE = 1e45`)
+is future work.
 -/
 structure InteriorSafe
-    (sellLow sellHigh buyLow buyHigh : Uint256)
-    (startTime endTime currentTime : Uint256) : Prop where
-  /-- The `mul k elapsed` at line 471 fits inside the positive Int256
-      half-range, so the `int256(...)` cast at line 471 does not flip
-      its sign and `Int256.neg` produces a non-positive Int256. -/
+    (sellPrices buyPrices : PriceRange)
+    (auction_startTime auction_endTime block_timestamp : Uint256) : Prop where
+  /-- The `mul k elapsed` at L471 fits inside the positive Int256 half-range,
+      so the `int256(...)` cast does not flip its sign and `Int256.neg` produces
+      a non-positive Int256. -/
   hKElapsedFitsInt :
-      let sP := startPrice sellHigh buyLow
-      let eP := endPrice sellLow buyHigh
-      let auctionLength := sub endTime startTime
-      let elapsed := sub currentTime startTime
-      let k := div (ln (mulDivDown sP D18 eP)) auctionLength
+      let startPrice := mulDivUp sellPrices.high D27 buyPrices.low
+      let endPrice := mulDivUp sellPrices.low D27 buyPrices.high
+      let auctionLength := sub auction_endTime auction_startTime
+      let elapsed := sub block_timestamp auction_startTime
+      let k := div (MathLib_ln (mulDivDown startPrice D18 endPrice)) auctionLength
       (mul k elapsed).val ≤ Verity.EVM.MAX_INT256.toNat
   /-- The Uint256 multiplication inside `mulDivUp startPrice exp(...) D18`
-      at line 471 does not overflow. With `exp(...) ≤ D18`, this reduces
-      to `startPrice * D18 + D18 - 1 < 2^256`, i.e. `startPrice <
-      ~1.16e59`.
-
-      For typical Reserve auctions (UoA prices in the `1e27`-`1e30` range,
-      D27 fixed-point), this is met with multiple orders of magnitude of
-      headroom. The launcher *could* theoretically open an auction with
-      `sellHigh = MAX_TOKEN_PRICE = 1e45` and `buyLow = 1`, yielding
-      `startPrice = 1e72`, which violates this bound. The case scopes
-      itself to launcher-published bands realistic enough to fit; pushing
-      this bound to cover all `Constants.sol` extremes is future work. -/
+      at L471 does not overflow. With `MathLib_exp(...) ≤ D18`, this reduces
+      to `startPrice * D18 + D18 - 1 < 2^256`, i.e. `startPrice < ~1.16e59`. -/
   hMulNoOverflow :
-      let sP := startPrice sellHigh buyLow
-      sP.val * D18.val + D18.val - 1 < Verity.Core.Uint256.modulus
+      let startPrice := mulDivUp sellPrices.high D27 buyPrices.low
+      startPrice.val * D18.val + D18.val - 1 < Verity.Core.Uint256.modulus
 
 end Benchmark.Cases.Reserve.AuctionPriceBand

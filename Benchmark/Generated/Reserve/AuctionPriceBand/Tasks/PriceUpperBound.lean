@@ -4,17 +4,21 @@ namespace Benchmark.Cases.Reserve.AuctionPriceBand
 
 open Verity
 open Verity.EVM.Uint256
+open Verity.Stdlib.Math
 
 /--
-The band invariant upper bound: `price ≤ startPrice` for any timestamp,
+Band invariant upper bound: `p ≤ startPrice` for any timestamp,
 given a well-formed band and the interior-branch overflow / fixed-point
 safety bounds bundled in `InteriorSafe`.
 -/
 theorem price_upper_bound
-    (sellLow sellHigh buyLow buyHigh startTime endTime currentTime : Uint256)
-    (hBand : endPrice sellLow buyHigh ≤ startPrice sellHigh buyLow)
-    (hSafe : InteriorSafe sellLow sellHigh buyLow buyHigh startTime endTime currentTime) :
-    price_upper_bound_spec sellLow sellHigh buyLow buyHigh startTime endTime currentTime := by
+    (sellPrices buyPrices : PriceRange)
+    (auction_startTime auction_endTime block_timestamp : Uint256)
+    (hBand :
+      mulDivUp sellPrices.low D27 buyPrices.high
+        ≤ mulDivUp sellPrices.high D27 buyPrices.low)
+    (hSafe : InteriorSafe sellPrices buyPrices auction_startTime auction_endTime block_timestamp) :
+    price_upper_bound_spec sellPrices buyPrices auction_startTime auction_endTime block_timestamp := by
   exact ?_
 
 end Benchmark.Cases.Reserve.AuctionPriceBand

@@ -6,12 +6,14 @@ open Verity
 open Verity.EVM.Uint256
 
 /--
-At `currentTime = endTime` and `startTime ≠ endTime`, `_price` returns `endPrice`.
+At `block_timestamp = auction_endTime` and `auction_startTime ≠ auction_endTime`,
+`_price` returns `endPrice`.
 -/
 theorem price_at_end_time
-    (sellLow sellHigh buyLow buyHigh startTime endTime : Uint256)
-    (hStartNeEnd : startTime ≠ endTime) :
-    price_at_end_time_spec sellLow sellHigh buyLow buyHigh startTime endTime := by
+    (sellPrices buyPrices : PriceRange)
+    (auction_startTime auction_endTime : Uint256)
+    (hStartNeEnd : auction_startTime ≠ auction_endTime) :
+    price_at_end_time_spec sellPrices buyPrices auction_startTime auction_endTime := by
   exact ?_
 
 end Benchmark.Cases.Reserve.AuctionPriceBand

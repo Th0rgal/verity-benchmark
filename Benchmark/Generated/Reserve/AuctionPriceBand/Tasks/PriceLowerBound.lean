@@ -4,15 +4,19 @@ namespace Benchmark.Cases.Reserve.AuctionPriceBand
 
 open Verity
 open Verity.EVM.Uint256
+open Verity.Stdlib.Math
 
 /--
-The band invariant lower bound: `endPrice ≤ price` for any timestamp,
+Band invariant lower bound: `endPrice ≤ p` for any timestamp,
 given a well-formed band `endPrice ≤ startPrice`.
 -/
 theorem price_lower_bound
-    (sellLow sellHigh buyLow buyHigh startTime endTime currentTime : Uint256)
-    (hBand : endPrice sellLow buyHigh ≤ startPrice sellHigh buyLow) :
-    price_lower_bound_spec sellLow sellHigh buyLow buyHigh startTime endTime currentTime := by
+    (sellPrices buyPrices : PriceRange)
+    (auction_startTime auction_endTime block_timestamp : Uint256)
+    (hBand :
+      mulDivUp sellPrices.low D27 buyPrices.high
+        ≤ mulDivUp sellPrices.high D27 buyPrices.low) :
+    price_lower_bound_spec sellPrices buyPrices auction_startTime auction_endTime block_timestamp := by
   exact ?_
 
 end Benchmark.Cases.Reserve.AuctionPriceBand
