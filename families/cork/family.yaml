@@ -1,0 +1,16 @@
+manifest_kind: family
+schema_version: 1
+family_id: cork
+display_name: Cork Protocol
+split: active
+status: active
+description: >
+  Benchmark family for Cork Protocol (Phoenix version) covering pool solvency
+  invariants from the Certora formal verification report (September-December 2025).
+  Targets the P-02 solvency gap where Certora timed out on unwindExerciseOther.
+implementation_ids:
+  - phoenix
+case_ids:
+  - cork/pool_solvency
+source_languages:
+  - solidity
