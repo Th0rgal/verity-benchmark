@@ -8,7 +8,7 @@ implementation_id: v3
 stage: build_green
 translation_status: translated
 spec_status: frozen
-proof_status: in_progress
+proof_status: complete
 upstream_repo: https://github.com/alchemix-finance/v3
 upstream_commit: 117c95b6ee11a75221d6fbdc79f16ac6acdb96f5
 original_contract_path: src/AlchemistV3.sol

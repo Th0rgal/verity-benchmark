@@ -16,7 +16,7 @@ This report is generated from the benchmark manifests.
 ### `alchemix/earmark_conservation`
 - Family / implementation: `alchemix` / `v3`
 - Stage: `build_green`
-- Status dimensions: translation=`translated`, spec=`frozen`, proof=`in_progress`
+- Status dimensions: translation=`translated`, spec=`frozen`, proof=`complete`
 - Lean target: `Benchmark.Cases.Alchemix.EarmarkConservation.Compile`
 - Source ref: `https://github.com/alchemix-finance/v3@117c95b6ee11a75221d6fbdc79f16ac6acdb96f5:src/AlchemistV3.sol`
 - Selected functions: `_earmark`, `_sync`, `_computeUnrealizedAccount`, `redeem`, `_subEarmarkedDebt`, `_subDebt`
@@ -141,7 +141,7 @@ This report is generated from the benchmark manifests.
 
 ### `alchemix/earmark_conservation/earmark_preserves_invariant`
 - Track / property class / proof family: `proof-only` / `accounting_conservation` / `state_preservation_local_effects`
-- Readiness: prompt_context=`ready`, editable_proof=`blocked`, reference_solution=`blocked`
+- Readiness: prompt_context=`ready`, editable_proof=`ready`, reference_solution=`ready`
 - Theorem target: `Benchmark.Cases.Alchemix.EarmarkConservation._earmark_preserves_invariant`
 - Evaluation: engine=`lean_proof_generation`, target_kind=`proof_generation`
 - Implementation files: `cases/alchemix/earmark_conservation/verity/Contract.lean`, `Benchmark/Cases/Alchemix/EarmarkConservation/Contract.lean`
@@ -151,7 +151,7 @@ This report is generated from the benchmark manifests.
 
 ### `alchemix/earmark_conservation/redeem_preserves_invariant`
 - Track / property class / proof family: `proof-only` / `accounting_conservation` / `state_preservation_local_effects`
-- Readiness: prompt_context=`ready`, editable_proof=`blocked`, reference_solution=`blocked`
+- Readiness: prompt_context=`ready`, editable_proof=`ready`, reference_solution=`ready`
 - Theorem target: `Benchmark.Cases.Alchemix.EarmarkConservation.redeem_preserves_invariant`
 - Evaluation: engine=`lean_proof_generation`, target_kind=`proof_generation`
 - Implementation files: `cases/alchemix/earmark_conservation/verity/Contract.lean`, `Benchmark/Cases/Alchemix/EarmarkConservation/Contract.lean`
@@ -161,7 +161,7 @@ This report is generated from the benchmark manifests.
 
 ### `alchemix/earmark_conservation/sub_debt_preserves_invariant`
 - Track / property class / proof family: `proof-only` / `accounting_conservation` / `state_preservation_local_effects`
-- Readiness: prompt_context=`ready`, editable_proof=`blocked`, reference_solution=`blocked`
+- Readiness: prompt_context=`ready`, editable_proof=`ready`, reference_solution=`ready`
 - Theorem target: `Benchmark.Cases.Alchemix.EarmarkConservation._subDebt_preserves_invariant`
 - Evaluation: engine=`lean_proof_generation`, target_kind=`proof_generation`
 - Implementation files: `cases/alchemix/earmark_conservation/verity/Contract.lean`, `Benchmark/Cases/Alchemix/EarmarkConservation/Contract.lean`
@@ -171,7 +171,7 @@ This report is generated from the benchmark manifests.
 
 ### `alchemix/earmark_conservation/sub_earmarked_debt_preserves_invariant`
 - Track / property class / proof family: `proof-only` / `accounting_conservation` / `state_preservation_local_effects`
-- Readiness: prompt_context=`ready`, editable_proof=`blocked`, reference_solution=`blocked`
+- Readiness: prompt_context=`ready`, editable_proof=`ready`, reference_solution=`ready`
 - Theorem target: `Benchmark.Cases.Alchemix.EarmarkConservation._subEarmarkedDebt_preserves_invariant`
 - Evaluation: engine=`lean_proof_generation`, target_kind=`proof_generation`
 - Implementation files: `cases/alchemix/earmark_conservation/verity/Contract.lean`, `Benchmark/Cases/Alchemix/EarmarkConservation/Contract.lean`
@@ -181,7 +181,7 @@ This report is generated from the benchmark manifests.
 
 ### `alchemix/earmark_conservation/sync_account_preserves_invariant`
 - Track / property class / proof family: `proof-only` / `accounting_conservation` / `state_preservation_local_effects`
-- Readiness: prompt_context=`ready`, editable_proof=`blocked`, reference_solution=`blocked`
+- Readiness: prompt_context=`ready`, editable_proof=`ready`, reference_solution=`ready`
 - Theorem target: `Benchmark.Cases.Alchemix.EarmarkConservation._sync_preserves_invariant`
 - Evaluation: engine=`lean_proof_generation`, target_kind=`proof_generation`
 - Implementation files: `cases/alchemix/earmark_conservation/verity/Contract.lean`, `Benchmark/Cases/Alchemix/EarmarkConservation/Contract.lean`

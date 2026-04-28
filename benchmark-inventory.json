@@ -17,7 +17,7 @@
     "active_task_count": 85,
     "backlog_task_count": 8,
     "buildable_case_count": 14,
-    "runnable_task_count": 88,
+    "runnable_task_count": 93,
     "case_stage_counts": {
       "build_green": 12,
       "candidate": 2,
@@ -29,8 +29,7 @@
     },
     "proof_status_counts": {
       "blocked": 2,
-      "complete": 6,
-      "in_progress": 1,
+      "complete": 7,
       "partial": 7
     },
     "task_track_counts": {
@@ -628,7 +627,7 @@
       "stage": "build_green",
       "translation_status": "translated",
       "spec_status": "frozen",
-      "proof_status": "in_progress",
+      "proof_status": "complete",
       "source_language": "solidity",
       "upstream_repo": "https://github.com/alchemix-finance/v3",
       "upstream_commit": "117c95b6ee11a75221d6fbdc79f16ac6acdb96f5",
@@ -1335,7 +1334,7 @@
       "theorem_name": "Benchmark.Cases.Alchemix.EarmarkConservation._earmark_preserves_invariant",
       "proof_family": "state_preservation_local_effects",
       "translation_status": "translated",
-      "proof_status": "in_progress",
+      "proof_status": "complete",
       "implementation_files": [
         "cases/alchemix/earmark_conservation/verity/Contract.lean",
         "Benchmark/Cases/Alchemix/EarmarkConservation/Contract.lean"
@@ -1360,8 +1359,8 @@
       },
       "readiness": {
         "prompt_context": "ready",
-        "editable_proof": "blocked",
-        "reference_solution": "blocked"
+        "editable_proof": "ready",
+        "reference_solution": "ready"
       }
     },
     {
@@ -1383,7 +1382,7 @@
       "theorem_name": "Benchmark.Cases.Alchemix.EarmarkConservation.redeem_preserves_invariant",
       "proof_family": "state_preservation_local_effects",
       "translation_status": "translated",
-      "proof_status": "in_progress",
+      "proof_status": "complete",
       "implementation_files": [
         "cases/alchemix/earmark_conservation/verity/Contract.lean",
         "Benchmark/Cases/Alchemix/EarmarkConservation/Contract.lean"
@@ -1408,8 +1407,8 @@
       },
       "readiness": {
         "prompt_context": "ready",
-        "editable_proof": "blocked",
-        "reference_solution": "blocked"
+        "editable_proof": "ready",
+        "reference_solution": "ready"
       }
     },
     {
@@ -1431,7 +1430,7 @@
       "theorem_name": "Benchmark.Cases.Alchemix.EarmarkConservation._subDebt_preserves_invariant",
       "proof_family": "state_preservation_local_effects",
       "translation_status": "translated",
-      "proof_status": "in_progress",
+      "proof_status": "complete",
       "implementation_files": [
         "cases/alchemix/earmark_conservation/verity/Contract.lean",
         "Benchmark/Cases/Alchemix/EarmarkConservation/Contract.lean"
@@ -1456,8 +1455,8 @@
       },
       "readiness": {
         "prompt_context": "ready",
-        "editable_proof": "blocked",
-        "reference_solution": "blocked"
+        "editable_proof": "ready",
+        "reference_solution": "ready"
       }
     },
     {
@@ -1479,7 +1478,7 @@
       "theorem_name": "Benchmark.Cases.Alchemix.EarmarkConservation._subEarmarkedDebt_preserves_invariant",
       "proof_family": "state_preservation_local_effects",
       "translation_status": "translated",
-      "proof_status": "in_progress",
+      "proof_status": "complete",
       "implementation_files": [
         "cases/alchemix/earmark_conservation/verity/Contract.lean",
         "Benchmark/Cases/Alchemix/EarmarkConservation/Contract.lean"
@@ -1504,8 +1503,8 @@
       },
       "readiness": {
         "prompt_context": "ready",
-        "editable_proof": "blocked",
-        "reference_solution": "blocked"
+        "editable_proof": "ready",
+        "reference_solution": "ready"
       }
     },
     {
@@ -1527,7 +1526,7 @@
       "theorem_name": "Benchmark.Cases.Alchemix.EarmarkConservation._sync_preserves_invariant",
       "proof_family": "state_preservation_local_effects",
       "translation_status": "translated",
-      "proof_status": "in_progress",
+      "proof_status": "complete",
       "implementation_files": [
         "cases/alchemix/earmark_conservation/verity/Contract.lean",
         "Benchmark/Cases/Alchemix/EarmarkConservation/Contract.lean"
@@ -1552,8 +1551,8 @@
       },
       "readiness": {
         "prompt_context": "ready",
-        "editable_proof": "blocked",
-        "reference_solution": "blocked"
+        "editable_proof": "ready",
+        "reference_solution": "ready"
       }
     },
     {
@@ -5522,5 +5521,5 @@
       }
     }
   ],
-  "generated_at": "2026-04-28T16:28:27.526323+00:00"
+  "generated_at": "2026-04-28T17:34:17.541206+00:00"
 }

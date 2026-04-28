@@ -14,7 +14,7 @@ difficulty: easy
 category: lazy_accrual_invariant
 track: proof-only
 translation_status: translated
-proof_status: in_progress
+proof_status: complete
 evaluation_engine: lean_proof_generation
 implementation_files:
   - cases/alchemix/earmark_conservation/verity/Contract.lean

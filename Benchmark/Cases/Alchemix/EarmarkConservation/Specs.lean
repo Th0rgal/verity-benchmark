@@ -248,4 +248,70 @@ def _subDebt_preserves_invariant_spec
 def cumulativeEarmarked_le_totalDebt_spec (s : ContractState) : Prop :=
   cumulativeEarmarked s ≤ totalDebt s
 
+/-! ## Pure helpers from the contract bodies
+
+  These mirror the values that `redeem` / `_earmark` compute internally
+  from the contract state. They are spec-level pure functions; the
+  reference proof reads them off the contract body via the slot-write
+  lemmas. Exposed at the spec surface so theorem hypotheses can name
+  them without dragging in `Proofs.lean`.
+-/
+
+/-- `ratioApplied` chosen by `redeem(amount)`. -/
+def redeem_ratioApplied (amount cumulativeEarmarked_ : Uint256) : Uint256 :=
+  let amountClamped := ite (amount > cumulativeEarmarked_) cumulativeEarmarked_ amount
+  let ratioWantedRaw :=
+    div (mul (sub cumulativeEarmarked_ amountClamped) ONE_Q128) cumulativeEarmarked_
+  ite (amountClamped == cumulativeEarmarked_) 0 ratioWantedRaw
+
+/-- `active` flag for `redeem(amount)`. -/
+def redeem_active (amount cumulativeEarmarked_ : Uint256) : Bool :=
+  let amountClamped := ite (amount > cumulativeEarmarked_) cumulativeEarmarked_ amount
+  cumulativeEarmarked_ != 0 && amountClamped != 0
+
+/-- `ratioApplied` chosen by `_earmark()`. -/
+def _earmark_ratioApplied
+    (totalDebt_ cumulativeEarmarked_ amountIn : Uint256) : Uint256 :=
+  let liveUnearmarked := sub totalDebt_ cumulativeEarmarked_
+  let amount := ite (amountIn > liveUnearmarked) liveUnearmarked amountIn
+  let ratioWantedRaw :=
+    div (mul (sub liveUnearmarked amount) ONE_Q128) liveUnearmarked
+  ite (amount == liveUnearmarked) 0 ratioWantedRaw
+
+/-- `active` flag for `_earmark()`. -/
+def _earmark_active
+    (totalDebt_ cumulativeEarmarked_ amountIn : Uint256) : Bool :=
+  let liveUnearmarked := sub totalDebt_ cumulativeEarmarked_
+  let amount := ite (amountIn > liveUnearmarked) liveUnearmarked amountIn
+  totalDebt_ != 0 && amount != 0 && liveUnearmarked != 0
+
+/-- `effectiveEarmarked` from `_earmark()`. -/
+def _earmark_effectiveEarmarked
+    (totalDebt_ cumulativeEarmarked_ amountIn : Uint256) : Uint256 :=
+  let liveUnearmarked := sub totalDebt_ cumulativeEarmarked_
+  let ratioApplied := _earmark_ratioApplied totalDebt_ cumulativeEarmarked_ amountIn
+  sub liveUnearmarked (mulQ128 liveUnearmarked ratioApplied)
+
+/-- Per-id Q128-projected live unearmarked exposure weighted through the
+    redemption-window survival. Appears in the parallel-debt-conservation
+    bridging hypothesis for `_earmark_preserves_invariant`. -/
+def earmark_unearmarkedTimesRSR (s : ContractState) (id : Uint256) : Uint256 :=
+  let eW    := _earmarkWeight s
+  let rW    := _redemptionWeight s
+  let lastEW := accounts_lastAccruedEarmarkWeight s id
+  let lastRW := accounts_lastAccruedRedemptionWeight s id
+  let dbt    := accounts_debt s id
+  let earm   := accounts_earmarked s id
+  let unearmarkSurvivalRatio :=
+    if lastEW = eW then ONE_Q128
+    else if lastEW = 0 then ONE_Q128
+    else divQ128 eW lastEW
+  let redemptionSurvivalRatio :=
+    if lastRW = rW then ONE_Q128
+    else if lastRW = 0 then ONE_Q128
+    else divQ128 rW lastRW
+  let userExposure := if dbt > earm then sub dbt earm else 0
+  let unearmarkedRemaining := mulQ128 userExposure unearmarkSurvivalRatio
+  mulQ128 unearmarkedRemaining redemptionSurvivalRatio
+
 end Benchmark.Cases.Alchemix.EarmarkConservation
