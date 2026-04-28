@@ -1,0 +1,35 @@
+manifest_kind: task
+schema_version: 1
+task_id: price_upper_bound
+case_id: reserve/auction_price_band
+split: active
+family_id: reserve
+implementation_id: dtfs
+source_ref: https://github.com/reserve-protocol/dtfs@14f75d18856d587adfaff24e77e5b20dda7c7267:contracts/utils/RebalancingLib.sol
+task_interface_version: 2
+theorem_name: Benchmark.Cases.Reserve.AuctionPriceBand.price_upper_bound
+proof_family: functional_correctness
+property_class: price_band
+difficulty: hard
+category: arithmetic-invariant
+track: proof-only
+translation_status: translated
+proof_status: partial
+evaluation_engine: lean_proof_generation
+implementation_files:
+  - cases/reserve/auction_price_band/verity/Contract.lean
+  - Benchmark/Cases/Reserve/AuctionPriceBand/Contract.lean
+specification_files:
+  - cases/reserve/auction_price_band/verity/Specs.lean
+  - Benchmark/Cases/Reserve/AuctionPriceBand/Specs.lean
+editable_files:
+  - Benchmark/Generated/Reserve/AuctionPriceBand/Tasks/PriceUpperBound.lean
+reference_solution_module: Benchmark.Cases.Reserve.AuctionPriceBand.Proofs
+reference_solution_declaration: Benchmark.Cases.Reserve.AuctionPriceBand.price_upper_bound
+abstraction_level: protocol_slice
+abstraction_notes: >
+  Upper band: `price ≤ startPrice` for any timestamp. Relies on the
+  axiom `exp_nonpositive_le_d18` (declared in Contract.lean) plus
+  `mulDivUp` ceiling-division algebra to discharge the interior branch.
+  Phase 3 proving target.
+unsupported_feature_codes: []

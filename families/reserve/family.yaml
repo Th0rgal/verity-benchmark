@@ -1,0 +1,16 @@
+manifest_kind: family
+schema_version: 1
+family_id: reserve
+display_name: Reserve
+split: active
+status: active
+description: >
+  Active benchmark family for Reserve DTF Protocol slices, focused on
+  proving arithmetic and behavioral properties over the rebalance and
+  auction surfaces of the production Folio contracts.
+implementation_ids:
+  - dtfs
+case_ids:
+  - reserve/auction_price_band
+source_languages:
+  - solidity
