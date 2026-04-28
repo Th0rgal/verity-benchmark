@@ -154,6 +154,19 @@ Group by theme (e.g. "missing DSL bind source", "packed storage", "external call
 **Do not create issues on the Verity repository.** These are proposals only. The user
 will review them in 2e and decide which ones to actually file.
 
+**Before proposing any gap as a Verity issue,** check the Verity repository for existing
+coverage. This is not just an issue search — check ALL of:
+- Open issues (`gh issue list --repo lfglabs-dev/verity --search "<keyword>"`)
+- Open PRs (`gh pr list --repo lfglabs-dev/verity --search "<keyword>"`)
+- Recently merged PRs that may have landed the feature
+- Umbrella/tracking issues (e.g. Solidity feature parity) and their comments for
+  scope updates mentioning the gap
+- The roadmap docs in the Verity repo (`docs/ROADMAP.md`, `LANGUAGE_DESIGN_AXES.md`)
+
+If the gap is already tracked, reference the existing issue instead of proposing a new
+one. If it's tracked but the specific use case adds new information, propose a comment
+on the existing issue rather than a duplicate.
+
 ### 2d. Build the scaffold
 
 ```bash
@@ -176,8 +189,10 @@ checks:
 1. **Are the claimed Verity gaps legitimate?** For each gap listed in 2c, verify by
    reading the actual Verity source in `.lake/packages/verity/`, any repo-local or
    user-provided fork (e.g. `.context/lfglabs-verity`), and
-   [veritylang.com](https://veritylang.com). Also check open issues and PRs on the
-   Verity repo — the feature may already be in progress.
+   [veritylang.com](https://veritylang.com). Also check the Verity repo for existing
+   coverage: open issues, open PRs, recently merged PRs, umbrella tracking issues
+   and their comments, and roadmap docs. The feature may already exist, be in
+   progress, or be tracked under a different name.
 2. **Is semantics preserved?** Compare the Verity model against the Solidity source
    function-by-function. Flag any place where behavior differs (missing revert path,
    different overflow semantics, dropped external call, etc.).

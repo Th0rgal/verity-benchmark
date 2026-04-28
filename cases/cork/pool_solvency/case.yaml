@@ -1,0 +1,45 @@
+manifest_kind: case
+project: cork
+case_id: pool_solvency
+schema_version: 1
+split: active
+family_id: cork
+implementation_id: phoenix
+stage: build_green
+translation_status: translated
+spec_status: frozen
+proof_status: partial
+upstream_repo: https://github.com/Cork-Technology/phoenix
+upstream_commit: 40d9b173c4b
+original_contract_path: contracts/libraries/PoolLib.sol
+source_ref: https://github.com/Cork-Technology/phoenix@40d9b173c4b:contracts/libraries/PoolLib.sol
+lean_target: Benchmark.Cases.Cork.PoolSolvency.Compile
+spec_target: Benchmark.Cases.Cork.PoolSolvency.Specs
+proof_target: Benchmark.Cases.Cork.PoolSolvency.Proofs
+selected_functions:
+  - previewUnwindExerciseOther
+  - _unwindExercise
+source_language: solidity
+verity_version: 4ebe4931d25e5a1594fcd3f43ff040ecc3c4225a
+lean_toolchain: leanprover/lean4:v4.22.0
+abstraction_level: protocol_slice
+abstraction_tags:
+  - oracle_elided
+  - fee_decay_elided
+  - access_control_elided
+  - token_transfers_elided
+  - decimal_exponentiation_parameterized
+abstraction_notes: >
+  The benchmark isolates the solvency-critical arithmetic of Cork Phoenix
+  unwindExerciseOther. The model captures how cST shares released and net
+  collateral added relate to the solvency invariant. Time-decay fee computation
+  is factored out (net effect preserved). Decimal scale factors are parameterized
+  rather than computed from exponentiation. Oracle rate is a storage parameter.
+  Certora P-02 timed out on this function; this case fills that gap and proves
+  solvency for arbitrary exchange rates and decimal combinations (Certora
+  restricted to rate=1 or 3*1e18, decimals=17/16).
+unsupported_feature_codes: []
+notes: >
+  Cork Phoenix pool solvency slice targeting the Certora P-02 gap.
+  Based on the Certora formal verification report (September-December 2025).
+  P-02 was verified for all functions except unwindExerciseOther (timeout).

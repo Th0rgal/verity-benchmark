@@ -1,0 +1,37 @@
+manifest_kind: task
+schema_version: 1
+task_id: solvency_preserved
+case_id: cork/pool_solvency
+split: active
+family_id: cork
+implementation_id: phoenix
+source_ref: https://github.com/Cork-Technology/phoenix@40d9b173c4b:contracts/libraries/PoolLib.sol
+task_interface_version: 2
+theorem_name: Benchmark.Cases.Cork.PoolSolvency.solvency_preserved
+proof_family: functional_correctness
+property_class: accounting_bound
+difficulty: hard
+category: arithmetic-invariant
+track: proof-only
+translation_status: translated
+proof_status: partial
+evaluation_engine: lean_proof_generation
+implementation_files:
+  - cases/cork/pool_solvency/verity/Contract.lean
+  - Benchmark/Cases/Cork/PoolSolvency/Contract.lean
+specification_files:
+  - cases/cork/pool_solvency/verity/Specs.lean
+  - Benchmark/Cases/Cork/PoolSolvency/Specs.lean
+editable_files:
+  - Benchmark/Generated/Cork/PoolSolvency/Tasks/SolvencyPreserved.lean
+reference_solution_module: Benchmark.Cases.Cork.PoolSolvency.Proofs
+reference_solution_declaration: Benchmark.Cases.Cork.PoolSolvency.solvency_preserved
+abstraction_level: protocol_slice
+abstraction_notes: >
+  Certora P-02 solvency invariant for unwindExerciseOther. After the operation,
+  locked collateral normalized to 18 decimals must still cover the outstanding
+  swap share supply. Requires showing that ceiling-rounded collateral added is
+  at least the floor-rounded shares released, via the ceilDiv sandwich bound.
+  Certora timed out on this function and restricted rate/decimals; this proof
+  covers arbitrary parameters.
+unsupported_feature_codes: []
