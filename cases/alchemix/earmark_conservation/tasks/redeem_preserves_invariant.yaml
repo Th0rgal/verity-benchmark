@@ -8,7 +8,7 @@ implementation_id: v3
 source_ref: https://github.com/alchemix-finance/v3@117c95b6ee11a75221d6fbdc79f16ac6acdb96f5:src/AlchemistV3.sol
 task_interface_version: 2
 theorem_name: Benchmark.Cases.Alchemix.EarmarkConservation.redeem_preserves_invariant
-proof_family: invariant_preservation
+proof_family: state_preservation_local_effects
 property_class: accounting_conservation
 difficulty: hard
 category: lazy_accrual_invariant
