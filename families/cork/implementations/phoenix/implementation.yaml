@@ -1,0 +1,17 @@
+manifest_kind: implementation
+schema_version: 1
+family_id: cork
+implementation_id: phoenix
+display_name: Cork Phoenix
+split: active
+status: translated
+upstream_repo: https://github.com/Cork-Technology/phoenix
+upstream_commit: 40d9b173c4b
+source_language: solidity
+source_artifact_path: contracts/libraries/PoolLib.sol
+case_ids:
+  - cork/pool_solvency
+notes: >
+  Implementation entry for Cork Protocol Phoenix version (v1.1.2),
+  benchmarking the pool solvency invariant (Certora P-02) for the
+  unwindExerciseOther function path.
