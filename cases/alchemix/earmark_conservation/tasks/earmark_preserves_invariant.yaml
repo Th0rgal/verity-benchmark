@@ -7,7 +7,7 @@ family_id: alchemix
 implementation_id: v3
 source_ref: https://github.com/alchemix-finance/v3@117c95b6ee11a75221d6fbdc79f16ac6acdb96f5:src/AlchemistV3.sol
 task_interface_version: 2
-theorem_name: Benchmark.Cases.Alchemix.EarmarkConservation.earmark_preserves_invariant
+theorem_name: Benchmark.Cases.Alchemix.EarmarkConservation._earmark_preserves_invariant
 proof_family: invariant_preservation
 property_class: accounting_conservation
 difficulty: hard
@@ -25,7 +25,7 @@ specification_files:
 editable_files:
   - Benchmark/Generated/Alchemix/EarmarkConservation/Tasks/EarmarkPreservesInvariant.lean
 reference_solution_module: Benchmark.Cases.Alchemix.EarmarkConservation.Proofs
-reference_solution_declaration: Benchmark.Cases.Alchemix.EarmarkConservation.earmark_preserves_invariant
+reference_solution_declaration: Benchmark.Cases.Alchemix.EarmarkConservation._earmark_preserves_invariant
 abstraction_level: protocol_slice
 abstraction_notes: >
   Proves that calling `earmark()` preserves the lazy-projected earmark

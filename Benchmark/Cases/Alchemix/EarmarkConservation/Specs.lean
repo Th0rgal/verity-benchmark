@@ -23,99 +23,128 @@ abbrev FiniteSet := Verity.Core.FiniteSet
   guarantees and is the property whose violation would actually break
   the protocol's collateral accounting.
 
-  Storage layout (from verity_contract AlchemistEarmark):
-    slot 0 : cumulativeEarmarked
-    slot 1 : totalDebt
-    slot 2 : earmarkWeight
-    slot 3 : redemptionWeight
-    slot 4 : survivalAccumulator
-    slot 5 : transmuterEarmarkAmount  (ghost)
+  Storage layout (from verity_contract AlchemistV3):
+    slot 0   : cumulativeEarmarked
+    slot 1   : totalDebt
+    slot 2   : _earmarkWeight
+    slot 3   : _redemptionWeight
+    slot 4   : _survivalAccumulator
+    slot 5   : _transmuterEarmarkAmount  (ghost: abstracts _earmark pre-amble)
 
-    slot 100 : accountDebt[id]
-    slot 101 : accountEarmarked[id]
-    slot 102 : accountLastAccruedEarmarkWeight[id]
-    slot 103 : accountLastAccruedRedemptionWeight[id]
-    slot 104 : accountLastSurvivalAccumulator[id]
+    slot 100 : _accounts[id].debt
+    slot 101 : _accounts[id].earmarked
+    slot 102 : _accounts[id].lastAccruedEarmarkWeight
+    slot 103 : _accounts[id].lastAccruedRedemptionWeight
+    slot 104 : _accounts[id].lastSurvivalAccumulator
 -/
 
 /-! ## Storage accessors (article-readable surface) -/
 
-/-- Global `cumulativeEarmarked` (slot 0). -/
+/-- Models `AlchemistV3.cumulativeEarmarked` (slot 0). -/
 def cumulativeEarmarked (s : ContractState) : Uint256 := s.storage 0
 
-/-- Global `totalDebt` (slot 1). -/
+/-- Models `AlchemistV3.totalDebt` (slot 1). -/
 def totalDebt (s : ContractState) : Uint256 := s.storage 1
 
-/-- Global `_earmarkWeight` (slot 2). -/
-def earmarkWeight (s : ContractState) : Uint256 := s.storage 2
+/-- Models `AlchemistV3._earmarkWeight` (slot 2). -/
+def _earmarkWeight (s : ContractState) : Uint256 := s.storage 2
 
-/-- Global `_redemptionWeight` (slot 3). -/
-def redemptionWeight (s : ContractState) : Uint256 := s.storage 3
+/-- Models `AlchemistV3._redemptionWeight` (slot 3). -/
+def _redemptionWeight (s : ContractState) : Uint256 := s.storage 3
 
-/-- Global `_survivalAccumulator` (slot 4). -/
-def survivalAccumulator (s : ContractState) : Uint256 := s.storage 4
+/-- Models `AlchemistV3._survivalAccumulator` (slot 4). -/
+def _survivalAccumulator (s : ContractState) : Uint256 := s.storage 4
 
-/-- Per-account `account.debt`. -/
-def accountDebt (s : ContractState) (id : Uint256) : Uint256 :=
+/-- Models `AlchemistV3._accounts[id].debt`. -/
+def accounts_debt (s : ContractState) (id : Uint256) : Uint256 :=
   s.storageMapUint 100 id
 
-/-- Per-account `account.earmarked` (the *stored* value; can be stale
-    relative to `cumulativeEarmarked` between syncs — see `projectedEarmarked`
-    for the lazy-projected current value). -/
-def accountEarmarked (s : ContractState) (id : Uint256) : Uint256 :=
+/-- Models `AlchemistV3._accounts[id].earmarked` (the *stored* value; can be
+    stale relative to `cumulativeEarmarked` between syncs — see
+    `_computeUnrealizedAccount` / `projectedEarmarked` for the lazy-projected
+    current value). -/
+def accounts_earmarked (s : ContractState) (id : Uint256) : Uint256 :=
   s.storageMapUint 101 id
 
-/-- Per-account `account.lastAccruedEarmarkWeight`. -/
-def accountLastEarmarkWeight (s : ContractState) (id : Uint256) : Uint256 :=
+/-- Models `AlchemistV3._accounts[id].lastAccruedEarmarkWeight`. -/
+def accounts_lastAccruedEarmarkWeight (s : ContractState) (id : Uint256) : Uint256 :=
   s.storageMapUint 102 id
 
-/-- Per-account `account.lastAccruedRedemptionWeight`. -/
-def accountLastRedemptionWeight (s : ContractState) (id : Uint256) : Uint256 :=
+/-- Models `AlchemistV3._accounts[id].lastAccruedRedemptionWeight`. -/
+def accounts_lastAccruedRedemptionWeight (s : ContractState) (id : Uint256) : Uint256 :=
   s.storageMapUint 103 id
 
 /-! ## Lazy projection — `_computeUnrealizedAccount`
 
-  The Solidity `_computeUnrealizedAccount(account, eW, rW, sA)` returns
-  a triple `(newDebt, newEarmarked, redeemedDebt)`. For the conservation
-  invariant we only need the second component, so we expose
-  `projectedEarmarked` as a single Uint256.
+  The Solidity `_computeUnrealizedAccount(account, eW, rW, sA)`
+  (AlchemistV3.sol:1478-1579) returns a triple
+  `(newDebt, newEarmarked, redeemedDebt)`. For the conservation
+  invariant we only need the second component (`newEarmarked`), but we
+  keep the source name on the function that produces all three so the
+  lineage is obvious. `projectedEarmarked` is the thin extractor used
+  by the invariant.
 
-  This mirrors the within-epoch / within-survival-window path of the
-  Solidity function (lines 1478-1579) — the same path the Contract.lean
-  `syncAccount` function commits to storage. Conservation between the
-  projection and the global is what `_sync` is designed to maintain.
+  Both mirror the within-epoch / within-survival-window path of the
+  Solidity function — the same path that `Contract.lean`'s `_sync`
+  commits to storage. Conservation between the projection and the
+  global is what `_sync` is designed to maintain.
 -/
 
-/-- Lazy-projected earmarked debt for an account at the current global
-    weights, idealized (no Q128 floor-rounding drift).
+/-- Output of `_computeUnrealizedAccount` (Solidity returns a triple).
+    For the invariant we only consume `newEarmarked`. -/
+structure ComputeUnrealizedAccountResult where
+  newDebt : Uint256
+  newEarmarked : Uint256
+  redeemedDebt : Uint256
 
-    Mirrors `_computeUnrealizedAccount(...).newEarmarked` on the
-    within-epoch / within-survival-window path. -/
-def projectedEarmarked (s : ContractState) (id : Uint256) : Uint256 :=
-  let eW := earmarkWeight s
-  let rW := redemptionWeight s
-  let lastEW := accountLastEarmarkWeight s id
-  let lastRW := accountLastRedemptionWeight s id
-  let dbt := accountDebt s id
-  let earm := accountEarmarked s id
+/-- Models `_computeUnrealizedAccount(account, _earmarkWeight,
+    _redemptionWeight, _survivalAccumulator)`
+    (AlchemistV3.sol:1478-1579), within-epoch / within-survival-window
+    telescoped path, idealized (no Q128 floor-rounding drift). -/
+def _computeUnrealizedAccount (s : ContractState) (id : Uint256)
+    : ComputeUnrealizedAccountResult :=
+  let eW    := _earmarkWeight s
+  let rW    := _redemptionWeight s
+  let lastEW := accounts_lastAccruedEarmarkWeight s id
+  let lastRW := accounts_lastAccruedRedemptionWeight s id
+  let dbt    := accounts_debt s id
+  let earm   := accounts_earmarked s id
 
+  -- src: AlchemistV3.sol:1747-1763 — _earmarkSurvivalRatio(lastEW, eW)
   let unearmarkSurvivalQ := div (mul eW ONE_Q128) lastEW
   let unearmarkSurvivalRatio :=
     if lastEW = eW then ONE_Q128
     else if lastEW = 0 then ONE_Q128
     else unearmarkSurvivalQ
 
+  -- src: AlchemistV3.sol:1768-1789 — _redemptionSurvivalRatio(lastRW, rW)
   let redemptionSurvivalQ := div (mul rW ONE_Q128) lastRW
   let redemptionSurvivalRatio :=
     if lastRW = rW then ONE_Q128
     else if lastRW = 0 then ONE_Q128
     else redemptionSurvivalQ
 
+  -- src: AlchemistV3.sol:1489-1497 — userExposure, unearmarkedRemaining, earmarkRaw
   let userExposure := if dbt > earm then sub dbt earm else 0
   let unearmarkedRemaining := div (mul userExposure unearmarkSurvivalRatio) ONE_Q128
   let earmarkRaw := sub userExposure unearmarkedRemaining
+
+  -- src: AlchemistV3.sol:1530+1577 — newEarmarked (telescoped same-epoch)
   let totalEarmarkedNow := add earm earmarkRaw
-  div (mul totalEarmarkedNow redemptionSurvivalRatio) ONE_Q128
+  let newEarmarked := div (mul totalEarmarkedNow redemptionSurvivalRatio) ONE_Q128
+
+  -- src: AlchemistV3.sol:1573-1576 — redeemedTotal, newDebt
+  let redeemedFromAccount := sub totalEarmarkedNow newEarmarked
+  let newDebt := if dbt ≥ redeemedFromAccount then sub dbt redeemedFromAccount else 0
+
+  { newDebt := newDebt
+    newEarmarked := newEarmarked
+    redeemedDebt := redeemedFromAccount }
+
+/-- Lazy-projected earmarked debt for an account, used by the conservation
+    invariant. Equals `_computeUnrealizedAccount(s, id).newEarmarked`. -/
+def projectedEarmarked (s : ContractState) (id : Uint256) : Uint256 :=
+  (_computeUnrealizedAccount s id).newEarmarked
 
 /-! ## The lazy-projected sum -/
 
@@ -135,7 +164,7 @@ def sumProjectedEarmarked (s : ContractState) (ids : FiniteSet Uint256) : Uint25
     in `ids` has been synced at the current global weights. See
     `synced_corollary_spec`. -/
 def sumStoredEarmarked (s : ContractState) (ids : FiniteSet Uint256) : Uint256 :=
-  ids.sum (fun id => accountEarmarked s id)
+  ids.sum (fun id => accounts_earmarked s id)
 
 /-! ## The conservation invariant -/
 
@@ -165,7 +194,7 @@ def earmark_conservation_spec
     `earmark_conservation_spec` together with the assumption of full sync. -/
 def synced_corollary_spec
     (s : ContractState) (ids : FiniteSet Uint256) : Prop :=
-  (∀ id ∈ ids.elements, accountEarmarked s id = projectedEarmarked s id) →
+  (∀ id ∈ ids.elements, accounts_earmarked s id = projectedEarmarked s id) →
   sumStoredEarmarked s ids = cumulativeEarmarked s
 
 /-! ## Per-operation preservation specs
@@ -175,18 +204,18 @@ def synced_corollary_spec
   each operation maps a state satisfying the invariant to a state still
   satisfying it.
 
-  In-scope operations: `earmark`, `syncAccount`, `redeem`,
-  `subEarmarkedDebt`, `subDebt`. (`_computeUnrealizedAccount` is pure
-  read-only — it cannot violate the invariant.)
+  In-scope operations: `_earmark`, `_sync`, `redeem`, `_subEarmarkedDebt`,
+  `_subDebt`. (`_computeUnrealizedAccount` is pure read-only — it cannot
+  violate the invariant.)
 -/
 
-/-- Preservation under `earmark()`. -/
-def earmark_preserves_invariant_spec
+/-- Preservation under `_earmark()`. -/
+def _earmark_preserves_invariant_spec
     (s s' : ContractState) (ids : FiniteSet Uint256) : Prop :=
   earmark_conservation_spec s ids → earmark_conservation_spec s' ids
 
-/-- Preservation under `syncAccount(id)`. -/
-def syncAccount_preserves_invariant_spec
+/-- Preservation under `_sync(tokenId)`. -/
+def _sync_preserves_invariant_spec
     (s s' : ContractState) (ids : FiniteSet Uint256) : Prop :=
   earmark_conservation_spec s ids → earmark_conservation_spec s' ids
 
@@ -195,18 +224,18 @@ def redeem_preserves_invariant_spec
     (s s' : ContractState) (ids : FiniteSet Uint256) : Prop :=
   earmark_conservation_spec s ids → earmark_conservation_spec s' ids
 
-/-- Preservation under `subEarmarkedDebt(amount, accountId)`.
+/-- Preservation under `_subEarmarkedDebt(amountInDebtTokens, accountId)`.
 
     This requires `accountId ∈ ids` — the operation is invariant-preserving
     only when applied to an account that's actually being tracked. -/
-def subEarmarkedDebt_preserves_invariant_spec
+def _subEarmarkedDebt_preserves_invariant_spec
     (s s' : ContractState) (ids : FiniteSet Uint256)
     (accountId : Uint256) : Prop :=
   accountId ∈ ids.elements →
   earmark_conservation_spec s ids → earmark_conservation_spec s' ids
 
-/-- Preservation under `subDebt(tokenId, amount)`. -/
-def subDebt_preserves_invariant_spec
+/-- Preservation under `_subDebt(tokenId, amount)`. -/
+def _subDebt_preserves_invariant_spec
     (s s' : ContractState) (ids : FiniteSet Uint256)
     (tokenId : Uint256) : Prop :=
   tokenId ∈ ids.elements →

@@ -15,12 +15,12 @@ together with `cumulativeEarmarked ≤ totalDebt` (a corollary of the
 invariant that always holds), the clamp is a no-op and conservation is
 preserved trivially.
 -/
-theorem subDebt_preserves_invariant
+theorem _subDebt_preserves_invariant
     (s : ContractState)
     (ids : Verity.Core.FiniteSet Uint256)
     (tokenId amount : Uint256) :
-    let s' := ((AlchemistEarmark.subDebt tokenId amount).run s).snd
-    subDebt_preserves_invariant_spec s s' ids tokenId := by
+    let s' := ((AlchemistV3._subDebt tokenId amount).run s).snd
+    _subDebt_preserves_invariant_spec s s' ids tokenId := by
   -- Replace this placeholder with a complete Lean proof.
   exact ?_
 

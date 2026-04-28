@@ -15,11 +15,11 @@ updates `_earmarkWeight` and `_survivalAccumulator`. Every active account's
 equals exactly `effectiveEarmarked` (under the Q128-idealization
 assumption).
 -/
-theorem earmark_preserves_invariant
+theorem _earmark_preserves_invariant
     (s : ContractState)
     (ids : Verity.Core.FiniteSet Uint256) :
-    let s' := ((AlchemistEarmark.earmark).run s).snd
-    earmark_preserves_invariant_spec s s' ids := by
+    let s' := ((AlchemistV3._earmark).run s).snd
+    _earmark_preserves_invariant_spec s s' ids := by
   -- Replace this placeholder with a complete Lean proof.
   exact ?_
 

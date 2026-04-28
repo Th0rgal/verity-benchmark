@@ -15,6 +15,25 @@ open Verity.Stdlib.Math
   In scope: _earmark, _sync, _computeUnrealizedAccount, redeem,
             _subEarmarkedDebt, _subDebt
 
+  Naming convention used in this file
+  ------------------------------------
+  - Function names mirror the Solidity source: `_earmark`, `_sync`,
+    `_subEarmarkedDebt`, `_subDebt` keep their leading underscore,
+    `redeem` does not (matches Solidity visibility).
+  - Storage slot names mirror the Solidity source variable names. Private
+    state variables keep their leading underscore (`_earmarkWeight`,
+    `_redemptionWeight`, `_survivalAccumulator`); public state variables
+    do not (`cumulativeEarmarked`, `totalDebt`).
+  - Loaded local copies of slots take a trailing underscore: `let
+    cumulativeEarmarked_ ← getStorage cumulativeEarmarked` reads the value
+    at the slot named `cumulativeEarmarked` into a local called
+    `cumulativeEarmarked_`. The Lean parser cannot reuse the same
+    identifier for both, so the trailing-underscore form is the standard
+    Verity convention (see Lido VaulthubLocked, Wildcat BorrowLiquiditySafety).
+  - The `mapping(uint256 => Account)` struct is flattened: each Account
+    field becomes its own slot, `_accounts[id].debt` becomes
+    `_accounts_debt[id]`, etc. Verity has no struct mapping primitive.
+
   The benchmark targets the lazy-projected earmark conservation invariant
   agreed with the Alchemix team (Ov3rkoalafied, 2026-04-24):
 
@@ -47,27 +66,24 @@ open Verity.Stdlib.Math
   What was simplified:
   - The set of active token IDs is passed as an explicit
     `activeIds : FiniteSet Uint256` rather than a ghost field of
-    `ContractState`. `Verity.Core.ContractState` exposes
-    `knownAddresses : Nat -> FiniteAddressSet` for `mapping(address => T)`
-    cases (used by `Verity.Specs.Common.Sum.sumBalances`) but has no
-    parallel `knownTokenIds : Nat -> FiniteSet Uint256` for
-    `mapping(uint256 => T)` cases.
+    `ContractState`.
   Why:
-  - Verity-gap, surfaced as a proposed issue. Workaround is purely
-    spec-level: pass the finset explicitly. Semantics preserved.
+  - `Verity.Core.ContractState` exposes `knownAddresses : Nat -> FiniteAddressSet`
+    for `mapping(address => T)` cases (used by `Verity.Specs.Common.Sum.sumBalances`)
+    but has no parallel `knownTokenIds : Nat -> FiniteSet Uint256` for
+    `mapping(uint256 => T)` cases. Verity-gap, surfaced as a proposed issue.
+    Workaround is purely spec-level: pass the finset explicitly.
 
   What was simplified:
-  - The cross-epoch branch of `_computeUnrealizedAccount` (lines 1539-1564
-    of the source: when the earmark epoch advances between an account's
-    last sync and now, the projection splits at the boundary using the
+  - The cross-epoch branch of `_computeUnrealizedAccount` (source lines
+    1539-1564: when the earmark epoch advances between an account's last
+    sync and now, the projection splits at the boundary using the
     `_earmarkEpochStartRedemptionWeight` / `_earmarkEpochStartSurvivalAccumulator`
     snapshot mappings) is folded into the same-epoch path.
   Why:
   - This first-pass case targets the within-epoch conservation property,
     which is the dominant operational regime. The cross-epoch reconciliation
-    logic is correctness-preserving but adds substantial proof surface
-    around the boundary checkpoint mappings. A follow-up case can extend
-    coverage.
+    logic is correctness-preserving but adds substantial proof surface.
 
   What was simplified:
   - The default same-epoch sub-branch of `_computeUnrealizedAccount`
@@ -76,12 +92,7 @@ open Verity.Stdlib.Math
     the telescoped same-epoch sub-branch (source line 1530:
     `earmarkedUnredeemed = mulQ128(earmarkRaw, survivalRatio)`).
   Why:
-  - Under Q128 idealization the two branches coincide algebraically: the
-    telescoped form is what the source uses when the survival accumulator
-    matches the per-account-rounded computation, and idealizing rounding
-    means it always matches. The default-path scaffolding (`earmarkSurvival`
-    extraction, `survivalDiff` clamping) is purely there to absorb floor
-    drift between the two formulas in the deployed contract.
+  - Under Q128 idealization the two branches coincide algebraically.
 
   What was simplified:
   - The `if (newEarmarked > newDebt) newEarmarked = newDebt;` cap (source
@@ -89,9 +100,7 @@ open Verity.Stdlib.Math
   Why:
   - Under the conservation invariant pre-state and Q128 idealization, the
     cap is provably a no-op (one of the side-properties carried by the
-    invariant is `account.earmarked ≤ account.debt`). The cap is a
-    defensive guard against rounding drift, not a semantic feature of
-    the lazy-accrual model.
+    invariant is `account.earmarked ≤ account.debt`).
 
   What was simplified:
   - When `redeem(amount)` is called with `amount == liveEarmarked` (full
@@ -99,12 +108,9 @@ open Verity.Stdlib.Math
     via `_packRed(oldEpoch + 1, ONE_Q128)`. The model writes
     `redemptionWeight := mulQ128(redemptionWeight, 0) = 0` instead.
   Why:
-  - The model treats `redemptionWeight` as a flat Q128 weight, not a
-    packed (epoch, index) pair. On every consumer path (the survival
-    ratio `divQ128(rW, lastRW)` in `syncAccount`), both representations
-    yield the same survival ratio of 0 once the wipe has happened, so
-    the conservation invariant is preserved. The representation
-    divergence is invisible to the invariant.
+  - The model treats `_redemptionWeight` as a flat Q128 weight, not a
+    packed (epoch, index) pair. Both representations yield the same
+    survival ratio of 0 on every consumer path.
 
   What was simplified:
   - Early-returns and conditional state writes are encoded with pure `ite`
@@ -117,13 +123,25 @@ open Verity.Stdlib.Math
     used in Wildcat BorrowLiquiditySafety.
 
   What was simplified:
+  - The pre-amble of `_earmark()` (source lines 1583-1609: block-number
+    guard, transmuter MYT balance read, `_pendingCoverShares` update,
+    `Transmuter.queryGraph` external call, cover-shares application) is
+    abstracted into a single ghost storage slot `_transmuterEarmarkAmount`.
+    The Verity `_earmark` function reads that slot directly as `amount`.
+  Why:
+  - Cover-shares logic only feeds *how much* gets earmarked this window;
+    it does not affect *whether* per-account earmarked sums to
+    `cumulativeEarmarked`. The conservation invariant holds for any value
+    of `amount` between 0 and `liveUnearmarked`. Modeling the pre-amble
+    line-by-line would inflate the model and the proof without changing
+    the invariant proof obligation.
+
+  What was simplified:
   - External calls (`ITransmuter(transmuter).queryGraph(...)`,
     `TokenUtils.safeBalanceOf(myt, transmuter)`, `TokenUtils.safeTransfer`)
     are modeled as opaque ghost storage reads / no-ops.
   Why:
-  - Standard benchmark practice (see Lido VaulthubLocked, Wildcat
-    BorrowLiquiditySafety). The conservation invariant is internal
-    accounting; external token movement is a trust boundary.
+  - Standard benchmark practice. Internal accounting only.
 
   What was simplified:
   - `Account` fields not relevant to the invariant (`collateralBalance`,
@@ -134,8 +152,7 @@ open Verity.Stdlib.Math
   - Of the 13 fields in the source `Account` struct, only 5 are read or
     written along paths that affect `cumulativeEarmarked` or
     `account.earmarked`: `debt`, `earmarked`, `lastAccruedEarmarkWeight`,
-    `lastAccruedRedemptionWeight`, `lastSurvivalAccumulator`. Keeping
-    only those preserves the invariant's semantics.
+    `lastAccruedRedemptionWeight`, `lastSurvivalAccumulator`.
 
   What was simplified:
   - Modifiers (`onlyTransmuter`, `onlyAdmin`, etc.), `Initializable`,
@@ -143,17 +160,6 @@ open Verity.Stdlib.Math
   Why:
   - These constrain who can call, not how state evolves. Irrelevant
     to the conservation property.
-
-  What was simplified:
-  - `_pendingCoverShares` cover-shares logic and `_syncEarmarkedTransmuterTransfer`
-    are abstracted: `_earmark` reads a single opaque "this-window earmark
-    amount" from a ghost slot. Cover shares simply reduce that amount
-    upstream.
-  Why:
-  - Cover-shares logic feeds how much gets earmarked this window; it does
-    not affect whether per-account earmarked sums to `cumulativeEarmarked`.
-    Modeling it would inflate the model without adding to invariant proof
-    surface.
 -/
 
 /-! ## Constants and Q128 helpers -/
@@ -178,51 +184,67 @@ def divQ128 (a b : Uint256) : Uint256 := div (mul a ONE_Q128) b
 
 /-! ## Storage layout
 
-  Solidity slot mapping (model-side; not bit-faithful to deployment):
-
-    Globals:
-      slot 0 : cumulativeEarmarked
-      slot 1 : totalDebt
-      slot 2 : _earmarkWeight        (Q128 packed weight)
-      slot 3 : _redemptionWeight     (Q128 packed weight)
-      slot 4 : _survivalAccumulator  (Q128 accumulator)
-      slot 5 : transmuterEarmarkAmount  (ghost: opaque external-call result)
-
-    Per-account (mapping(uint256 => Account), each field at its own slot):
-      slot 100 : accountDebt[id]
-      slot 101 : accountEarmarked[id]
-      slot 102 : accountLastAccruedEarmarkWeight[id]
-      slot 103 : accountLastAccruedRedemptionWeight[id]
-      slot 104 : accountLastSurvivalAccumulator[id]
+  The model preserves Solidity slot names where possible. Private state
+  variables in Solidity (those declared `private` or with leading `_`)
+  retain a leading underscore. Struct-of-mappings is flattened: each
+  Account field becomes its own slot keyed by tokenId.
 -/
 
-verity_contract AlchemistEarmark where
+verity_contract AlchemistV3 where
   storage
-    -- Globals
+    /- Models `uint256 public cumulativeEarmarked;` (AlchemistV3.sol:45).
+       Total earmarked debt across all accounts. -/
     cumulativeEarmarked : Uint256 := slot 0
-    totalDebt : Uint256 := slot 1
-    earmarkWeight : Uint256 := slot 2
-    redemptionWeight : Uint256 := slot 3
-    survivalAccumulator : Uint256 := slot 4
-    transmuterEarmarkAmount : Uint256 := slot 5
 
-    -- Per-account fields (Uint256-keyed mappings)
-    accountDebt : Uint256 → Uint256 := slot 100
-    accountEarmarked : Uint256 → Uint256 := slot 101
-    accountLastAccruedEarmarkWeight : Uint256 → Uint256 := slot 102
-    accountLastAccruedRedemptionWeight : Uint256 → Uint256 := slot 103
-    accountLastSurvivalAccumulator : Uint256 → Uint256 := slot 104
+    /- Models `uint256 public totalDebt;` (AlchemistV3.sol:72).
+       Sum of all account debt. -/
+    totalDebt : Uint256 := slot 1
+
+    /- Models `uint256 private _earmarkWeight;` (AlchemistV3.sol:120).
+       Q128 packed weight tracking how much live unearmarked debt survives
+       each earmark step. -/
+    _earmarkWeight : Uint256 := slot 2
+
+    /- Models `uint256 private _redemptionWeight;` (AlchemistV3.sol:123).
+       Q128 packed weight tracking survival of earmarked debt across
+       redemptions. -/
+    _redemptionWeight : Uint256 := slot 3
+
+    /- Models `uint256 private _survivalAccumulator;` (AlchemistV3.sol:126).
+       Accumulator used to reconstruct earmarked debt survival across
+       redemption windows. -/
+    _survivalAccumulator : Uint256 := slot 4
+
+    /- Ghost slot — abstracts the pre-amble of `_earmark()`
+       (AlchemistV3.sol:1583-1609: transmuter query + cover shares).
+       Read directly as the net `amount` to be earmarked this window.
+       See simplifications block. -/
+    _transmuterEarmarkAmount : Uint256 := slot 5
+
+    /- Models `_accounts[tokenId].debt`. The Solidity Account struct
+       (AlchemistV3.sol Account, IAlchemistV3State) is flattened: each
+       field becomes its own `mapping(uint256 => uint256)`. -/
+    _accounts_debt : Uint256 → Uint256 := slot 100
+
+    /- Models `_accounts[tokenId].earmarked`. -/
+    _accounts_earmarked : Uint256 → Uint256 := slot 101
+
+    /- Models `_accounts[tokenId].lastAccruedEarmarkWeight`. -/
+    _accounts_lastAccruedEarmarkWeight : Uint256 → Uint256 := slot 102
+
+    /- Models `_accounts[tokenId].lastAccruedRedemptionWeight`. -/
+    _accounts_lastAccruedRedemptionWeight : Uint256 → Uint256 := slot 103
+
+    /- Models `_accounts[tokenId].lastSurvivalAccumulator`. -/
+    _accounts_lastSurvivalAccumulator : Uint256 → Uint256 := slot 104
 
   /-
-    Models `_earmark()` (AlchemistV3.sol:1582-1641), within-epoch path.
+    Models `_earmark()` (AlchemistV3.sol:1582-1641), within-epoch path
+    only. The pre-amble (lines 1583-1609) is abstracted into a single
+    `_transmuterEarmarkAmount` ghost read.
 
-    The early-return on `totalDebt == 0` is encoded by computing
-    `effectiveEarmarked = 0` in that case (an `ite` guard), so all writes
-    are no-ops on the trivial path.
-
-    Solidity (within-epoch path):
-      if (totalDebt == 0) return;
-      uint256 amount = transmuterEarmarkAmount;
+    Solidity (the part we model, lines 1610-1640):
+      uint256 amount = transmuterEarmarkAmount;       // ghost-read
       uint256 liveUnearmarked = totalDebt - cumulativeEarmarked;
       if (amount > liveUnearmarked) amount = liveUnearmarked;
       if (amount > 0 && liveUnearmarked != 0) {
@@ -230,54 +252,61 @@ verity_contract AlchemistEarmark where
           : divQ128(liveUnearmarked - amount, liveUnearmarked);
         // _simulateEarmarkPackedUpdate (within-epoch): ratioApplied = ratioWanted
         uint256 ratioApplied = ratioWanted;
-        uint256 oldEarmarkWeight = earmarkWeight;
-        earmarkWeight = mulQ128(oldEarmarkWeight, ratioApplied);
+        uint256 oldEarmarkWeight = _earmarkWeight;
+        _earmarkWeight = mulQ128(oldEarmarkWeight, ratioApplied);
         uint256 earmarkedFraction = ONE_Q128 - ratioApplied;
-        survivalAccumulator += mulQ128(oldEarmarkWeight, earmarkedFraction);
+        _survivalAccumulator += mulQ128(oldEarmarkWeight, earmarkedFraction);
         uint256 newUnearmarked = mulQ128(liveUnearmarked, ratioApplied);
         uint256 effectiveEarmarked = liveUnearmarked - newUnearmarked;
         cumulativeEarmarked += effectiveEarmarked;
       }
   -/
-  function earmark () : Unit := do
+  function _earmark () : Unit := do
+    -- src: AlchemistV3.sol:1583-1609 — transmuter query + cover shares (abstracted)
     let totalDebt_ ← getStorage totalDebt
     let cumulativeEarmarked_ ← getStorage cumulativeEarmarked
-    let earmarkWeight_ ← getStorage earmarkWeight
-    let survivalAccumulator_ ← getStorage survivalAccumulator
-    let amountIn ← getStorage transmuterEarmarkAmount
+    let earmarkWeight_ ← getStorage _earmarkWeight
+    let survivalAccumulator_ ← getStorage _survivalAccumulator
+    let amountIn ← getStorage _transmuterEarmarkAmount
 
+    -- src: AlchemistV3.sol:1610-1611 — liveUnearmarked, cap amount
     let liveUnearmarked := sub totalDebt_ cumulativeEarmarked_
     let amount := ite (amountIn > liveUnearmarked) liveUnearmarked amountIn
 
+    -- src: AlchemistV3.sol:1614-1616 — ratioWanted = (amount == liveUnearmarked) ? 0 : divQ128(...)
     -- Within-epoch: ratioApplied = ratioWanted, inline divQ128.
     let ratioWantedRaw := div (mul (sub liveUnearmarked amount) 340282366920938463463374607431768211456) liveUnearmarked
     let ratioApplied := ite (amount == liveUnearmarked) 0 ratioWantedRaw
 
-    -- Active gate: totalDebt != 0 AND amount != 0 AND liveUnearmarked != 0.
+    -- src: AlchemistV3.sol:1583+1613 — active gate: totalDebt != 0 AND amount > 0 AND liveUnearmarked != 0
     let active := totalDebt_ != 0 && amount != 0 && liveUnearmarked != 0
 
+    -- src: AlchemistV3.sol:1622 — _earmarkWeight = mulQ128(oldEarmarkWeight, ratioApplied)
     let packedNew := div (mul earmarkWeight_ ratioApplied) 340282366920938463463374607431768211456
     let newEarmarkWeight := ite active packedNew earmarkWeight_
 
+    -- src: AlchemistV3.sol:1625-1626 — _survivalAccumulator += mulQ128(oldIndex, earmarkedFraction)
     let earmarkedFraction := sub 340282366920938463463374607431768211456 ratioApplied
     let survivalIncrement := div (mul earmarkWeight_ earmarkedFraction) 340282366920938463463374607431768211456
     let newSurvivalAccumulator :=
       ite active (add survivalAccumulator_ survivalIncrement) survivalAccumulator_
 
+    -- src: AlchemistV3.sol:1634-1637 — effectiveEarmarked, cumulativeEarmarked += effectiveEarmarked
     let newUnearmarked := div (mul liveUnearmarked ratioApplied) 340282366920938463463374607431768211456
     let effectiveEarmarked := sub liveUnearmarked newUnearmarked
     let newCumulativeEarmarked :=
       ite active (add cumulativeEarmarked_ effectiveEarmarked) cumulativeEarmarked_
 
-    setStorage earmarkWeight newEarmarkWeight
-    setStorage survivalAccumulator newSurvivalAccumulator
+    setStorage _earmarkWeight newEarmarkWeight
+    setStorage _survivalAccumulator newSurvivalAccumulator
     setStorage cumulativeEarmarked newCumulativeEarmarked
 
   /-
     Models `_sync(tokenId)` (AlchemistV3.sol:1442-1472), invariant-relevant
-    fields only. Within-epoch / within-survival-window projection path.
+    fields only. The body inlines the within-epoch / within-survival-window
+    path of `_computeUnrealizedAccount` (source lines 1478-1579).
 
-    Solidity:
+    Solidity (_sync):
       Account storage account = _accounts[tokenId];
       (uint256 newDebt, uint256 newEarmarked, uint256 redeemedTotal) =
         _computeUnrealizedAccount(account, _earmarkWeight,
@@ -289,66 +318,68 @@ verity_contract AlchemistEarmark where
       account.lastAccruedRedemptionWeight = _redemptionWeight;
       account.lastSurvivalAccumulator = _survivalAccumulator;
   -/
-  function syncAccount (tokenId : Uint256) : Unit := do
-    let earmarkWeight_ ← getStorage earmarkWeight
-    let redemptionWeight_ ← getStorage redemptionWeight
-    let survivalAccumulator_ ← getStorage survivalAccumulator
+  function _sync (tokenId : Uint256) : Unit := do
+    let earmarkWeight_ ← getStorage _earmarkWeight
+    let redemptionWeight_ ← getStorage _redemptionWeight
+    let survivalAccumulator_ ← getStorage _survivalAccumulator
 
-    let accountDebt_ ← getMappingUint accountDebt tokenId
-    let accountEarmarked_ ← getMappingUint accountEarmarked tokenId
-    let lastEW_ ← getMappingUint accountLastAccruedEarmarkWeight tokenId
-    let lastRW_ ← getMappingUint accountLastAccruedRedemptionWeight tokenId
+    let accountDebt_ ← getMappingUint _accounts_debt tokenId
+    let accountEarmarked_ ← getMappingUint _accounts_earmarked tokenId
+    let lastEW_ ← getMappingUint _accounts_lastAccruedEarmarkWeight tokenId
+    let lastRW_ ← getMappingUint _accounts_lastAccruedRedemptionWeight tokenId
 
-    -- _earmarkSurvivalRatio(lastEW, earmarkWeight): ratio of unearmarked
-    -- exposure that "stayed unearmarked" since last sync. Inline divQ128.
+    -- src: AlchemistV3.sol:1747-1763 — _earmarkSurvivalRatio(lastEW, _earmarkWeight)
     let earmarkSurvivalQ := div (mul earmarkWeight_ 340282366920938463463374607431768211456) lastEW_
     let unearmarkSurvivalRatio :=
       ite (lastEW_ == earmarkWeight_) 340282366920938463463374607431768211456
         (ite (lastEW_ == 0) 340282366920938463463374607431768211456 earmarkSurvivalQ)
 
-    -- _redemptionSurvivalRatio(lastRW, redemptionWeight): ratio of
-    -- earmarked exposure that "survived" redemptions in this sync window.
+    -- src: AlchemistV3.sol:1768-1789 — _redemptionSurvivalRatio(lastRW, _redemptionWeight)
     let redemptionSurvivalQ := div (mul redemptionWeight_ 340282366920938463463374607431768211456) lastRW_
     let redemptionSurvivalRatio :=
       ite (lastRW_ == redemptionWeight_) 340282366920938463463374607431768211456
         (ite (lastRW_ == 0) 340282366920938463463374607431768211456 redemptionSurvivalQ)
 
-    -- userExposure = debt - earmarked (unearmarked portion of account debt)
+    -- src: AlchemistV3.sol:1489 — userExposure = debt - earmarked
     let userExposure :=
       ite (accountDebt_ > accountEarmarked_) (sub accountDebt_ accountEarmarked_) 0
 
-    -- amount that stayed unearmarked, and the newly earmarked portion
+    -- src: AlchemistV3.sol:1494-1497 — unearmarkedRemaining, earmarkRaw
     let unearmarkedRemaining := div (mul userExposure unearmarkSurvivalRatio) 340282366920938463463374607431768211456
     let earmarkRaw := sub userExposure unearmarkedRemaining
 
-    -- Within-epoch redemption survival branch:
+    -- src: AlchemistV3.sol:1530+1577 — newEarmarked (telescoped same-epoch path)
     -- newEarmarked = mulQ128(account.earmarked + earmarkRaw, redemptionSurvivalRatio)
     let totalEarmarkedNow := add accountEarmarked_ earmarkRaw
     let newEarmarked := div (mul totalEarmarkedNow redemptionSurvivalRatio) 340282366920938463463374607431768211456
+
+    -- src: AlchemistV3.sol:1573-1576 — redeemedTotal, newDebt
     let redeemedFromAccount := sub totalEarmarkedNow newEarmarked
     let newDebt :=
       ite (accountDebt_ >= redeemedFromAccount) (sub accountDebt_ redeemedFromAccount) 0
 
-    setMappingUint accountDebt tokenId newDebt
-    setMappingUint accountEarmarked tokenId newEarmarked
-    setMappingUint accountLastAccruedEarmarkWeight tokenId earmarkWeight_
-    setMappingUint accountLastAccruedRedemptionWeight tokenId redemptionWeight_
-    setMappingUint accountLastSurvivalAccumulator tokenId survivalAccumulator_
+    -- src: AlchemistV3.sol:1463-1471 — write back to account fields
+    setMappingUint _accounts_debt tokenId newDebt
+    setMappingUint _accounts_earmarked tokenId newEarmarked
+    setMappingUint _accounts_lastAccruedEarmarkWeight tokenId earmarkWeight_
+    setMappingUint _accounts_lastAccruedRedemptionWeight tokenId redemptionWeight_
+    setMappingUint _accounts_lastSurvivalAccumulator tokenId survivalAccumulator_
 
   /-
     Models `redeem(amount)` (AlchemistV3.sol:655-731), within-epoch path.
     Only the parts that affect `cumulativeEarmarked`, weights, and `totalDebt`.
+    Source's `_earmark()` call at line 656, collateral transfer math at
+    lines 712-727, fee transfer, and event emission are out of scope.
 
-    Solidity (after _earmark()):
+    Solidity (the part we model, lines 658-708):
       uint256 liveEarmarked = cumulativeEarmarked;
       if (amount > liveEarmarked) amount = liveEarmarked;
       if (liveEarmarked != 0 && amount != 0) {
         uint256 ratioWanted = (amount == liveEarmarked) ? 0
           : divQ128(liveEarmarked - amount, liveEarmarked);
-        // _redemptionWeight packed update (within-epoch):
-        //   ratioApplied = ratioWanted
-        redemptionWeight = mulQ128(redemptionWeight, ratioApplied);
-        survivalAccumulator = mulQ128(survivalAccumulator, ratioApplied);
+        // _redemptionWeight packed update (within-epoch): ratioApplied = ratioWanted
+        _redemptionWeight = mulQ128(_redemptionWeight, ratioApplied);
+        _survivalAccumulator = mulQ128(_survivalAccumulator, ratioApplied);
         uint256 remainingEarmarked = mulQ128(liveEarmarked, ratioApplied);
         uint256 effectiveRedeemed = liveEarmarked - remainingEarmarked;
         cumulativeEarmarked = remainingEarmarked;
@@ -358,38 +389,43 @@ verity_contract AlchemistEarmark where
   function redeem (amount : Uint256) : Unit := do
     let cumulativeEarmarked_ ← getStorage cumulativeEarmarked
     let totalDebt_ ← getStorage totalDebt
-    let redemptionWeight_ ← getStorage redemptionWeight
-    let survivalAccumulator_ ← getStorage survivalAccumulator
+    let redemptionWeight_ ← getStorage _redemptionWeight
+    let survivalAccumulator_ ← getStorage _survivalAccumulator
 
+    -- src: AlchemistV3.sol:658-659 — liveEarmarked, cap amount
     let liveEarmarked := cumulativeEarmarked_
     let amountClamped := ite (amount > liveEarmarked) liveEarmarked amount
 
-    -- ratioApplied = ratioWanted (within-epoch); inline divQ128.
+    -- src: AlchemistV3.sol:664-665 — ratioWanted = (amount == liveEarmarked) ? 0 : divQ128(...)
+    -- Within-epoch: ratioApplied = ratioWanted
     let ratioWantedRaw := div (mul (sub liveEarmarked amountClamped) 340282366920938463463374607431768211456) liveEarmarked
     let ratioApplied := ite (amountClamped == liveEarmarked) 0 ratioWantedRaw
 
-    -- Active gate: liveEarmarked != 0 AND amountClamped != 0.
+    -- src: AlchemistV3.sol:663 — active gate: liveEarmarked != 0 AND amountClamped != 0
     let active := liveEarmarked != 0 && amountClamped != 0
 
-    -- Inline mulQ128 for each downstream value.
+    -- src: AlchemistV3.sol:693+700+703+707 — inline mulQ128 for each updated value
     let newRedemptionWeightActive := div (mul redemptionWeight_ ratioApplied) 340282366920938463463374607431768211456
     let newSurvivalAccumulatorActive := div (mul survivalAccumulator_ ratioApplied) 340282366920938463463374607431768211456
     let remainingEarmarked := div (mul liveEarmarked ratioApplied) 340282366920938463463374607431768211456
     let effectiveRedeemed := sub liveEarmarked remainingEarmarked
 
+    -- src: AlchemistV3.sol:693+700+706+707 — write back; inactive branch leaves storage unchanged
     let newRedemptionWeight := ite active newRedemptionWeightActive redemptionWeight_
     let newSurvivalAccumulator := ite active newSurvivalAccumulatorActive survivalAccumulator_
     let newCumulativeEarmarked := ite active remainingEarmarked cumulativeEarmarked_
     let newTotalDebt := ite active (sub totalDebt_ effectiveRedeemed) totalDebt_
 
-    setStorage redemptionWeight newRedemptionWeight
-    setStorage survivalAccumulator newSurvivalAccumulator
+    setStorage _redemptionWeight newRedemptionWeight
+    setStorage _survivalAccumulator newSurvivalAccumulator
     setStorage cumulativeEarmarked newCumulativeEarmarked
     setStorage totalDebt newTotalDebt
 
   /-
     Models `_subEarmarkedDebt(amountInDebtTokens, accountId)`
-    (AlchemistV3.sol:1002-1019).
+    (AlchemistV3.sol:1002-1019). The function returns `earmarkToRemove` in
+    Solidity; we drop the return because no caller path uses it for the
+    invariant.
 
     Solidity:
       uint256 debt = account.debt;
@@ -401,16 +437,19 @@ verity_contract AlchemistEarmark where
                           ? cumulativeEarmarked : earmarkToRemove;
       cumulativeEarmarked -= remove;
   -/
-  function subEarmarkedDebt (amountInDebtTokens : Uint256, accountId : Uint256) : Unit := do
+  function _subEarmarkedDebt (amountInDebtTokens : Uint256, accountId : Uint256) : Unit := do
     let cumulativeEarmarked_ ← getStorage cumulativeEarmarked
-    let debt_ ← getMappingUint accountDebt accountId
-    let earmarkedDebt_ ← getMappingUint accountEarmarked accountId
+    let debt_ ← getMappingUint _accounts_debt accountId
+    let earmarkedDebt_ ← getMappingUint _accounts_earmarked accountId
 
+    -- src: AlchemistV3.sol:1008-1009 — credit, earmarkToRemove
     let credit := ite (amountInDebtTokens > debt_) debt_ amountInDebtTokens
     let earmarkToRemove := ite (credit > earmarkedDebt_) earmarkedDebt_ credit
 
-    setMappingUint accountEarmarked accountId (sub earmarkedDebt_ earmarkToRemove)
+    -- src: AlchemistV3.sol:1012 — account.earmarked -= earmarkToRemove
+    setMappingUint _accounts_earmarked accountId (sub earmarkedDebt_ earmarkToRemove)
 
+    -- src: AlchemistV3.sol:1015-1016 — clamped global subtraction
     let remove := ite (earmarkToRemove > cumulativeEarmarked_)
                     cumulativeEarmarked_ earmarkToRemove
     setStorage cumulativeEarmarked (sub cumulativeEarmarked_ remove)
@@ -426,16 +465,17 @@ verity_contract AlchemistEarmark where
         cumulativeEarmarked = totalDebt;
       }
   -/
-  function subDebt (tokenId : Uint256, amount : Uint256) : Unit := do
+  function _subDebt (tokenId : Uint256, amount : Uint256) : Unit := do
     let totalDebt_ ← getStorage totalDebt
     let cumulativeEarmarked_ ← getStorage cumulativeEarmarked
-    let accountDebt_ ← getMappingUint accountDebt tokenId
+    let accountDebt_ ← getMappingUint _accounts_debt tokenId
 
-    setMappingUint accountDebt tokenId (sub accountDebt_ amount)
+    -- src: AlchemistV3.sol:1303-1304 — account.debt -= amount; totalDebt -= amount
+    setMappingUint _accounts_debt tokenId (sub accountDebt_ amount)
     let newTotalDebt := sub totalDebt_ amount
     setStorage totalDebt newTotalDebt
 
-    -- Clamp: if (cumulativeEarmarked > totalDebt) cumulativeEarmarked = totalDebt;
+    -- src: AlchemistV3.sol:1306-1308 — clamp cumulativeEarmarked to newTotalDebt
     let newCumulativeEarmarked :=
       ite (cumulativeEarmarked_ > newTotalDebt) newTotalDebt cumulativeEarmarked_
     setStorage cumulativeEarmarked newCumulativeEarmarked

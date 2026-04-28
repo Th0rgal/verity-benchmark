@@ -18,7 +18,7 @@ theorem redeem_preserves_invariant
     (s : ContractState)
     (ids : Verity.Core.FiniteSet Uint256)
     (amount : Uint256) :
-    let s' := ((AlchemistEarmark.redeem amount).run s).snd
+    let s' := ((AlchemistV3.redeem amount).run s).snd
     redeem_preserves_invariant_spec s s' ids := by
   -- Replace this placeholder with a complete Lean proof.
   exact ?_
