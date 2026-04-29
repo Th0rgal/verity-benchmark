@@ -651,7 +651,7 @@ private theorem singleton_le_sum_of_no_overflow
 /-- **H5 corollary**: under the conservation invariant, H2-synced at
     `accountId`, and no-overflow on the projection sum, the stored
     earmarked at `accountId` is bounded by `cumulativeEarmarked`. -/
-private theorem accounts_earmarked_le_cumulative_of_invariant
+theorem accounts_earmarked_le_cumulative_of_invariant
     (s : ContractState) (ids : FiniteSet Uint256) (accountId : Uint256)
     (hMem : accountId ∈ ids.elements)
     (hSyncedAtAccountId :
@@ -882,7 +882,7 @@ theorem _subEarmarkedDebt_preserves_invariant
 
 /-- Slot-write lemma for `_sync(tokenId)`: globals slots 0-4 are
     untouched (only mappings 100-104 at tokenId are written). -/
-private theorem _sync_slot_write
+theorem _sync_slot_write
     (tokenId : Uint256) (s : ContractState) :
     let s' := ((AlchemistV3._sync tokenId).run s).snd
     s'.storage 0 = s.storage 0 ∧
@@ -923,7 +923,7 @@ private theorem _sync_mapping_unchanged_diff
 
 /-- After `_sync(tokenId)`, the lastAccruedEarmarkWeight at tokenId equals
     the (unchanged) global `_earmarkWeight`. -/
-private theorem _sync_writes_lastEW
+theorem _sync_writes_lastEW
     (tokenId : Uint256) (s : ContractState) :
     let s' := ((AlchemistV3._sync tokenId).run s).snd
     s'.storageMapUint 102 tokenId = s.storage 2 := by
@@ -940,7 +940,7 @@ private theorem _sync_writes_lastEW
 
 /-- After `_sync(tokenId)`, the lastAccruedRedemptionWeight at tokenId
     equals the global `_redemptionWeight`. -/
-private theorem _sync_writes_lastRW
+theorem _sync_writes_lastRW
     (tokenId : Uint256) (s : ContractState) :
     let s' := ((AlchemistV3._sync tokenId).run s).snd
     s'.storageMapUint 103 tokenId = s.storage 3 := by
