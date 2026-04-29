@@ -1,0 +1,45 @@
+manifest_kind: case
+project: reserve
+case_id: auction_price_band
+schema_version: 1
+split: active
+family_id: reserve
+implementation_id: dtfs
+stage: build_green
+translation_status: translated
+spec_status: frozen
+proof_status: complete
+upstream_repo: https://github.com/reserve-protocol/dtfs
+upstream_commit: 14f75d18856d587adfaff24e77e5b20dda7c7267
+original_contract_path: contracts/utils/RebalancingLib.sol
+source_ref: https://github.com/reserve-protocol/dtfs@14f75d18856d587adfaff24e77e5b20dda7c7267:contracts/utils/RebalancingLib.sol
+lean_target: Benchmark.Cases.Reserve.AuctionPriceBand.Compile
+selected_functions:
+  - _price
+source_language: solidity
+verity_version: 74d8fe20ffa2f5dbb94959f3dd40a62df6aa8224
+lean_toolchain: leanprover/lean4:v4.22.0
+abstraction_level: protocol_slice
+abstraction_tags:
+  - auction_price_band
+  - exponential_decay_axiomatised
+  - storage_state_elided
+  - require_gate_as_precondition
+abstraction_notes: >
+  The benchmark freezes the per-pair auction price band that
+  RebalancingLib._price exposes. The interior exponential decay (PRBMath
+  ln + exp) is preserved structurally in the model with two opaque
+  axioms: `MathLib.exp` and `MathLib.ln`. The proof uses one algebraic
+  axiom on `exp` (`exp_nonpositive_le_d18`). The storage-mapping reads
+  on `auction.prices[token]` and `rebalance.details[token].inRebalance`
+  are taken as parameter inputs (NexusMutual RammSpotPrice precedent);
+  the Solidity require gate is encoded as a precondition on the pure
+  function rather than as a `Verity.require` call.
+unsupported_feature_codes: []
+spec_target: Benchmark.Cases.Reserve.AuctionPriceBand.Specs
+proof_target: Benchmark.Cases.Reserve.AuctionPriceBand.Proofs
+notes: >
+  Auction price band slice of Reserve DTF Protocol's RebalancingLib._price.
+  The Verity model keeps the start/end branching plus the interior
+  exponential decay; storage I/O and external view calls (auction +
+  rebalance state) are folded into pure parameters.

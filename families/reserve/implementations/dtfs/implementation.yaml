@@ -1,0 +1,17 @@
+manifest_kind: implementation
+schema_version: 1
+family_id: reserve
+implementation_id: dtfs
+display_name: Reserve DTF Protocol
+split: active
+status: translated
+upstream_repo: https://github.com/reserve-protocol/dtfs
+upstream_commit: 14f75d18856d587adfaff24e77e5b20dda7c7267
+source_language: solidity
+source_artifact_path: contracts/utils/RebalancingLib.sol
+case_ids:
+  - reserve/auction_price_band
+notes: >
+  Active implementation entry for Reserve's DTF Protocol repository,
+  currently benchmarking the auction price-band slice on
+  RebalancingLib._price.
