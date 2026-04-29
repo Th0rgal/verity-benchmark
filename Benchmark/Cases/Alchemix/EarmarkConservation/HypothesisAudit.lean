@@ -159,20 +159,33 @@ theorem H5_from_invariant_and_no_overflow
   cannot prove it. We give a concrete pair `(s, ids)` where the LHS
   and RHS disagree to show H6 is *not* a model tautology.
 
-  The counterexample state has `totalDebt = 100`, `cumulativeEarmarked
-  = 0`, `_transmuterEarmarkAmount = 50` (so `_earmark_active = true`),
-  and an empty active-id set. The LHS sum is therefore 0, while the
-  RHS is `sub 100 0 = 100`. -/
+  Non-empty witness: `totalDebt = 100`, `cumulativeEarmarked = 0`,
+  `_transmuterEarmarkAmount = 50` (so `_earmark_active = true`),
+  weights all set to `ONE_Q128`, and the single tracked account has
+  `debt = 1`, `earmarked = 0`. This is exactly the situation where
+  the (unmodeled) debt-conservation sister invariant fails:
+  `Σ accounts_debt = 1 ≠ 100 = totalDebt`.
+
+  Per-account `earmark_unearmarkedTimesRSR` for id 1 evaluates to 1
+  (userExposure = 1, both survival ratios are ONE_Q128). So the LHS
+  sum is 1, while the RHS is `sub 100 0 = 100`. -/
 
 def h6_cex_state : ContractState :=
   { Verity.defaultState with
     «storage» := fun n =>
-      if n = 1 then (100 : Uint256)
-      else if n = 5 then (50 : Uint256)
+      if n = 1 then (100 : Uint256)         -- totalDebt
+      else if n = 2 then ONE_Q128            -- _earmarkWeight
+      else if n = 3 then ONE_Q128            -- _redemptionWeight
+      else if n = 5 then (50 : Uint256)      -- transmuter amount
+      else (0 : Uint256)
+    «storageMapUint» := fun n k =>
+      if n = 100 ∧ k = (1 : Uint256) then (1 : Uint256)         -- debt
+      else if n = 102 ∧ k = (1 : Uint256) then ONE_Q128         -- lastAccruedEW
+      else if n = 103 ∧ k = (1 : Uint256) then ONE_Q128         -- lastAccruedRW
       else (0 : Uint256) }
 
 def h6_cex_ids : FiniteSet Uint256 :=
-  Verity.Core.FiniteSet.empty
+  ⟨[(1 : Uint256)], by simp⟩
 
 /-- The pre-state side of H6 fires (`_earmark_active = true`). -/
 theorem H6_active :
