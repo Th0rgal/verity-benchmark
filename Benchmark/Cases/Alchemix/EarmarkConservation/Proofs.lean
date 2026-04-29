@@ -142,6 +142,20 @@ private theorem foldl_add_congr {α : Type} (l : List α)
     rw [ha]
     exact ih (acc + g a) (fun x hx => h x (List.mem_cons_of_mem a hx))
 
+/-- Pointwise congruence for `foldl` of Nat-add. Used to transfer the
+    no-overflow hypothesis across operations that don't change projections. -/
+private theorem foldl_nat_add_congr {α : Type} (l : List α)
+    (f g : α → Nat) (acc : Nat)
+    (h : ∀ x ∈ l, f x = g x) :
+    l.foldl (fun a x => a + f x) acc = l.foldl (fun a x => a + g x) acc := by
+  induction l generalizing acc with
+  | nil => rfl
+  | cons a t ih =>
+    simp only [List.foldl]
+    have ha : f a = g a := h a (by simp)
+    rw [ha]
+    exact ih (acc + g a) (fun x hx => h x (List.mem_cons_of_mem a hx))
+
 /-- Foldl-shift for additive accumulators: `foldl + f (acc + d) l = foldl + f acc l + d`. -/
 private theorem foldl_add_shift
     (l : List Uint256) (f : Uint256 → Uint256) (acc d : Uint256) :
@@ -486,6 +500,181 @@ private theorem sum_singleton_decrement
   simp only [if_pos rfl]
   exact uint256_sub_telescope (s.sum f) (f a) c hLe
 
+/-! ## "Single summand ≤ sum" under non-overflow
+
+  In Uint256 modular arithmetic, individual summands can exceed the
+  modular sum if any partial sum wraps around 2^256. The
+  `accounts_earmarked ≤ cumulativeEarmarked` precondition used by
+  `_subEarmarkedDebt_preserves_invariant` is precisely "single summand
+  ≤ sum" combined with H2-synced (so stored = projection) and the
+  conservation invariant (so sum = cumulativeEarmarked). Once we have
+  no-overflow, the inequality is automatic; H5 is *not* an independent
+  hypothesis. -/
+
+/-- Nat foldl-add shift: `foldl (acc + d) l = foldl acc l + d`. -/
+private theorem foldl_nat_add_shift
+    (l : List Uint256) (f : Uint256 → Uint256) (acc d : Nat) :
+    l.foldl (fun b x => b + (f x).val) (acc + d) =
+      l.foldl (fun b x => b + (f x).val) acc + d := by
+  induction l generalizing acc with
+  | nil => rfl
+  | cons hd tl ih =>
+    simp only [List.foldl]
+    have h : acc + d + (f hd).val = (acc + (f hd).val) + d := by omega
+    rw [h]
+    exact ih (acc + (f hd).val)
+
+/-- Nat foldl-add is monotone in the accumulator. -/
+private theorem foldl_nat_add_ge_acc
+    (l : List Uint256) (f : Uint256 → Uint256) (acc : Nat) :
+    acc ≤ l.foldl (fun b x => b + (f x).val) acc := by
+  induction l generalizing acc with
+  | nil => exact Nat.le_refl acc
+  | cons hd tl ih =>
+    simp only [List.foldl]
+    have h := ih (acc + (f hd).val)
+    have h2 : acc ≤ acc + (f hd).val := Nat.le_add_right acc (f hd).val
+    exact Nat.le_trans h2 h
+
+/-- Single summand ≤ Nat foldl-add sum. -/
+private theorem foldl_nat_add_ge_singleton
+    (l : List Uint256) (f : Uint256 → Uint256) (a : Uint256) (hMem : a ∈ l) :
+    ∀ acc, (f a).val ≤ l.foldl (fun b x => b + (f x).val) acc := by
+  induction l with
+  | nil => intro _; cases hMem
+  | cons hd tl ih =>
+    intro acc
+    simp only [List.foldl]
+    rcases List.mem_cons.mp hMem with hEq | hMemTl
+    · subst hEq
+      have hge :
+          acc + (f a).val ≤ tl.foldl (fun b x => b + (f x).val) (acc + (f a).val) :=
+        foldl_nat_add_ge_acc tl f (acc + (f a).val)
+      have h2 : (f a).val ≤ acc + (f a).val := Nat.le_add_left _ _
+      exact Nat.le_trans h2 hge
+    · exact ih hMemTl _
+
+/-- The Uint256 foldl-add `.val` matches the Nat foldl-add when no partial
+    sum exceeds 2^256. -/
+private theorem foldl_uint256_val_eq_nat_of_no_overflow
+    (l : List Uint256) (f : Uint256 → Uint256) :
+    ∀ acc : Uint256,
+      acc.val + l.foldl (fun b x => b + (f x).val) 0 < Verity.Core.Uint256.modulus →
+      (l.foldl (fun b x => b + f x) acc).val =
+        acc.val + l.foldl (fun b x => b + (f x).val) 0 := by
+  induction l with
+  | nil => intro acc _; show acc.val = acc.val + 0; omega
+  | cons hd tl ih =>
+    intro acc hNo
+    simp only [List.foldl]
+    -- Nat-sum over hd::tl from 0 = (f hd).val + Nat-sum over tl from 0.
+    have hShift :
+        tl.foldl (fun b x => b + (f x).val) ((f hd).val) =
+          tl.foldl (fun b x => b + (f x).val) 0 + (f hd).val := by
+      have := foldl_nat_add_shift tl f 0 (f hd).val
+      simpa using this
+    -- Rewrite hNo using hShift.
+    have hNo' :
+        acc.val + ((f hd).val + tl.foldl (fun b x => b + (f x).val) 0) <
+          Verity.Core.Uint256.modulus := by
+      have hSimp :
+          (List.foldl (fun b x => b + (f x).val) 0 (hd :: tl)) =
+            (f hd).val + tl.foldl (fun b x => b + (f x).val) 0 := by
+        show tl.foldl (fun b x => b + (f x).val) (0 + (f hd).val) =
+             (f hd).val + tl.foldl (fun b x => b + (f x).val) 0
+        rw [Nat.zero_add]
+        rw [hShift]
+        exact Nat.add_comm _ _
+      have hNoEq : acc.val + (List.foldl (fun b x => b + (f x).val) 0 (hd :: tl)) =
+            acc.val + ((f hd).val + tl.foldl (fun b x => b + (f x).val) 0) := by
+        rw [hSimp]
+      omega
+    -- (acc + f hd).val = acc.val + (f hd).val (no wrap because the sum is bounded).
+    have hAccHd_no_wrap : acc.val + (f hd).val < Verity.Core.Uint256.modulus := by
+      have h1 :
+          acc.val + (f hd).val ≤
+            acc.val + ((f hd).val + tl.foldl (fun b x => b + (f x).val) 0) := by
+        have h2 : (f hd).val ≤
+            (f hd).val + tl.foldl (fun b x => b + (f x).val) 0 := Nat.le_add_right _ _
+        omega
+      exact Nat.lt_of_le_of_lt h1 hNo'
+    have hAccHdVal : (acc + f hd).val = acc.val + (f hd).val := by
+      show (Verity.Core.Uint256.add acc (f hd)).val = acc.val + (f hd).val
+      unfold Verity.Core.Uint256.add
+      show (Verity.Core.Uint256.ofNat (acc.val + (f hd).val)).val =
+             acc.val + (f hd).val
+      exact Nat.mod_eq_of_lt hAccHd_no_wrap
+    -- IH applies for (acc + f hd) over tl.
+    have hIHno :
+        (acc + f hd).val + tl.foldl (fun b x => b + (f x).val) 0 <
+          Verity.Core.Uint256.modulus := by
+      rw [hAccHdVal]
+      omega
+    have hIH := ih (acc + f hd) hIHno
+    rw [hIH, hAccHdVal]
+    -- Goal: acc.val + (f hd).val + tl.foldl ... 0 = acc.val + (foldl over hd::tl from 0)
+    show acc.val + (f hd).val + tl.foldl (fun b x => b + (f x).val) 0 =
+         acc.val + tl.foldl (fun b x => b + (f x).val) (0 + (f hd).val)
+    rw [Nat.zero_add, hShift]
+    omega
+
+/-- Under no-overflow, the Uint256 `FiniteSet.sum` `.val` equals the Nat sum. -/
+private theorem sum_val_eq_nat_sum_of_no_overflow
+    (ids : FiniteSet Uint256) (f : Uint256 → Uint256)
+    (hNo : ids.elements.foldl (fun b x => b + (f x).val) 0 <
+              Verity.Core.Uint256.modulus) :
+    (ids.sum f).val =
+      ids.elements.foldl (fun b x => b + (f x).val) 0 := by
+  unfold Verity.Core.FiniteSet.sum
+  have h0 : (0 : Uint256).val = 0 := rfl
+  have hNo' : (0 : Uint256).val + ids.elements.foldl (fun b x => b + (f x).val) 0 <
+                Verity.Core.Uint256.modulus := by rw [h0]; omega
+  have h := foldl_uint256_val_eq_nat_of_no_overflow ids.elements f 0 hNo'
+  rw [h0] at h
+  omega
+
+/-- **Single summand ≤ sum** for `FiniteSet.sum` under no-overflow.
+
+    This is the bridge from "the conservation invariant pins
+    `Σ projections = cumulativeEarmarked`" to "no individual projection
+    exceeds `cumulativeEarmarked`" — provided the sum doesn't wrap. -/
+private theorem singleton_le_sum_of_no_overflow
+    (ids : FiniteSet Uint256) (f : Uint256 → Uint256)
+    (a : Uint256) (hMem : a ∈ ids.elements)
+    (hNo : ids.elements.foldl (fun b x => b + (f x).val) 0 <
+              Verity.Core.Uint256.modulus) :
+    f a ≤ ids.sum f := by
+  show (f a).val ≤ (ids.sum f).val
+  rw [sum_val_eq_nat_sum_of_no_overflow ids f hNo]
+  exact foldl_nat_add_ge_singleton ids.elements f a hMem 0
+
+/-- **H5 corollary**: under the conservation invariant, H2-synced at
+    `accountId`, and no-overflow on the projection sum, the stored
+    earmarked at `accountId` is bounded by `cumulativeEarmarked`. -/
+private theorem accounts_earmarked_le_cumulative_of_invariant
+    (s : ContractState) (ids : FiniteSet Uint256) (accountId : Uint256)
+    (hMem : accountId ∈ ids.elements)
+    (hSyncedAtAccountId :
+      accounts_lastAccruedEarmarkWeight s accountId = _earmarkWeight s ∧
+      accounts_lastAccruedRedemptionWeight s accountId = _redemptionWeight s)
+    (hQ128MulOne : ∀ x : Uint256, mulQ128 x ONE_Q128 = x)
+    (hInvariant : sumProjectedEarmarked s ids = cumulativeEarmarked s)
+    (hSumNoOverflow :
+      ids.elements.foldl (fun b x => b + (projectedEarmarked s x).val) 0 <
+        Verity.Core.Uint256.modulus) :
+    accounts_earmarked s accountId ≤ cumulativeEarmarked s := by
+  have hProj_eq_stored :
+      projectedEarmarked s accountId = accounts_earmarked s accountId :=
+    projectedEarmarked_of_synced s accountId
+      hSyncedAtAccountId.1 hSyncedAtAccountId.2 hQ128MulOne
+  have hLe :
+      projectedEarmarked s accountId ≤ sumProjectedEarmarked s ids :=
+    singleton_le_sum_of_no_overflow ids
+      (fun id => projectedEarmarked s id) accountId hMem hSumNoOverflow
+  show (accounts_earmarked s accountId).val ≤ (cumulativeEarmarked s).val
+  rw [← hProj_eq_stored, ← hInvariant]
+  exact hLe
+
 /-! ## `_subEarmarkedDebt` slot writes and preservation -/
 
 /-- Pure helper: `earmarkToRemove` as computed by the contract. -/
@@ -583,14 +772,21 @@ theorem _subEarmarkedDebt_preserves_invariant
     (hSyncedAtAccountId :
       accounts_lastAccruedEarmarkWeight s accountId = _earmarkWeight s ∧
       accounts_lastAccruedRedemptionWeight s accountId = _redemptionWeight s)
-    (hAccountEarmarkedLeCumulative :
-      accounts_earmarked s accountId ≤ cumulativeEarmarked s) :
+    (hSumNoOverflow :
+      ids.elements.foldl (fun b x => b + (projectedEarmarked s x).val) 0 <
+        Verity.Core.Uint256.modulus) :
     let s' := ((AlchemistV3._subEarmarkedDebt amountInDebtTokens accountId).run s).snd
     _subEarmarkedDebt_preserves_invariant_spec s s' ids accountId := by
   intro s' hMem hPre
   show sumProjectedEarmarked s' ids = cumulativeEarmarked s'
   rcases _subEarmarkedDebt_slot_write amountInDebtTokens accountId s with
     ⟨h0, _h1, h2, h3, _h4, _hM100, hM101, hM102, hM103, _hM104⟩
+  -- Derived: stored at accountId ≤ cumulativeEarmarked. Was H5 in the
+  -- previous formulation; now derived from invariant + H2 + no-overflow.
+  have hAccountEarmarkedLeCumulative :
+      accounts_earmarked s accountId ≤ cumulativeEarmarked s :=
+    accounts_earmarked_le_cumulative_of_invariant s ids accountId hMem
+      hSyncedAtAccountId hQ128MulOne hPre hSumNoOverflow
   have hETR_le_earmarked :
       subEarmarkedDebt_earmarkToRemove amountInDebtTokens
           (accounts_debt s accountId) (accounts_earmarked s accountId)
@@ -871,6 +1067,119 @@ theorem _sync_preserves_invariant
   show sumProjectedEarmarked s' ids = cumulativeEarmarked s
   rw [← hPre]
   exact sum_congr_on hProj
+
+/-! ## Composite call-site theorems — H2 discharged
+
+  In the deployed Solidity, every call site for `_subDebt` and
+  `_subEarmarkedDebt` invokes `_sync(id)` immediately before (lines 502,
+  522, 567, 590, 869, 1052). The local `_subDebt_preserves_invariant`
+  and `_subEarmarkedDebt_preserves_invariant` theorems take that
+  synced precondition (H2) as a hypothesis. The composite theorems
+  below prove the call-site sequence `_sync(id); _<op>(...)` preserves
+  the invariant *without* H2: the synced precondition is discharged
+  inside via `_sync_writes_lastEW` / `_sync_writes_lastRW`. -/
+
+/-- The Nat foldl-sum of projections over `ids` is unchanged across
+    `_sync(tokenId)`. Used to transfer the `hSumNoOverflow` hypothesis
+    of `_subEarmarkedDebt_preserves_invariant` from `s` to the post-sync
+    state. -/
+private theorem _sync_projectedEarmarked_natsum_unchanged
+    (s : ContractState) (tokenId : Uint256) (ids : FiniteSet Uint256)
+    (hQ128MulOne : ∀ x : Uint256, mulQ128 x ONE_Q128 = x) :
+    let s_synced := ((AlchemistV3._sync tokenId).run s).snd
+    ids.elements.foldl
+        (fun b x => b + (projectedEarmarked s_synced x).val) 0 =
+      ids.elements.foldl
+        (fun b x => b + (projectedEarmarked s x).val) 0 := by
+  intro s_synced
+  apply foldl_nat_add_congr
+  intro id _hMem
+  by_cases hid : id = tokenId
+  · subst hid
+    rw [_sync_projectedEarmarked_tokenId s id hQ128MulOne]
+  · rw [_sync_projectedEarmarked_other s tokenId id hid]
+
+/-- **`_sync(tokenId); _subDebt(tokenId, amount)` preserves the
+    invariant.** Discharges H2 (synced-at-touched-id). -/
+theorem _sync_then_subDebt_preserves_invariant
+    (s : ContractState)
+    (ids : FiniteSet Uint256)
+    (tokenId amount : Uint256)
+    (hQ128MulOne : ∀ x : Uint256, mulQ128 x ONE_Q128 = x)
+    (hCumulativeLeTotalDebt :
+      cumulativeEarmarked s ≤ sub (totalDebt s) amount) :
+    let s_synced := ((AlchemistV3._sync tokenId).run s).snd
+    let s' := ((AlchemistV3._subDebt tokenId amount).run s_synced).snd
+    _subDebt_preserves_invariant_spec s s' ids tokenId := by
+  intro s_synced s' hMem hPre
+  -- Sync preserves the invariant.
+  have hSyncedInvariant :
+      sumProjectedEarmarked s_synced ids = cumulativeEarmarked s_synced :=
+    _sync_preserves_invariant s ids tokenId hQ128MulOne hPre
+  -- After sync, tokenId is synced (H2 discharged).
+  have hSyncedH2 :
+      accounts_lastAccruedEarmarkWeight s_synced tokenId = _earmarkWeight s_synced ∧
+      accounts_lastAccruedRedemptionWeight s_synced tokenId = _redemptionWeight s_synced := by
+    constructor
+    · show s_synced.storageMapUint 102 tokenId = s_synced.storage 2
+      rcases _sync_slot_write tokenId s with ⟨_h0, _h1, h2, _h3, _h4, _h5⟩
+      rw [h2]
+      exact _sync_writes_lastEW tokenId s
+    · show s_synced.storageMapUint 103 tokenId = s_synced.storage 3
+      rcases _sync_slot_write tokenId s with ⟨_h0, _h1, _h2, h3, _h4, _h5⟩
+      rw [h3]
+      exact _sync_writes_lastRW tokenId s
+  -- H4 transfers across sync (cumulativeEarmarked and totalDebt unchanged).
+  have hSyncedH4 :
+      cumulativeEarmarked s_synced ≤ sub (totalDebt s_synced) amount := by
+    rcases _sync_slot_write tokenId s with ⟨h0, h1, _h2, _h3, _h4, _h5⟩
+    have hC : cumulativeEarmarked s_synced = cumulativeEarmarked s := h0
+    have hT : totalDebt s_synced = totalDebt s := h1
+    show (cumulativeEarmarked s_synced).val ≤ (sub (totalDebt s_synced) amount).val
+    rw [hC, hT]
+    exact hCumulativeLeTotalDebt
+  -- Apply the local theorem on the synced state.
+  exact _subDebt_preserves_invariant s_synced ids tokenId amount hQ128MulOne
+    hSyncedH2 hSyncedH4 hMem hSyncedInvariant
+
+/-- **`_sync(accountId); _subEarmarkedDebt(amount, accountId)` preserves
+    the invariant.** Discharges H2 (synced-at-touched-id). -/
+theorem _sync_then_subEarmarkedDebt_preserves_invariant
+    (s : ContractState)
+    (ids : FiniteSet Uint256)
+    (amountInDebtTokens accountId : Uint256)
+    (hQ128MulOne : ∀ x : Uint256, mulQ128 x ONE_Q128 = x)
+    (hSumNoOverflow :
+      ids.elements.foldl (fun b x => b + (projectedEarmarked s x).val) 0 <
+        Verity.Core.Uint256.modulus) :
+    let s_synced := ((AlchemistV3._sync accountId).run s).snd
+    let s' :=
+      ((AlchemistV3._subEarmarkedDebt amountInDebtTokens accountId).run s_synced).snd
+    _subEarmarkedDebt_preserves_invariant_spec s s' ids accountId := by
+  intro s_synced s' hMem hPre
+  have hSyncedInvariant :
+      sumProjectedEarmarked s_synced ids = cumulativeEarmarked s_synced :=
+    _sync_preserves_invariant s ids accountId hQ128MulOne hPre
+  have hSyncedH2 :
+      accounts_lastAccruedEarmarkWeight s_synced accountId = _earmarkWeight s_synced ∧
+      accounts_lastAccruedRedemptionWeight s_synced accountId = _redemptionWeight s_synced := by
+    constructor
+    · show s_synced.storageMapUint 102 accountId = s_synced.storage 2
+      rcases _sync_slot_write accountId s with ⟨_h0, _h1, h2, _h3, _h4, _h5⟩
+      rw [h2]
+      exact _sync_writes_lastEW accountId s
+    · show s_synced.storageMapUint 103 accountId = s_synced.storage 3
+      rcases _sync_slot_write accountId s with ⟨_h0, _h1, _h2, h3, _h4, _h5⟩
+      rw [h3]
+      exact _sync_writes_lastRW accountId s
+  have hSyncedNoOverflow :
+      ids.elements.foldl
+          (fun b x => b + (projectedEarmarked s_synced x).val) 0 <
+        Verity.Core.Uint256.modulus := by
+    rw [_sync_projectedEarmarked_natsum_unchanged s accountId ids hQ128MulOne]
+    exact hSumNoOverflow
+  exact _subEarmarkedDebt_preserves_invariant s_synced ids amountInDebtTokens accountId
+    hQ128MulOne hSyncedH2 hSyncedNoOverflow hMem hSyncedInvariant
 
 /-! ## `redeem(amount)` slot writes and preservation
 
@@ -1467,5 +1776,365 @@ theorem _earmark_preserves_invariant
     show sumProjectedEarmarked s' ids = cumulativeEarmarked s
     rw [← hPre]
     exact sum_congr_on hProjUnchanged
+
+/-! ## Sister invariant: `cumulativeEarmarked ≤ totalDebt`
+
+  The H4 hypothesis on `_subDebt_preserves_invariant`
+  (`cumulativeEarmarked s ≤ sub (totalDebt s) amount`) is the line-1306
+  clamp invariant `cumulativeEarmarked ≤ totalDebt`, projected forward
+  by `amount`. The clamp-invariant itself is preserved by every
+  operation; once we have it as a sister invariant, H4 reduces to the
+  caller-side bound `amount ≤ totalDebt - cumulativeEarmarked` (the
+  live-unearmarked debt the caller already checks).
+
+  The five preservation lemmas below close that loop. -/
+
+theorem _sync_preserves_cumLeTotalDebt
+    (s : ContractState) (tokenId : Uint256) :
+    let s' := ((AlchemistV3._sync tokenId).run s).snd
+    cumulativeEarmarked_le_totalDebt_spec s →
+    cumulativeEarmarked_le_totalDebt_spec s' := by
+  intro s' hPre
+  rcases _sync_slot_write tokenId s with ⟨h0, h1, _h2, _h3, _h4, _h5⟩
+  show (cumulativeEarmarked s').val ≤ (totalDebt s').val
+  show s'.storage 0 ≤ s'.storage 1
+  rw [h0, h1]
+  exact hPre
+
+theorem _subDebt_preserves_cumLeTotalDebt
+    (s : ContractState) (tokenId amount : Uint256) :
+    let s' := ((AlchemistV3._subDebt tokenId amount).run s).snd
+    cumulativeEarmarked_le_totalDebt_spec s →
+    cumulativeEarmarked_le_totalDebt_spec s' := by
+  intro s' _hPre
+  rcases _subDebt_slot_write tokenId amount s with
+    ⟨h1, h0, _h2, _h3, _h4, _hM100, _hM101, _hM102, _hM103, _hM104⟩
+  show (cumulativeEarmarked s').val ≤ (totalDebt s').val
+  show s'.storage 0 ≤ s'.storage 1
+  rw [h0, h1]
+  -- Goal: (if cum > td - amount then td - amount else cum) ≤ td - amount
+  by_cases hClamp : cumulativeEarmarked s > sub (totalDebt s) amount
+  · rw [if_pos hClamp]
+    exact Nat.le_refl _
+  · rw [if_neg hClamp]
+    show (cumulativeEarmarked s).val ≤ (sub (totalDebt s) amount).val
+    have : ¬ (sub (totalDebt s) amount).val < (cumulativeEarmarked s).val := hClamp
+    omega
+
+theorem _subEarmarkedDebt_preserves_cumLeTotalDebt
+    (s : ContractState) (amountInDebtTokens accountId : Uint256) :
+    let s' := ((AlchemistV3._subEarmarkedDebt amountInDebtTokens accountId).run s).snd
+    cumulativeEarmarked_le_totalDebt_spec s →
+    cumulativeEarmarked_le_totalDebt_spec s' := by
+  intro s' hPre
+  rcases _subEarmarkedDebt_slot_write amountInDebtTokens accountId s with
+    ⟨h0, h1, _h2, _h3, _h4, _hM100, _hM101, _hM102, _hM103, _hM104⟩
+  show (cumulativeEarmarked s').val ≤ (totalDebt s').val
+  show s'.storage 0 ≤ s'.storage 1
+  rw [h0, h1]
+  generalize hEtr :
+      subEarmarkedDebt_earmarkToRemove amountInDebtTokens
+        (accounts_debt s accountId) (accounts_earmarked s accountId) = etr
+  -- Goal: (sub cum (ite (etr > cum) cum etr)).val ≤ td.val
+  have hRemoveLeCum :
+      (ite (etr > cumulativeEarmarked s) (cumulativeEarmarked s) etr) ≤
+        cumulativeEarmarked s := by
+    show (ite (etr > cumulativeEarmarked s) (cumulativeEarmarked s) etr).val ≤
+        (cumulativeEarmarked s).val
+    by_cases hC : etr > cumulativeEarmarked s
+    · rw [if_pos hC]
+      exact Nat.le_refl _
+    · rw [if_neg hC]
+      have : ¬ (cumulativeEarmarked s).val < etr.val := hC
+      omega
+  have hSubVal : (sub (cumulativeEarmarked s)
+        (ite (etr > cumulativeEarmarked s) (cumulativeEarmarked s) etr)).val =
+        (cumulativeEarmarked s).val -
+          (ite (etr > cumulativeEarmarked s) (cumulativeEarmarked s) etr).val :=
+    Verity.Core.Uint256.sub_eq_of_le hRemoveLeCum
+  show (sub (cumulativeEarmarked s)
+        (ite (etr > cumulativeEarmarked s) (cumulativeEarmarked s) etr)).val ≤
+        (totalDebt s).val
+  rw [hSubVal]
+  have h1' : (cumulativeEarmarked s).val -
+      (ite (etr > cumulativeEarmarked s) (cumulativeEarmarked s) etr).val
+        ≤ (cumulativeEarmarked s).val := Nat.sub_le _ _
+  exact Nat.le_trans h1' hPre
+
+theorem redeem_preserves_cumLeTotalDebt
+    (s : ContractState) (amount : Uint256)
+    (hQ128MulAppliedLeRedeem :
+      mulQ128 (cumulativeEarmarked s)
+        (redeem_ratioApplied amount (cumulativeEarmarked s))
+        ≤ cumulativeEarmarked s) :
+    let s' := ((AlchemistV3.redeem amount).run s).snd
+    cumulativeEarmarked_le_totalDebt_spec s →
+    cumulativeEarmarked_le_totalDebt_spec s' := by
+  intro s' hPre
+  rcases redeem_slot_write amount s with ⟨h0, h1, _h2, _h3, _h4⟩
+  show (cumulativeEarmarked s').val ≤ (totalDebt s').val
+  show s'.storage 0 ≤ s'.storage 1
+  rw [h0, h1]
+  by_cases hActive : redeem_active amount (cumulativeEarmarked s) = true
+  · rw [hActive]
+    show (mulQ128 (cumulativeEarmarked s)
+            (redeem_ratioApplied amount (cumulativeEarmarked s))).val ≤
+          (sub (totalDebt s)
+            (sub (cumulativeEarmarked s)
+              (mulQ128 (cumulativeEarmarked s)
+                (redeem_ratioApplied amount (cumulativeEarmarked s))))).val
+    have hCum'LeCum :
+        (mulQ128 (cumulativeEarmarked s)
+          (redeem_ratioApplied amount (cumulativeEarmarked s))).val ≤
+            (cumulativeEarmarked s).val := hQ128MulAppliedLeRedeem
+    have hCumLeTd : (cumulativeEarmarked s).val ≤ (totalDebt s).val := hPre
+    have hSubCumVal :
+        (sub (cumulativeEarmarked s)
+          (mulQ128 (cumulativeEarmarked s)
+            (redeem_ratioApplied amount (cumulativeEarmarked s)))).val =
+        (cumulativeEarmarked s).val -
+          (mulQ128 (cumulativeEarmarked s)
+            (redeem_ratioApplied amount (cumulativeEarmarked s))).val :=
+      Verity.Core.Uint256.sub_eq_of_le hCum'LeCum
+    have hSub2Le :
+        (sub (cumulativeEarmarked s)
+          (mulQ128 (cumulativeEarmarked s)
+            (redeem_ratioApplied amount (cumulativeEarmarked s)))).val ≤
+          (totalDebt s).val := by
+      rw [hSubCumVal]
+      omega
+    have hSubTdVal :
+        (sub (totalDebt s)
+          (sub (cumulativeEarmarked s)
+            (mulQ128 (cumulativeEarmarked s)
+              (redeem_ratioApplied amount (cumulativeEarmarked s))))).val =
+          (totalDebt s).val -
+            (sub (cumulativeEarmarked s)
+              (mulQ128 (cumulativeEarmarked s)
+                (redeem_ratioApplied amount (cumulativeEarmarked s)))).val :=
+      Verity.Core.Uint256.sub_eq_of_le hSub2Le
+    rw [hSubTdVal, hSubCumVal]
+    omega
+  · have hInactive : redeem_active amount (cumulativeEarmarked s) = false := by
+      cases h : redeem_active amount (cumulativeEarmarked s)
+      · rfl
+      · exfalso; exact hActive h
+    rw [hInactive]
+    exact hPre
+
+theorem _earmark_preserves_cumLeTotalDebt
+    (s : ContractState)
+    (hEffectiveLeLive :
+      _earmark_effectiveEarmarked (totalDebt s) (cumulativeEarmarked s) (s.storage 5)
+        ≤ sub (totalDebt s) (cumulativeEarmarked s)) :
+    let s' := ((AlchemistV3._earmark).run s).snd
+    cumulativeEarmarked_le_totalDebt_spec s →
+    cumulativeEarmarked_le_totalDebt_spec s' := by
+  intro s' hPre
+  rcases _earmark_slot_write s with ⟨h0, h1, _h2, _h3⟩
+  show (cumulativeEarmarked s').val ≤ (totalDebt s').val
+  show s'.storage 0 ≤ s'.storage 1
+  rw [h0, h1]
+  by_cases hActive :
+      _earmark_active (totalDebt s) (cumulativeEarmarked s) (s.storage 5) = true
+  · rw [hActive]
+    show (add (cumulativeEarmarked s)
+      (_earmark_effectiveEarmarked (totalDebt s) (cumulativeEarmarked s)
+        (s.storage 5))).val ≤ (totalDebt s).val
+    have hCumLeTd : (cumulativeEarmarked s).val ≤ (totalDebt s).val := hPre
+    have hSubVal :
+        (sub (totalDebt s) (cumulativeEarmarked s)).val =
+          (totalDebt s).val - (cumulativeEarmarked s).val :=
+      Verity.Core.Uint256.sub_eq_of_le hCumLeTd
+    have hEffLeSub :
+        (_earmark_effectiveEarmarked (totalDebt s) (cumulativeEarmarked s)
+            (s.storage 5)).val ≤
+          (sub (totalDebt s) (cumulativeEarmarked s)).val := hEffectiveLeLive
+    have hEffLe :
+        (_earmark_effectiveEarmarked (totalDebt s) (cumulativeEarmarked s)
+            (s.storage 5)).val ≤
+          (totalDebt s).val - (cumulativeEarmarked s).val := by
+      rw [← hSubVal]; exact hEffLeSub
+    have hSumLe :
+        (cumulativeEarmarked s).val +
+          (_earmark_effectiveEarmarked (totalDebt s) (cumulativeEarmarked s)
+            (s.storage 5)).val ≤ (totalDebt s).val := by omega
+    have hSumLt :
+        (cumulativeEarmarked s).val +
+          (_earmark_effectiveEarmarked (totalDebt s) (cumulativeEarmarked s)
+            (s.storage 5)).val < Verity.Core.Uint256.modulus :=
+      Nat.lt_of_le_of_lt hSumLe (totalDebt s).isLt
+    have hAddVal :
+        (add (cumulativeEarmarked s)
+          (_earmark_effectiveEarmarked (totalDebt s) (cumulativeEarmarked s)
+            (s.storage 5))).val =
+          (cumulativeEarmarked s).val +
+            (_earmark_effectiveEarmarked (totalDebt s) (cumulativeEarmarked s)
+              (s.storage 5)).val := by
+      show (Verity.Core.Uint256.add _ _).val = _
+      unfold Verity.Core.Uint256.add
+      show (Verity.Core.Uint256.ofNat _).val = _
+      exact Nat.mod_eq_of_lt hSumLt
+    rw [hAddVal]
+    exact hSumLe
+  · have hInactive :
+        _earmark_active (totalDebt s) (cumulativeEarmarked s) (s.storage 5) = false := by
+      cases h : _earmark_active (totalDebt s) (cumulativeEarmarked s) (s.storage 5)
+      · rfl
+      · exfalso; exact hActive h
+    rw [hInactive]
+    exact hPre
+
+/-! ## H4-discharged composite for `_subDebt`
+
+  Combines the sister invariant (`cumulativeEarmarked ≤ totalDebt`) with
+  the caller-side bound (`amount ≤ totalDebt - cumulativeEarmarked` —
+  the live unearmarked debt) to discharge H4 in
+  `_sync_then_subDebt_preserves_invariant`. -/
+
+theorem _sync_then_subDebt_preserves_invariant_v2
+    (s : ContractState)
+    (ids : FiniteSet Uint256)
+    (tokenId amount : Uint256)
+    (hQ128MulOne : ∀ x : Uint256, mulQ128 x ONE_Q128 = x)
+    (hSister : cumulativeEarmarked_le_totalDebt_spec s)
+    (hAmountLeLive : amount ≤ sub (totalDebt s) (cumulativeEarmarked s)) :
+    let s_synced := ((AlchemistV3._sync tokenId).run s).snd
+    let s' := ((AlchemistV3._subDebt tokenId amount).run s_synced).snd
+    _subDebt_preserves_invariant_spec s s' ids tokenId := by
+  -- H4 = (cum ≤ td - amount) follows from sister invariant + caller bound.
+  have hH4 : cumulativeEarmarked s ≤ sub (totalDebt s) amount := by
+    show (cumulativeEarmarked s).val ≤ (sub (totalDebt s) amount).val
+    have hCumLeTd : (cumulativeEarmarked s).val ≤ (totalDebt s).val := hSister
+    have hSubLive : (sub (totalDebt s) (cumulativeEarmarked s)).val =
+        (totalDebt s).val - (cumulativeEarmarked s).val :=
+      Verity.Core.Uint256.sub_eq_of_le hCumLeTd
+    have hAmtLeLiveVal : amount.val ≤ (totalDebt s).val - (cumulativeEarmarked s).val := by
+      have hThis : amount.val ≤ (sub (totalDebt s) (cumulativeEarmarked s)).val :=
+        hAmountLeLive
+      rw [hSubLive] at hThis
+      exact hThis
+    have hAmtLeTd : amount.val ≤ (totalDebt s).val := by omega
+    have hSubAmtVal : (sub (totalDebt s) amount).val =
+        (totalDebt s).val - amount.val :=
+      Verity.Core.Uint256.sub_eq_of_le hAmtLeTd
+    rw [hSubAmtVal]
+    omega
+  exact _sync_then_subDebt_preserves_invariant s ids tokenId amount hQ128MulOne hH4
+
+/-! ## H3 — model counterexample (non-discharge)
+
+  Of the five hypotheses originally surfaced on the preservation
+  theorems, four (H2, H4, H5, H6) are scope cuts: properties the
+  contract itself maintains but that we chose not to prove inside the
+  case. The discharges above remove H2, H4, H5 and the bridging step of
+  H6 (see below) from the user-facing call-site theorems.
+
+  H3 (`accounts_lastAccruedRedemptionWeight s id ≠ 0` for every active
+  id, used in `redeem_preserves_invariant` and `_earmark_preserves_invariant`)
+  is different. It is **not** a scope cut — it is a model artifact.
+
+  ## Concrete counterexample to dropping H3 from `redeem_preserves_invariant`
+
+  Build the following ContractState `s`:
+
+      storage 0 (cumulativeEarmarked)        = 2
+      storage 1 (totalDebt)                  = 3
+      storage 2 (_earmarkWeight)             = ONE_Q128
+      storage 3 (_redemptionWeight)          = 0      ← witness of ¬H3 globally
+      storageMapUint 100 1 (_accounts_debt)              = 3
+      storageMapUint 101 1 (_accounts_earmarked)         = 2
+      storageMapUint 102 1 (lastAccruedEarmarkWeight)    = ONE_Q128
+      storageMapUint 103 1 (lastAccruedRedemptionWeight) = 0    ← H3 violated
+      ids = {1}.
+
+  The conservation invariant *holds* in `s`:
+    projectedEarmarked s 1
+      = mulQ128 (2 + (1 - mulQ128 1 ONE_Q128)) ONE_Q128   -- USR-redeem = ONE_Q128 (lastRW = rW = 0)
+      = mulQ128 (2 + 0) ONE_Q128
+      = 2 = cumulativeEarmarked s.
+
+  Now apply `redeem(1)`:
+    amountClamped = 1, ratioApplied = (2 - 1) / 2 = ONE_Q128/2.
+    cumulativeEarmarked'  = mulQ128 2 (ONE_Q128/2)  = 1.
+    _redemptionWeight'    = mulQ128 0 (ONE_Q128/2)  = 0.    -- still 0
+    Per-account mappings unchanged.
+
+  In the post-state `s'`:
+    projectedEarmarked s' 1
+      = (lastRW=0, rW'=0 → first branch of redemptionSurvivalRatio → ONE_Q128)
+      = mulQ128 (2 + 0) ONE_Q128
+      = 2.
+
+  So `sumProjectedEarmarked s' ids = 2 ≠ 1 = cumulativeEarmarked s'`.
+  The invariant is **broken**.
+
+  ## Why this state is unreachable in deployed Solidity
+
+  Alchemix's `redeem` advances the redemption epoch and resets
+  `_redemptionWeight` to `ONE_Q128` whenever `amount == liveEarmarked`
+  (full wipe). After a full wipe, `_redemptionWeight` is non-zero in
+  the new epoch, and any subsequent `_sync(id)` writes a non-zero
+  snapshot. So in Solidity, `_redemptionWeight = 0` is not a reachable
+  storage value, and H3 is a genuine invariant of the deployed contract.
+
+  Our model collapses the (epoch, index) pair into a flat Q128 weight
+  and writes `redemptionWeight := mulQ128 redemptionWeight 0 = 0`
+  instead of the epoch-reset (Contract.lean simplification block,
+  lines 105–113). The state above is reachable in the model but not in
+  Solidity. H3 is the proxy precondition that hides the elision.
+
+  ## Closing H3 honestly
+
+  Two options to remove H3 as a hypothesis:
+
+  1. **Extend the model with epochs.** Replace the flat
+     `_redemptionWeight` slot with a packed (epoch, index) representation
+     and faithfully model the epoch-advance branch of `redeem`. After
+     that change, H3 becomes provable as a sister invariant. This is
+     the right long-term move; it is out of scope for this case.
+
+  2. **Strengthen the precondition.** Replace H3 with a stronger,
+     per-id condition that *is* preserved in the flat model — e.g.
+     "every active id has been re-synced after the most recent
+     redeem(amount) with amount = cumulativeEarmarked". This narrows
+     the theorem's reach without changing the model.
+
+  We chose (1) as the proper fix and surface this comment as the
+  honest documentation. -/
+
+/-! ## H6 — parallel debt-conservation summation (scope cut)
+
+  The remaining hypothesis is the bridging identity used inside
+  `_earmark_preserves_invariant`:
+
+      _earmark_active s →
+        ids.sum (earmark_unearmarkedTimesRSR s) =
+          sub (totalDebt s) (cumulativeEarmarked s)
+
+  Read in plain terms: the Q128-projected sum of every account's
+  unearmarked-survivor exposure equals the live unearmarked debt.
+
+  This is the projected counterpart of the **debt-conservation sister
+  invariant** the contract maintains:
+
+      Σ_id (accounts_debt s id) = totalDebt s.
+
+  Discharging it from first principles requires:
+
+  1. Modeling the debt-mutation operations the case currently leaves
+     out: `_addDebt`, `_resetDebt`, the constructor write that seeds
+     `totalDebt = 0`. These touch `accounts_debt` and `totalDebt` but
+     not `accounts_earmarked` or `cumulativeEarmarked`, so they sit
+     "next to" the earmark-side ops we did model.
+  2. Proving debt-conservation as a sister invariant preserved by
+     every op (5 modeled here + the new debt-mutation ones).
+  3. Promoting that storage-level invariant to its Q128-projected form
+     via the per-id projection algebra already developed in this file.
+
+  Each step is mechanical and uses the same slot-write + survival-ratio
+  toolkit we built for the earmark side. The case scope was the
+  earmark side, so we carry H6 as a hypothesis here. A follow-up case
+  on the debt side closes the loop and removes H6 entirely. -/
 
 end Benchmark.Cases.Alchemix.EarmarkConservation
