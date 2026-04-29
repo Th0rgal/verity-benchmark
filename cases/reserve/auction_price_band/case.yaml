@@ -8,7 +8,7 @@ implementation_id: dtfs
 stage: build_green
 translation_status: translated
 spec_status: frozen
-proof_status: partial
+proof_status: complete
 upstream_repo: https://github.com/reserve-protocol/dtfs
 upstream_commit: 14f75d18856d587adfaff24e77e5b20dda7c7267
 original_contract_path: contracts/utils/RebalancingLib.sol

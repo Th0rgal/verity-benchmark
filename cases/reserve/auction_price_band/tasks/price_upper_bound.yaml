@@ -14,7 +14,7 @@ difficulty: hard
 category: arithmetic-invariant
 track: proof-only
 translation_status: translated
-proof_status: partial
+proof_status: complete
 evaluation_engine: lean_proof_generation
 implementation_files:
   - cases/reserve/auction_price_band/verity/Contract.lean
@@ -28,8 +28,8 @@ reference_solution_module: Benchmark.Cases.Reserve.AuctionPriceBand.Proofs
 reference_solution_declaration: Benchmark.Cases.Reserve.AuctionPriceBand.price_upper_bound
 abstraction_level: protocol_slice
 abstraction_notes: >
-  Upper band: `price ≤ startPrice` for any timestamp. Relies on the
-  axiom `exp_nonpositive_le_d18` (declared in Contract.lean) plus
-  `mulDivUp` ceiling-division algebra to discharge the interior branch.
-  Phase 3 proving target.
+  Upper band: `price ≤ startPrice` for any timestamp. Discharged via
+  the axiom `MathLib_exp_nonpositive_le_D18` (declared in Contract.lean)
+  plus the `mulDivUp_le_self_of_le` ceil-division lemma proven inline
+  in Proofs.lean.
 unsupported_feature_codes: []
