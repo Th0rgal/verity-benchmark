@@ -12,7 +12,7 @@ import Benchmark.Cases.Alchemix.EarmarkConservation.Proofs
 
     H1  Q128 idealization                    irreducible (modeling level)
     H2  Synced-at-touched-id                 discharged compositionally
-    H3  lastAccruedRedemptionWeight ≠ 0      model artifact (counterexample below)
+    H3  lastAccruedRedemptionWeight ≠ 0      reachability artifact (counterexample below)
     H4  cumulativeEarmarked ≤ totalDebt − amount   discharged via sister invariant
     H5  accounts_earmarked ≤ cumulativeEarmarked   discharged from invariant + non-overflow
     H6  Σ unearmarkedTimesRSR = totalDebt − cumulativeEarmarked
@@ -25,7 +25,7 @@ import Benchmark.Cases.Alchemix.EarmarkConservation.Proofs
   out of scope).
 
   The remaining five are addressed below. H2/H4/H5 are discharged as
-  Lean theorems. H3 and H6 are model-level falsifiable from explicit
+  Lean theorems. H3 and H6 are falsifiable from explicit
   counterexample states. -/
 
 namespace Benchmark.Cases.Alchemix.EarmarkConservation
@@ -212,15 +212,16 @@ theorem H6_not_a_tautology :
 
   H3 is the precondition `∀ id ∈ ids, accounts_lastAccruedRedemptionWeight
   s id ≠ 0` carried by `redeem_preserves_invariant`. We show it cannot
-  be dropped: a state satisfying the conservation invariant in pre, and
-  violating H3, can have the conservation invariant break in post-state
-  after `redeem(amount)`.
+  be dropped from the current arbitrary-state theorem surface: a state
+  satisfying the conservation invariant in pre, and violating H3, can
+  have the conservation invariant break in post-state after
+  `redeem(amount)`.
 
   Storage layout of the witness (as in the `Proofs.lean` H3 commentary):
     storage 0  (cumulativeEarmarked)         = 2
     storage 1  (totalDebt)                   = 3
     storage 2  (_earmarkWeight)              = ONE_Q128
-    storage 3  (_redemptionWeight)           = 0   ← witness of ¬H3 globally
+    storage 3  (_redemptionWeight)           = 0   ← unreachable deployed state
     storageMapUint 100 1 (debt)              = 3
     storageMapUint 101 1 (earmarked)         = 2
     storageMapUint 102 1 (lastAccruedEW)     = ONE_Q128
@@ -228,11 +229,13 @@ theorem H6_not_a_tautology :
     ids = {1}.
 
   The post-state (after `redeem(1)`) has cumulativeEarmarked = 1 but
-  the per-account projection still computes to 2 because both the
-  pre and post `_redemptionWeight` and `lastAccruedRedemptionWeight`
-  are zero, so the redemption survival ratio collapses to ONE_Q128
-  via the `lastRW = rW` branch — the projection ignores the redeem
-  step entirely. -/
+  the per-account projection still computes to 2 because
+  `lastAccruedRedemptionWeight = 0` triggers the uninitialized-snapshot
+  branch of `_redemptionSurvivalRatio`, so the projection ignores the
+  redeem step entirely. This witness is unreachable in deployed
+  Solidity, which seeds `_redemptionWeight = ONE_Q128` during
+  `initialize()`, but it remains admissible in the benchmark's
+  arbitrary-state theorem surface. -/
 
 def h3_cex_state : ContractState :=
   { Verity.defaultState with

@@ -55,6 +55,14 @@ def _redemptionWeight (s : ContractState) : Uint256 := s.storage 3
 /-- Models `AlchemistV3._survivalAccumulator` (slot 4). -/
 def _survivalAccumulator (s : ContractState) : Uint256 := s.storage 4
 
+/-- Models `AlchemistV3._earmarkEpochStartRedemptionWeight[epoch]`. -/
+def earmarkEpochStartRedemptionWeight (s : ContractState) (epoch : Uint256) : Uint256 :=
+  s.storageMapUint 105 epoch
+
+/-- Models `AlchemistV3._earmarkEpochStartSurvivalAccumulator[epoch]`. -/
+def earmarkEpochStartSurvivalAccumulator (s : ContractState) (epoch : Uint256) : Uint256 :=
+  s.storageMapUint 106 epoch
+
 /-- Models `AlchemistV3._accounts[id].debt`. -/
 def accounts_debt (s : ContractState) (id : Uint256) : Uint256 :=
   s.storageMapUint 100 id
@@ -73,6 +81,50 @@ def accounts_lastAccruedEarmarkWeight (s : ContractState) (id : Uint256) : Uint2
 /-- Models `AlchemistV3._accounts[id].lastAccruedRedemptionWeight`. -/
 def accounts_lastAccruedRedemptionWeight (s : ContractState) (id : Uint256) : Uint256 :=
   s.storageMapUint 103 id
+
+/-- Models `AlchemistV3._accounts[id].lastSurvivalAccumulator`. -/
+def accounts_lastSurvivalAccumulator (s : ContractState) (id : Uint256) : Uint256 :=
+  s.storageMapUint 104 id
+
+/-! ## Packed weight helpers -/
+
+/-- Packed epoch/index base: `2^129`. -/
+def TWO_POW_129 : Uint256 := 680564733841876926926749214863536422912
+
+/-- Extract the epoch from a packed `(epoch, index)` weight. -/
+def packedEpoch (packed : Uint256) : Uint256 := packed / TWO_POW_129
+
+/-- Extract the low index from a packed `(epoch, index)` weight. -/
+def packedIndex (packed : Uint256) : Uint256 := packed % TWO_POW_129
+
+/-- Pack an `(epoch, index)` pair. -/
+def packWeight (epoch index : Uint256) : Uint256 := epoch * TWO_POW_129 + index
+
+/-- `_earmarkSurvivalRatio(oldPacked, newPacked)` from Solidity. -/
+def _earmarkSurvivalRatio (oldPacked newPacked : Uint256) : Uint256 :=
+  if newPacked = oldPacked then ONE_Q128
+  else if oldPacked = 0 then ONE_Q128
+  else
+    let oldEpoch := packedEpoch oldPacked
+    let newEpoch := packedEpoch newPacked
+    if newEpoch > oldEpoch then 0
+    else
+      let oldIdx := packedIndex oldPacked
+      let newIdx := packedIndex newPacked
+      if oldIdx = 0 then 0 else divQ128 newIdx oldIdx
+
+/-- `_redemptionSurvivalRatio(oldPacked, newPacked)` from Solidity. -/
+def _redemptionSurvivalRatio (oldPacked newPacked : Uint256) : Uint256 :=
+  if newPacked = oldPacked then ONE_Q128
+  else if oldPacked = 0 then ONE_Q128
+  else
+    let oldEpoch := packedEpoch oldPacked
+    let newEpoch := packedEpoch newPacked
+    if newEpoch > oldEpoch then 0
+    else
+      let oldIdx := packedIndex oldPacked
+      let newIdx := packedIndex newPacked
+      if oldIdx = 0 then 0 else divQ128 newIdx oldIdx
 
 /-! ## Lazy projection — `_computeUnrealizedAccount`
 
@@ -99,47 +151,89 @@ structure ComputeUnrealizedAccountResult where
 
 /-- Models `_computeUnrealizedAccount(account, _earmarkWeight,
     _redemptionWeight, _survivalAccumulator)`
-    (AlchemistV3.sol:1478-1579), within-epoch / within-survival-window
-    telescoped path, idealized (no Q128 floor-rounding drift). -/
+    (AlchemistV3.sol:1478-1579), including the crossed-earmark-epoch
+    branch, idealized (no Q128 floor-rounding drift). -/
 def _computeUnrealizedAccount (s : ContractState) (id : Uint256)
     : ComputeUnrealizedAccountResult :=
   let eW    := _earmarkWeight s
   let rW    := _redemptionWeight s
   let lastEW := accounts_lastAccruedEarmarkWeight s id
   let lastRW := accounts_lastAccruedRedemptionWeight s id
+  let lastSA := accounts_lastSurvivalAccumulator s id
   let dbt    := accounts_debt s id
   let earm   := accounts_earmarked s id
 
   -- src: AlchemistV3.sol:1747-1763 — _earmarkSurvivalRatio(lastEW, eW)
-  let unearmarkSurvivalQ := div (mul eW ONE_Q128) lastEW
-  let unearmarkSurvivalRatio :=
-    if lastEW = eW then ONE_Q128
-    else if lastEW = 0 then ONE_Q128
-    else unearmarkSurvivalQ
+  let unearmarkSurvivalRatio := _earmarkSurvivalRatio lastEW eW
 
   -- src: AlchemistV3.sol:1768-1789 — _redemptionSurvivalRatio(lastRW, rW)
-  let redemptionSurvivalQ := div (mul rW ONE_Q128) lastRW
-  let redemptionSurvivalRatio :=
-    if lastRW = rW then ONE_Q128
-    else if lastRW = 0 then ONE_Q128
-    else redemptionSurvivalQ
+  let survivalRatio := _redemptionSurvivalRatio lastRW rW
 
   -- src: AlchemistV3.sol:1489-1497 — userExposure, unearmarkedRemaining, earmarkRaw
   let userExposure := if dbt > earm then sub dbt earm else 0
   let unearmarkedRemaining := div (mul userExposure unearmarkSurvivalRatio) ONE_Q128
   let earmarkRaw := sub userExposure unearmarkedRemaining
 
-  -- src: AlchemistV3.sol:1530+1577 — newEarmarked (telescoped same-epoch)
-  let totalEarmarkedNow := add earm earmarkRaw
-  let newEarmarked := div (mul totalEarmarkedNow redemptionSurvivalRatio) ONE_Q128
+  -- src: AlchemistV3.sol:1500-1505 — no-redemption early return
+  let noRedemption := survivalRatio = ONE_Q128
+  let earlyNewDebt := dbt
+  let earlyNewEarmarkedUncapped := add earm earmarkRaw
+  let earlyNewEarmarked :=
+    if earlyNewEarmarkedUncapped > earlyNewDebt then earlyNewDebt else earlyNewEarmarkedUncapped
 
-  -- src: AlchemistV3.sol:1573-1576 — redeemedTotal, newDebt
-  let redeemedFromAccount := sub totalEarmarkedNow newEarmarked
-  let newDebt := if dbt ≥ redeemedFromAccount then sub dbt redeemedFromAccount else 0
+  -- src: AlchemistV3.sol:1509-1566 — default and crossed-epoch reconciliation
+  let earmarkSurvivalRaw := packedIndex lastEW
+  let earmarkSurvival := if earmarkSurvivalRaw = 0 then ONE_Q128 else earmarkSurvivalRaw
+  let decayedRedeemed := mulQ128 lastSA survivalRatio
+  let survivalDiffRaw :=
+    if _survivalAccumulator s > decayedRedeemed then sub (_survivalAccumulator s) decayedRedeemed else 0
+  let survivalDiff := if survivalDiffRaw > earmarkSurvival then earmarkSurvival else survivalDiffRaw
+  let unredeemedRatio := divQ128 survivalDiff earmarkSurvival
+  let defaultEarmarkedUnredeemed := mulQ128 userExposure unredeemedRatio
+  let oldEarEpoch := packedEpoch lastEW
+  let newEarEpoch := packedEpoch eW
+  let currentEarmarkIndex := packedIndex eW
+  let telescopedEarmarkDrop :=
+    if earmarkSurvival > currentEarmarkIndex then sub earmarkSurvival currentEarmarkIndex else 0
+  let sameEpochEarmarkedUnredeemed :=
+    if survivalDiff = mulQ128 telescopedEarmarkDrop survivalRatio
+    then mulQ128 earmarkRaw survivalRatio
+    else defaultEarmarkedUnredeemed
+  let boundaryEpoch := add oldEarEpoch 1
+  let boundaryRedemptionWeight := earmarkEpochStartRedemptionWeight s boundaryEpoch
+  let boundarySurvivalAccumulator := earmarkEpochStartSurvivalAccumulator s boundaryEpoch
+  let crossedEpochEarmarkedUnredeemed :=
+    if boundaryRedemptionWeight != 0 then
+      let preBoundarySurvival := _redemptionSurvivalRatio lastRW boundaryRedemptionWeight
+      let decayedAtBoundary := mulQ128 lastSA preBoundarySurvival
+      let boundaryDiffRaw :=
+        if boundarySurvivalAccumulator > decayedAtBoundary
+        then sub boundarySurvivalAccumulator decayedAtBoundary else 0
+      let boundaryDiff := if boundaryDiffRaw > earmarkSurvival then earmarkSurvival else boundaryDiffRaw
+      let unredeemedAtBoundaryRatio := divQ128 boundaryDiff earmarkSurvival
+      let unredeemedAtBoundary := mulQ128 userExposure unredeemedAtBoundaryRatio
+      let postBoundarySurvival := _redemptionSurvivalRatio boundaryRedemptionWeight rW
+      mulQ128 unredeemedAtBoundary postBoundarySurvival
+    else
+      mulQ128 earmarkRaw survivalRatio
+  let earmarkedUnredeemedPreCap :=
+    if newEarEpoch > oldEarEpoch then crossedEpochEarmarkedUnredeemed else sameEpochEarmarkedUnredeemed
+  let earmarkedUnredeemed :=
+    if earmarkedUnredeemedPreCap > earmarkRaw then earmarkRaw else earmarkedUnredeemedPreCap
+  let exposureSurvival := mulQ128 earm survivalRatio
+  let redeemedFromEarmarked := sub earmarkRaw earmarkedUnredeemed
+  let redeemedTotal := add (sub earm exposureSurvival) redeemedFromEarmarked
+  let lateNewDebt := if dbt ≥ redeemedTotal then sub dbt redeemedTotal else 0
+  let lateNewEarmarkedUncapped := add exposureSurvival earmarkedUnredeemed
+  let lateNewEarmarked :=
+    if lateNewEarmarkedUncapped > lateNewDebt then lateNewDebt else lateNewEarmarkedUncapped
+  let newDebt := if noRedemption then earlyNewDebt else lateNewDebt
+  let newEarmarked := if noRedemption then earlyNewEarmarked else lateNewEarmarked
+  let redeemedDebt := dbt - newDebt
 
   { newDebt := newDebt
     newEarmarked := newEarmarked
-    redeemedDebt := redeemedFromAccount }
+    redeemedDebt := redeemedDebt }
 
 /-- Lazy-projected earmarked debt for an account, used by the conservation
     invariant. Equals `_computeUnrealizedAccount(s, id).newEarmarked`. -/

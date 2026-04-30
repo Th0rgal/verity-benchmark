@@ -2022,7 +2022,7 @@ theorem _sync_then_subDebt_preserves_invariant_v2
     omega
   exact _sync_then_subDebt_preserves_invariant s ids tokenId amount hQ128MulOne hH4
 
-/-! ## H3 — model counterexample (non-discharge)
+/-! ## H3 — reachability counterexample (non-discharge)
 
   Of the five hypotheses originally surfaced on the preservation
   theorems, four (H2, H4, H5, H6) are scope cuts: properties the
@@ -2032,7 +2032,9 @@ theorem _sync_then_subDebt_preserves_invariant_v2
 
   H3 (`accounts_lastAccruedRedemptionWeight s id ≠ 0` for every active
   id, used in `redeem_preserves_invariant` and `_earmark_preserves_invariant`)
-  is different. It is **not** a scope cut — it is a model artifact.
+  is different. It is **not** an algebraic consequence of the modeled
+  preservation theorems on arbitrary `ContractState`s; it is a
+  reachability fact about deployed states.
 
   ## Concrete counterexample to dropping H3 from `redeem_preserves_invariant`
 
@@ -2041,7 +2043,7 @@ theorem _sync_then_subDebt_preserves_invariant_v2
       storage 0 (cumulativeEarmarked)        = 2
       storage 1 (totalDebt)                  = 3
       storage 2 (_earmarkWeight)             = ONE_Q128
-      storage 3 (_redemptionWeight)          = 0      ← witness of ¬H3 globally
+      storage 3 (_redemptionWeight)          = 0      ← unreachable deployed state
       storageMapUint 100 1 (_accounts_debt)              = 3
       storageMapUint 101 1 (_accounts_earmarked)         = 2
       storageMapUint 102 1 (lastAccruedEarmarkWeight)    = ONE_Q128
@@ -2057,12 +2059,14 @@ theorem _sync_then_subDebt_preserves_invariant_v2
   Now apply `redeem(1)`:
     amountClamped = 1, ratioApplied = (2 - 1) / 2 = ONE_Q128/2.
     cumulativeEarmarked'  = mulQ128 2 (ONE_Q128/2)  = 1.
-    _redemptionWeight'    = mulQ128 0 (ONE_Q128/2)  = 0.    -- still 0
+    normalize packedOld=0 to (epoch=0,index=ONE_Q128),
+    ratioWanted = ONE_Q128/2,
+    _redemptionWeight'    = pack(0, ONE_Q128/2).
     Per-account mappings unchanged.
 
   In the post-state `s'`:
     projectedEarmarked s' 1
-      = (lastRW=0, rW'=0 → first branch of redemptionSurvivalRatio → ONE_Q128)
+      = (lastRW=0 → first branch of redemptionSurvivalRatio → ONE_Q128)
       = mulQ128 (2 + 0) ONE_Q128
       = 2.
 
@@ -2071,37 +2075,34 @@ theorem _sync_then_subDebt_preserves_invariant_v2
 
   ## Why this state is unreachable in deployed Solidity
 
-  Alchemix's `redeem` advances the redemption epoch and resets
-  `_redemptionWeight` to `ONE_Q128` whenever `amount == liveEarmarked`
-  (full wipe). After a full wipe, `_redemptionWeight` is non-zero in
-  the new epoch, and any subsequent `_sync(id)` writes a non-zero
-  snapshot. So in Solidity, `_redemptionWeight = 0` is not a reachable
-  storage value, and H3 is a genuine invariant of the deployed contract.
+  The crossed-epoch and full-wipe redemption logic is now modeled
+  faithfully: `redeem` normalizes packed zero, carries epochs, and
+  resets the index on full wipes. The remaining issue is simpler:
+  the benchmark still quantifies over arbitrary `ContractState`s, while
+  deployed Solidity starts from `initialize()`, which seeds
+  `_redemptionWeight = ONE_Q128`, `_earmarkWeight = ONE_Q128`, and the
+  epoch-0 boundary checkpoints. From that initialized base, `_sync`
+  copies non-zero redemption checkpoints into accounts and `redeem`
+  preserves the non-zero packed structure.
 
-  Our model collapses the (epoch, index) pair into a flat Q128 weight
-  and writes `redemptionWeight := mulQ128 redemptionWeight 0 = 0`
-  instead of the epoch-reset (Contract.lean simplification block,
-  lines 105–113). The state above is reachable in the model but not in
-  Solidity. H3 is the proxy precondition that hides the elision.
+  So H3 is no longer hiding a crossed-epoch modeling omission. It is
+  the proxy precondition that excludes unreachable uninitialized states
+  from the theorem surface.
 
   ## Closing H3 honestly
 
   Two options to remove H3 as a hypothesis:
 
-  1. **Extend the model with epochs.** Replace the flat
-     `_redemptionWeight` slot with a packed (epoch, index) representation
-     and faithfully model the epoch-advance branch of `redeem`. After
-     that change, H3 becomes provable as a sister invariant. This is
-     the right long-term move; it is out of scope for this case.
+  1. **Model initialization / reachability.** Add `initialize()` (or an
+     explicit initialized-state predicate) and prove H3 as a sister
+     invariant preserved from that base.
 
-  2. **Strengthen the precondition.** Replace H3 with a stronger,
-     per-id condition that *is* preserved in the flat model — e.g.
-     "every active id has been re-synced after the most recent
-     redeem(amount) with amount = cumulativeEarmarked". This narrows
-     the theorem's reach without changing the model.
+  2. **Keep the precondition.** Continue quantifying over arbitrary
+     `ContractState`s and use H3 to exclude the unreachable
+     uninitialized corner.
 
-  We chose (1) as the proper fix and surface this comment as the
-  honest documentation. -/
+  This patch completed the epoch-modeling part. The remaining work to
+  discharge H3 is state-reachability, not crossed-epoch semantics. -/
 
 /-! ## H6 — parallel debt-conservation summation (scope cut)
 

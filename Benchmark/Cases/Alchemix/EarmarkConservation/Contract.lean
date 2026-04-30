@@ -75,17 +75,6 @@ open Verity.Stdlib.Math
     Workaround is purely spec-level: pass the finset explicitly.
 
   What was simplified:
-  - The cross-epoch branch of `_computeUnrealizedAccount` (source lines
-    1539-1564: when the earmark epoch advances between an account's last
-    sync and now, the projection splits at the boundary using the
-    `_earmarkEpochStartRedemptionWeight` / `_earmarkEpochStartSurvivalAccumulator`
-    snapshot mappings) is folded into the same-epoch path.
-  Why:
-  - This first-pass case targets the within-epoch conservation property,
-    which is the dominant operational regime. The cross-epoch reconciliation
-    logic is correctness-preserving but adds substantial proof surface.
-
-  What was simplified:
   - The default same-epoch sub-branch of `_computeUnrealizedAccount`
     (source line 1517: `earmarkedUnredeemed = mulQ128(userExposure,
     unredeemedRatio)` via `_survivalAccumulator` diff) is collapsed into
@@ -101,16 +90,6 @@ open Verity.Stdlib.Math
   - Under the conservation invariant pre-state and Q128 idealization, the
     cap is provably a no-op (one of the side-properties carried by the
     invariant is `account.earmarked ≤ account.debt`).
-
-  What was simplified:
-  - When `redeem(amount)` is called with `amount == liveEarmarked` (full
-    wipe), the source advances the redemption epoch and resets the index
-    via `_packRed(oldEpoch + 1, ONE_Q128)`. The model writes
-    `redemptionWeight := mulQ128(redemptionWeight, 0) = 0` instead.
-  Why:
-  - The model treats `_redemptionWeight` as a flat Q128 weight, not a
-    packed (epoch, index) pair. Both representations yield the same
-    survival ratio of 0 on every consumer path.
 
   What was simplified:
   - Early-returns and conditional state writes are encoded with pure `ite`
@@ -171,6 +150,10 @@ open Verity.Stdlib.Math
     `Specs.lean` and `Proofs.lean`. -/
 def ONE_Q128 : Uint256 := 340282366920938463463374607431768211456
 
+/-- Packed epoch/index base: `2^129`. Source: `_REDEMPTION_INDEX_BITS`
+    and `_EARMARK_INDEX_BITS` are both 129. -/
+def TWO_POW_129 : Uint256 := 680564733841876926926749214863536422912
+
 /-- `mulQ128(a, b) = floor(a * b / 2^128)`. Treated as exact under the
     Q128-idealization assumption (see `Specs.lean`).
 
@@ -201,13 +184,13 @@ verity_contract AlchemistV3 where
     totalDebt : Uint256 := slot 1
 
     /- Models `uint256 private _earmarkWeight;` (AlchemistV3.sol:120).
-       Q128 packed weight tracking how much live unearmarked debt survives
-       each earmark step. -/
+       Packed `(epoch, index)` weight tracking how much live unearmarked
+       debt survives each earmark step. -/
     _earmarkWeight : Uint256 := slot 2
 
     /- Models `uint256 private _redemptionWeight;` (AlchemistV3.sol:123).
-       Q128 packed weight tracking survival of earmarked debt across
-       redemptions. -/
+       Packed `(epoch, index)` weight tracking survival of earmarked debt
+       across redemptions. -/
     _redemptionWeight : Uint256 := slot 3
 
     /- Models `uint256 private _survivalAccumulator;` (AlchemistV3.sol:126).
@@ -238,9 +221,15 @@ verity_contract AlchemistV3 where
     /- Models `_accounts[tokenId].lastSurvivalAccumulator`. -/
     _accounts_lastSurvivalAccumulator : Uint256 → Uint256 := slot 104
 
+    /- Models `_earmarkEpochStartRedemptionWeight[epoch]`. -/
+    _earmarkEpochStartRedemptionWeight : Uint256 → Uint256 := slot 105
+
+    /- Models `_earmarkEpochStartSurvivalAccumulator[epoch]`. -/
+    _earmarkEpochStartSurvivalAccumulator : Uint256 → Uint256 := slot 106
+
   /-
-    Models `_earmark()` (AlchemistV3.sol:1582-1641), within-epoch path
-    only. The pre-amble (lines 1583-1609) is abstracted into a single
+    Models `_earmark()` (AlchemistV3.sol:1582-1641). The pre-amble
+    (lines 1583-1609) is abstracted into a single
     `_transmuterEarmarkAmount` ghost read.
 
     Solidity (the part we model, lines 1610-1640):
@@ -250,12 +239,17 @@ verity_contract AlchemistV3 where
       if (amount > 0 && liveUnearmarked != 0) {
         uint256 ratioWanted = (amount == liveUnearmarked) ? 0
           : divQ128(liveUnearmarked - amount, liveUnearmarked);
-        // _simulateEarmarkPackedUpdate (within-epoch): ratioApplied = ratioWanted
-        uint256 ratioApplied = ratioWanted;
-        uint256 oldEarmarkWeight = _earmarkWeight;
-        _earmarkWeight = mulQ128(oldEarmarkWeight, ratioApplied);
+        uint256 packedOld = _earmarkWeight;
+        (uint256 packedNew, uint256 ratioApplied, uint256 oldIndex,
+          uint256 newEpoch, bool epochAdvanced) =
+          _simulateEarmarkPackedUpdate(packedOld, ratioWanted);
+        _earmarkWeight = packedNew;
         uint256 earmarkedFraction = ONE_Q128 - ratioApplied;
-        _survivalAccumulator += mulQ128(oldEarmarkWeight, earmarkedFraction);
+        _survivalAccumulator += mulQ128(oldIndex, earmarkedFraction);
+        if (epochAdvanced) {
+          _earmarkEpochStartRedemptionWeight[newEpoch] = _redemptionWeight;
+          _earmarkEpochStartSurvivalAccumulator[newEpoch] = _survivalAccumulator;
+        }
         uint256 newUnearmarked = mulQ128(liveUnearmarked, ratioApplied);
         uint256 effectiveEarmarked = liveUnearmarked - newUnearmarked;
         cumulativeEarmarked += effectiveEarmarked;
@@ -265,7 +259,8 @@ verity_contract AlchemistV3 where
     -- src: AlchemistV3.sol:1583-1609 — transmuter query + cover shares (abstracted)
     let totalDebt_ ← getStorage totalDebt
     let cumulativeEarmarked_ ← getStorage cumulativeEarmarked
-    let earmarkWeight_ ← getStorage _earmarkWeight
+    let packedOld ← getStorage _earmarkWeight
+    let redemptionWeight_ ← getStorage _redemptionWeight
     let survivalAccumulator_ ← getStorage _survivalAccumulator
     let amountIn ← getStorage _transmuterEarmarkAmount
 
@@ -274,25 +269,45 @@ verity_contract AlchemistV3 where
     let amount := ite (amountIn > liveUnearmarked) liveUnearmarked amountIn
 
     -- src: AlchemistV3.sol:1614-1616 — ratioWanted = (amount == liveUnearmarked) ? 0 : divQ128(...)
-    -- Within-epoch: ratioApplied = ratioWanted, inline divQ128.
     let ratioWantedRaw := div (mul (sub liveUnearmarked amount) 340282366920938463463374607431768211456) liveUnearmarked
-    let ratioApplied := ite (amount == liveUnearmarked) 0 ratioWantedRaw
+    let ratioWanted := ite (amount == liveUnearmarked) 0 ratioWantedRaw
 
     -- src: AlchemistV3.sol:1583+1613 — active gate: totalDebt != 0 AND amount > 0 AND liveUnearmarked != 0
     let active := totalDebt_ != 0 && amount != 0 && liveUnearmarked != 0
 
-    -- src: AlchemistV3.sol:1622 — _earmarkWeight = mulQ128(oldEarmarkWeight, ratioApplied)
-    let packedNew := div (mul earmarkWeight_ ratioApplied) 340282366920938463463374607431768211456
-    let newEarmarkWeight := ite active packedNew earmarkWeight_
+    -- src: AlchemistV3.sol:1618-1622 — _simulateEarmarkPackedUpdate + _earmarkWeight write
+    let rawOldEpoch := div packedOld 680564733841876926926749214863536422912
+    let rawOldIndex := mod packedOld 680564733841876926926749214863536422912
+    let oldEpochAfterZero := ite (packedOld == 0) 0 rawOldEpoch
+    let oldIndexAfterZero := ite (packedOld == 0) 340282366920938463463374607431768211456 rawOldIndex
+    let oldEpoch := ite (oldIndexAfterZero == 0) (add oldEpochAfterZero 1) oldEpochAfterZero
+    let oldIndex := ite (oldIndexAfterZero == 0) 340282366920938463463374607431768211456 oldIndexAfterZero
+    let newEpochActive := ite (ratioWanted == 0) (add oldEpoch 1) oldEpoch
+    let newIndexActive := ite (ratioWanted == 0) 340282366920938463463374607431768211456
+      (div (mul oldIndex ratioWanted) 340282366920938463463374607431768211456)
+    let epochAdvanced := newEpochActive > oldEpoch
+    let ratioAppliedActive :=
+      ite epochAdvanced 0
+        (div (mul newIndexActive 340282366920938463463374607431768211456) oldIndex)
+    let packedNewActive := add (mul newEpochActive 680564733841876926926749214863536422912) newIndexActive
+    let newEarmarkWeight := ite active packedNewActive packedOld
 
     -- src: AlchemistV3.sol:1625-1626 — _survivalAccumulator += mulQ128(oldIndex, earmarkedFraction)
-    let earmarkedFraction := sub 340282366920938463463374607431768211456 ratioApplied
-    let survivalIncrement := div (mul earmarkWeight_ earmarkedFraction) 340282366920938463463374607431768211456
+    let earmarkedFraction := sub 340282366920938463463374607431768211456 ratioAppliedActive
+    let survivalIncrement := div (mul oldIndex earmarkedFraction) 340282366920938463463374607431768211456
     let newSurvivalAccumulator :=
       ite active (add survivalAccumulator_ survivalIncrement) survivalAccumulator_
 
+    -- src: AlchemistV3.sol:1628-1630 — epoch boundary snapshots
+    let oldBoundaryRW ← getMappingUint _earmarkEpochStartRedemptionWeight newEpochActive
+    let oldBoundarySA ← getMappingUint _earmarkEpochStartSurvivalAccumulator newEpochActive
+    let newBoundaryRW :=
+      ite (active && epochAdvanced) redemptionWeight_ oldBoundaryRW
+    let newBoundarySA :=
+      ite (active && epochAdvanced) newSurvivalAccumulator oldBoundarySA
+
     -- src: AlchemistV3.sol:1634-1637 — effectiveEarmarked, cumulativeEarmarked += effectiveEarmarked
-    let newUnearmarked := div (mul liveUnearmarked ratioApplied) 340282366920938463463374607431768211456
+    let newUnearmarked := div (mul liveUnearmarked ratioAppliedActive) 340282366920938463463374607431768211456
     let effectiveEarmarked := sub liveUnearmarked newUnearmarked
     let newCumulativeEarmarked :=
       ite active (add cumulativeEarmarked_ effectiveEarmarked) cumulativeEarmarked_
@@ -300,11 +315,13 @@ verity_contract AlchemistV3 where
     setStorage _earmarkWeight newEarmarkWeight
     setStorage _survivalAccumulator newSurvivalAccumulator
     setStorage cumulativeEarmarked newCumulativeEarmarked
+    setMappingUint _earmarkEpochStartRedemptionWeight newEpochActive newBoundaryRW
+    setMappingUint _earmarkEpochStartSurvivalAccumulator newEpochActive newBoundarySA
 
   /-
     Models `_sync(tokenId)` (AlchemistV3.sol:1442-1472), invariant-relevant
-    fields only. The body inlines the within-epoch / within-survival-window
-    path of `_computeUnrealizedAccount` (source lines 1478-1579).
+    fields only. The body inlines the deployed `_computeUnrealizedAccount`
+    path (source lines 1478-1579).
 
     Solidity (_sync):
       Account storage account = _accounts[tokenId];
@@ -327,18 +344,31 @@ verity_contract AlchemistV3 where
     let accountEarmarked_ ← getMappingUint _accounts_earmarked tokenId
     let lastEW_ ← getMappingUint _accounts_lastAccruedEarmarkWeight tokenId
     let lastRW_ ← getMappingUint _accounts_lastAccruedRedemptionWeight tokenId
+    let lastSA_ ← getMappingUint _accounts_lastSurvivalAccumulator tokenId
 
     -- src: AlchemistV3.sol:1747-1763 — _earmarkSurvivalRatio(lastEW, _earmarkWeight)
-    let earmarkSurvivalQ := div (mul earmarkWeight_ 340282366920938463463374607431768211456) lastEW_
+    let oldEarEpoch := div lastEW_ 680564733841876926926749214863536422912
+    let newEarEpoch := div earmarkWeight_ 680564733841876926926749214863536422912
+    let oldEarIdx := mod lastEW_ 680564733841876926926749214863536422912
+    let newEarIdx := mod earmarkWeight_ 680564733841876926926749214863536422912
+    let earmarkSurvivalQ := div (mul newEarIdx 340282366920938463463374607431768211456) oldEarIdx
     let unearmarkSurvivalRatio :=
       ite (lastEW_ == earmarkWeight_) 340282366920938463463374607431768211456
-        (ite (lastEW_ == 0) 340282366920938463463374607431768211456 earmarkSurvivalQ)
+        (ite (lastEW_ == 0) 340282366920938463463374607431768211456
+          (ite (newEarEpoch > oldEarEpoch) 0
+            (ite (oldEarIdx == 0) 0 earmarkSurvivalQ)))
 
     -- src: AlchemistV3.sol:1768-1789 — _redemptionSurvivalRatio(lastRW, _redemptionWeight)
-    let redemptionSurvivalQ := div (mul redemptionWeight_ 340282366920938463463374607431768211456) lastRW_
+    let oldRedEpoch := div lastRW_ 680564733841876926926749214863536422912
+    let newRedEpoch := div redemptionWeight_ 680564733841876926926749214863536422912
+    let oldRedIdx := mod lastRW_ 680564733841876926926749214863536422912
+    let newRedIdx := mod redemptionWeight_ 680564733841876926926749214863536422912
+    let redemptionSurvivalQ := div (mul newRedIdx 340282366920938463463374607431768211456) oldRedIdx
     let redemptionSurvivalRatio :=
       ite (lastRW_ == redemptionWeight_) 340282366920938463463374607431768211456
-        (ite (lastRW_ == 0) 340282366920938463463374607431768211456 redemptionSurvivalQ)
+        (ite (lastRW_ == 0) 340282366920938463463374607431768211456
+          (ite (newRedEpoch > oldRedEpoch) 0
+            (ite (oldRedIdx == 0) 0 redemptionSurvivalQ)))
 
     -- src: AlchemistV3.sol:1489 — userExposure = debt - earmarked
     let userExposure :=
@@ -348,15 +378,73 @@ verity_contract AlchemistV3 where
     let unearmarkedRemaining := div (mul userExposure unearmarkSurvivalRatio) 340282366920938463463374607431768211456
     let earmarkRaw := sub userExposure unearmarkedRemaining
 
-    -- src: AlchemistV3.sol:1530+1577 — newEarmarked (telescoped same-epoch path)
-    -- newEarmarked = mulQ128(account.earmarked + earmarkRaw, redemptionSurvivalRatio)
-    let totalEarmarkedNow := add accountEarmarked_ earmarkRaw
-    let newEarmarked := div (mul totalEarmarkedNow redemptionSurvivalRatio) 340282366920938463463374607431768211456
+    -- src: AlchemistV3.sol:1500-1505 — early return branch when survivalRatio == ONE_Q128
+    let noRedemption := redemptionSurvivalRatio == 340282366920938463463374607431768211456
+    let earlyNewDebt := accountDebt_
+    let earlyNewEarmarkedUncapped := add accountEarmarked_ earmarkRaw
+    let earlyNewEarmarked := ite (earlyNewEarmarkedUncapped > earlyNewDebt) earlyNewDebt earlyNewEarmarkedUncapped
+
+    -- src: AlchemistV3.sol:1509-1566 — default and crossed-epoch earmarkedUnredeemed
+    let earmarkSurvivalRaw := mod lastEW_ 680564733841876926926749214863536422912
+    let earmarkSurvival := ite (earmarkSurvivalRaw == 0) 340282366920938463463374607431768211456 earmarkSurvivalRaw
+    let decayedRedeemed := div (mul lastSA_ redemptionSurvivalRatio) 340282366920938463463374607431768211456
+    let survivalDiffRaw := ite (survivalAccumulator_ > decayedRedeemed) (sub survivalAccumulator_ decayedRedeemed) 0
+    let survivalDiff := ite (survivalDiffRaw > earmarkSurvival) earmarkSurvival survivalDiffRaw
+    let unredeemedRatio := div (mul survivalDiff 340282366920938463463374607431768211456) earmarkSurvival
+    let defaultEarmarkedUnredeemed := div (mul userExposure unredeemedRatio) 340282366920938463463374607431768211456
+    let telescopedEarmarkDrop := ite (earmarkSurvival > newEarIdx) (sub earmarkSurvival newEarIdx) 0
+    let sameEpochTelescoped :=
+      survivalDiff == div (mul telescopedEarmarkDrop redemptionSurvivalRatio) 340282366920938463463374607431768211456
+    let sameEpochEarmarkedUnredeemed :=
+      ite sameEpochTelescoped
+        (div (mul earmarkRaw redemptionSurvivalRatio) 340282366920938463463374607431768211456)
+        defaultEarmarkedUnredeemed
+    let boundaryEpoch := add oldEarEpoch 1
+    let boundaryRedemptionWeight ← getMappingUint _earmarkEpochStartRedemptionWeight boundaryEpoch
+    let boundarySurvivalAccumulator ← getMappingUint _earmarkEpochStartSurvivalAccumulator boundaryEpoch
+    let boundaryOldRedEpoch := div lastRW_ 680564733841876926926749214863536422912
+    let boundaryNewRedEpoch := div boundaryRedemptionWeight 680564733841876926926749214863536422912
+    let boundaryOldRedIdx := mod lastRW_ 680564733841876926926749214863536422912
+    let boundaryNewRedIdx := mod boundaryRedemptionWeight 680564733841876926926749214863536422912
+    let preBoundarySurvivalQ := div (mul boundaryNewRedIdx 340282366920938463463374607431768211456) boundaryOldRedIdx
+    let preBoundarySurvival :=
+      ite (lastRW_ == boundaryRedemptionWeight) 340282366920938463463374607431768211456
+        (ite (lastRW_ == 0) 340282366920938463463374607431768211456
+          (ite (boundaryNewRedEpoch > boundaryOldRedEpoch) 0
+            (ite (boundaryOldRedIdx == 0) 0 preBoundarySurvivalQ)))
+    let decayedAtBoundary := div (mul lastSA_ preBoundarySurvival) 340282366920938463463374607431768211456
+    let boundaryDiffRaw := ite (boundarySurvivalAccumulator > decayedAtBoundary)
+      (sub boundarySurvivalAccumulator decayedAtBoundary) 0
+    let boundaryDiff := ite (boundaryDiffRaw > earmarkSurvival) earmarkSurvival boundaryDiffRaw
+    let unredeemedAtBoundaryRatio := div (mul boundaryDiff 340282366920938463463374607431768211456) earmarkSurvival
+    let unredeemedAtBoundary := div (mul userExposure unredeemedAtBoundaryRatio) 340282366920938463463374607431768211456
+    let postBoundaryOldRedEpoch := div boundaryRedemptionWeight 680564733841876926926749214863536422912
+    let postBoundaryNewRedEpoch := div redemptionWeight_ 680564733841876926926749214863536422912
+    let postBoundaryOldRedIdx := mod boundaryRedemptionWeight 680564733841876926926749214863536422912
+    let postBoundaryNewRedIdx := mod redemptionWeight_ 680564733841876926926749214863536422912
+    let postBoundarySurvivalQ := div (mul postBoundaryNewRedIdx 340282366920938463463374607431768211456) postBoundaryOldRedIdx
+    let postBoundarySurvival :=
+      ite (boundaryRedemptionWeight == redemptionWeight_) 340282366920938463463374607431768211456
+        (ite (boundaryRedemptionWeight == 0) 340282366920938463463374607431768211456
+          (ite (postBoundaryNewRedEpoch > postBoundaryOldRedEpoch) 0
+            (ite (postBoundaryOldRedIdx == 0) 0 postBoundarySurvivalQ)))
+    let crossedEpochEarmarkedUnredeemed :=
+      ite (boundaryRedemptionWeight != 0)
+        (div (mul unredeemedAtBoundary postBoundarySurvival) 340282366920938463463374607431768211456)
+        (div (mul earmarkRaw redemptionSurvivalRatio) 340282366920938463463374607431768211456)
+    let earmarkedUnredeemedPreCap :=
+      ite (newEarEpoch > oldEarEpoch) crossedEpochEarmarkedUnredeemed sameEpochEarmarkedUnredeemed
+    let earmarkedUnredeemed := ite (earmarkedUnredeemedPreCap > earmarkRaw) earmarkRaw earmarkedUnredeemedPreCap
 
     -- src: AlchemistV3.sol:1573-1576 — redeemedTotal, newDebt
-    let redeemedFromAccount := sub totalEarmarkedNow newEarmarked
-    let newDebt :=
-      ite (accountDebt_ >= redeemedFromAccount) (sub accountDebt_ redeemedFromAccount) 0
+    let exposureSurvival := div (mul accountEarmarked_ redemptionSurvivalRatio) 340282366920938463463374607431768211456
+    let redeemedFromEarmarked := sub earmarkRaw earmarkedUnredeemed
+    let redeemedTotal := add (sub accountEarmarked_ exposureSurvival) redeemedFromEarmarked
+    let lateNewDebt := ite (accountDebt_ >= redeemedTotal) (sub accountDebt_ redeemedTotal) 0
+    let lateNewEarmarkedUncapped := add exposureSurvival earmarkedUnredeemed
+    let lateNewEarmarked := ite (lateNewEarmarkedUncapped > lateNewDebt) lateNewDebt lateNewEarmarkedUncapped
+    let newDebt := ite noRedemption earlyNewDebt lateNewDebt
+    let newEarmarked := ite noRedemption earlyNewEarmarked lateNewEarmarked
 
     -- src: AlchemistV3.sol:1463-1471 — write back to account fields
     setMappingUint _accounts_debt tokenId newDebt
@@ -366,7 +454,7 @@ verity_contract AlchemistV3 where
     setMappingUint _accounts_lastSurvivalAccumulator tokenId survivalAccumulator_
 
   /-
-    Models `redeem(amount)` (AlchemistV3.sol:655-731), within-epoch path.
+    Models `redeem(amount)` (AlchemistV3.sol:655-731).
     Only the parts that affect `cumulativeEarmarked`, weights, and `totalDebt`.
     Source's `_earmark()` call at line 656, collateral transfer math at
     lines 712-727, fee transfer, and event emission are out of scope.
@@ -377,8 +465,17 @@ verity_contract AlchemistV3 where
       if (liveEarmarked != 0 && amount != 0) {
         uint256 ratioWanted = (amount == liveEarmarked) ? 0
           : divQ128(liveEarmarked - amount, liveEarmarked);
-        // _redemptionWeight packed update (within-epoch): ratioApplied = ratioWanted
-        _redemptionWeight = mulQ128(_redemptionWeight, ratioApplied);
+        uint256 packedOld = _redemptionWeight;
+        uint256 oldEpoch  = _redEpoch(packedOld);
+        uint256 oldIndex  = _redIndex(packedOld);
+        if (packedOld == 0) { oldEpoch = 0; oldIndex = ONE_Q128; }
+        if (oldIndex == 0) { oldEpoch += 1; oldIndex = ONE_Q128; }
+        uint256 newEpoch = oldEpoch;
+        uint256 newIndex;
+        if (ratioWanted == 0) { newEpoch += 1; newIndex = ONE_Q128; }
+        else { newIndex = mulQ128(oldIndex, ratioWanted); }
+        _redemptionWeight = _packRed(newEpoch, newIndex);
+        uint256 ratioApplied = (newEpoch > oldEpoch) ? 0 : divQ128(newIndex, oldIndex);
         _survivalAccumulator = mulQ128(_survivalAccumulator, ratioApplied);
         uint256 remainingEarmarked = mulQ128(liveEarmarked, ratioApplied);
         uint256 effectiveRedeemed = liveEarmarked - remainingEarmarked;
@@ -397,15 +494,25 @@ verity_contract AlchemistV3 where
     let amountClamped := ite (amount > liveEarmarked) liveEarmarked amount
 
     -- src: AlchemistV3.sol:664-665 — ratioWanted = (amount == liveEarmarked) ? 0 : divQ128(...)
-    -- Within-epoch: ratioApplied = ratioWanted
     let ratioWantedRaw := div (mul (sub liveEarmarked amountClamped) 340282366920938463463374607431768211456) liveEarmarked
-    let ratioApplied := ite (amountClamped == liveEarmarked) 0 ratioWantedRaw
+    let ratioWanted := ite (amountClamped == liveEarmarked) 0 ratioWantedRaw
 
     -- src: AlchemistV3.sol:663 — active gate: liveEarmarked != 0 AND amountClamped != 0
     let active := liveEarmarked != 0 && amountClamped != 0
 
-    -- src: AlchemistV3.sol:693+700+703+707 — inline mulQ128 for each updated value
-    let newRedemptionWeightActive := div (mul redemptionWeight_ ratioApplied) 340282366920938463463374607431768211456
+    -- src: AlchemistV3.sol:668-703 — packed redemption update + applied ratio
+    let rawOldEpoch := div redemptionWeight_ 680564733841876926926749214863536422912
+    let rawOldIndex := mod redemptionWeight_ 680564733841876926926749214863536422912
+    let oldEpochAfterZero := ite (redemptionWeight_ == 0) 0 rawOldEpoch
+    let oldIndexAfterZero := ite (redemptionWeight_ == 0) 340282366920938463463374607431768211456 rawOldIndex
+    let oldEpoch := ite (oldIndexAfterZero == 0) (add oldEpochAfterZero 1) oldEpochAfterZero
+    let oldIndex := ite (oldIndexAfterZero == 0) 340282366920938463463374607431768211456 oldIndexAfterZero
+    let newEpochActive := ite (ratioWanted == 0) (add oldEpoch 1) oldEpoch
+    let newIndexActive := ite (ratioWanted == 0) 340282366920938463463374607431768211456
+      (div (mul oldIndex ratioWanted) 340282366920938463463374607431768211456)
+    let ratioApplied := ite (newEpochActive > oldEpoch) 0
+      (div (mul newIndexActive 340282366920938463463374607431768211456) oldIndex)
+    let newRedemptionWeightActive := add (mul newEpochActive 680564733841876926926749214863536422912) newIndexActive
     let newSurvivalAccumulatorActive := div (mul survivalAccumulator_ ratioApplied) 340282366920938463463374607431768211456
     let remainingEarmarked := div (mul liveEarmarked ratioApplied) 340282366920938463463374607431768211456
     let effectiveRedeemed := sub liveEarmarked remainingEarmarked
