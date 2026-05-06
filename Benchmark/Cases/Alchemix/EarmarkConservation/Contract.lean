@@ -110,7 +110,10 @@ open Verity.Stdlib.Math
   Why:
   - The model treats `_redemptionWeight` as a flat Q128 weight, not a
     packed (epoch, index) pair. Both representations yield the same
-    survival ratio of 0 on every consumer path.
+    survival ratio on the proved within-epoch paths when the active
+    account snapshots are non-zero. Zero snapshots are excluded by an
+    explicit model-artifact hypothesis until the packed epoch/index
+    representation is modeled directly.
 
   What was simplified:
   - Early-returns and conditional state writes are encoded with pure `ite`
