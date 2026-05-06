@@ -280,7 +280,7 @@ private theorem projectedEarmarked_of_synced
     projectedEarmarked s id = accounts_earmarked s id := by
   unfold projectedEarmarked _computeUnrealizedAccount
   -- Reduce the unearmarkSurvivalRatio: lastEW = eW → first branch hits ONE_Q128.
-  simp only [hSyncedEW, hSyncedRW, if_pos rfl]
+  simp only [hSyncedEW, hSyncedRW]
   -- Now the unearmarkedRemaining = div (mul userExposure ONE_Q128) ONE_Q128 = mulQ128 userExposure ONE_Q128 = userExposure.
   -- earmarkRaw = userExposure - unearmarkedRemaining = 0.
   -- totalEarmarkedNow = earm + 0 = earm.
@@ -332,7 +332,7 @@ private theorem _subDebt_slot_write
     simp [AlchemistV3._subDebt,
       AlchemistV3._accounts_debt,
       AlchemistV3.cumulativeEarmarked, AlchemistV3.totalDebt,
-      cumulativeEarmarked, totalDebt, accounts_debt,
+      accounts_debt,
       getStorage, setStorage, getMappingUint, setMappingUint,
       Verity.bind, Bind.bind,
       Contract.run, ContractResult.snd]
@@ -497,7 +497,7 @@ private theorem sum_singleton_decrement
   rw [sum_singleton_replace s a hMem f
         (fun id => if id = a then sub (f id) c else f id)
         (by intro x hx; simp [hx])]
-  simp only [if_pos rfl]
+  rw [if_pos rfl]
   exact uint256_sub_telescope (s.sum f) (f a) c hLe
 
 /-! ## "Single summand ≤ sum" under non-overflow
@@ -708,7 +708,7 @@ private theorem _subEarmarkedDebt_slot_write
     simp [AlchemistV3._subEarmarkedDebt, subEarmarkedDebt_earmarkToRemove,
       AlchemistV3._accounts_debt, AlchemistV3._accounts_earmarked,
       AlchemistV3.cumulativeEarmarked,
-      cumulativeEarmarked, accounts_debt, accounts_earmarked,
+      accounts_debt, accounts_earmarked,
       getStorage, setStorage, getMappingUint, setMappingUint,
       Verity.bind, Bind.bind,
       Contract.run, ContractResult.snd]
@@ -917,7 +917,7 @@ private theorem _sync_mapping_unchanged_diff
     AlchemistV3._accounts_lastAccruedEarmarkWeight,
     AlchemistV3._accounts_lastAccruedRedemptionWeight,
     AlchemistV3._accounts_lastSurvivalAccumulator,
-    getStorage, setStorage, getMappingUint, setMappingUint,
+    getStorage, getMappingUint, setMappingUint,
     Verity.bind, Bind.bind,
     Contract.run, ContractResult.snd, h]
 
@@ -934,7 +934,7 @@ theorem _sync_writes_lastEW
     AlchemistV3._accounts_lastAccruedEarmarkWeight,
     AlchemistV3._accounts_lastAccruedRedemptionWeight,
     AlchemistV3._accounts_lastSurvivalAccumulator,
-    getStorage, setStorage, getMappingUint, setMappingUint,
+    getStorage, getMappingUint, setMappingUint,
     Verity.bind, Bind.bind,
     Contract.run, ContractResult.snd]
 
@@ -951,7 +951,7 @@ theorem _sync_writes_lastRW
     AlchemistV3._accounts_lastAccruedEarmarkWeight,
     AlchemistV3._accounts_lastAccruedRedemptionWeight,
     AlchemistV3._accounts_lastSurvivalAccumulator,
-    getStorage, setStorage, getMappingUint, setMappingUint,
+    getStorage, getMappingUint, setMappingUint,
     Verity.bind, Bind.bind,
     Contract.run, ContractResult.snd]
 
@@ -979,7 +979,7 @@ private theorem _sync_writes_projected
     AlchemistV3._accounts_lastAccruedEarmarkWeight,
     AlchemistV3._accounts_lastAccruedRedemptionWeight,
     AlchemistV3._accounts_lastSurvivalAccumulator,
-    getStorage, setStorage, getMappingUint, setMappingUint,
+    getStorage, getMappingUint, setMappingUint,
     Verity.bind, Bind.bind,
     Contract.run, ContractResult.snd]
 
@@ -1195,7 +1195,6 @@ private theorem redeem_slot_write
     (amount : Uint256) (s : ContractState) :
     let s' := ((AlchemistV3.redeem amount).run s).snd
     let liveEarmarked := cumulativeEarmarked s
-    let amountClamped := ite (amount > liveEarmarked) liveEarmarked amount
     let ratioApplied := redeem_ratioApplied amount liveEarmarked
     let active := redeem_active amount liveEarmarked
     s'.storage 0 =
@@ -1224,7 +1223,7 @@ private theorem redeem_mapping_unchanged
   simp [AlchemistV3.redeem,
     AlchemistV3.cumulativeEarmarked, AlchemistV3.totalDebt,
     AlchemistV3._redemptionWeight, AlchemistV3._survivalAccumulator,
-    getStorage, setStorage, getMappingUint, setMappingUint,
+    getStorage, setStorage,
     Verity.bind, Bind.bind, Contract.run, ContractResult.snd]
 
 /-- Inactive branch of `redeem(amount)`: per-id projection unchanged. -/
@@ -1262,7 +1261,6 @@ private theorem redeem_projectedEarmarked_inactive
   `redeem_projectedEarmarked_active`. -/
 private theorem survivalRatio_scales
     (eW lastEW r : Uint256) (hLastEWNonZero : lastEW ≠ 0)
-    (hQ128MulOne : ∀ x : Uint256, mulQ128 x ONE_Q128 = x)
     (hQ128OneMul : ∀ x : Uint256, mulQ128 ONE_Q128 x = x)
     (hQ128DivCommScale : ∀ a b r : Uint256,
       b ≠ 0 → divQ128 (mulQ128 a r) b = mulQ128 (divQ128 a b) r)
@@ -1317,7 +1315,6 @@ private theorem redeem_projectedEarmarked_active
     (s : ContractState) (amount id : Uint256)
     (hActive : redeem_active amount (cumulativeEarmarked s) = true)
     (hLastRWNonZero : accounts_lastAccruedRedemptionWeight s id ≠ 0)
-    (hQ128MulOne : ∀ x : Uint256, mulQ128 x ONE_Q128 = x)
     (hQ128OneMul : ∀ x : Uint256, mulQ128 ONE_Q128 x = x)
     (hQ128MulAssoc : ∀ a b c : Uint256,
       mulQ128 (mulQ128 a b) c = mulQ128 a (mulQ128 b c))
@@ -1384,7 +1381,7 @@ private theorem redeem_projectedEarmarked_active
            else divQ128 (s.storage 3) (s.storageMapUint 103 id))) ratioApplied
   -- Apply survivalRatio_scales to the post-state redemption-survival ratio.
   have hScale := survivalRatio_scales (s.storage 3) (s.storageMapUint 103 id) ratioApplied
-    hLastRWNonZero hQ128MulOne hQ128OneMul hQ128DivCommScale hQ128DivSelf hQ128MulCancelOne
+    hLastRWNonZero hQ128OneMul hQ128DivCommScale hQ128DivSelf hQ128MulCancelOne
   rw [hScale]
   generalize hX :
       add (s.storageMapUint 101 id)
@@ -1404,7 +1401,6 @@ theorem redeem_preserves_invariant
     (s : ContractState)
     (ids : FiniteSet Uint256)
     (amount : Uint256)
-    (hQ128MulOne : ∀ x : Uint256, mulQ128 x ONE_Q128 = x)
     (hQ128OneMul : ∀ x : Uint256, mulQ128 ONE_Q128 x = x)
     (hQ128MulAssoc : ∀ a b c : Uint256,
       mulQ128 (mulQ128 a b) c = mulQ128 a (mulQ128 b c))
@@ -1437,7 +1433,7 @@ theorem redeem_preserves_invariant
       intro id hMemId
       exact redeem_projectedEarmarked_active s amount id hActive
         (hLastRWNonZero id hMemId)
-        hQ128MulOne hQ128OneMul hQ128MulAssoc
+        hQ128OneMul hQ128MulAssoc
         hQ128DivCommScale hQ128DivSelf hQ128MulCancelOne
     have hSum_eq :
         sumProjectedEarmarked s' ids =
@@ -1500,9 +1496,9 @@ private theorem _earmark_mapping_unchanged
     s'.storageMapUint slotIdx key = s.storageMapUint slotIdx key := by
   simp [AlchemistV3._earmark,
     AlchemistV3.cumulativeEarmarked, AlchemistV3.totalDebt,
-    AlchemistV3._earmarkWeight, AlchemistV3._redemptionWeight,
+    AlchemistV3._earmarkWeight,
     AlchemistV3._survivalAccumulator, AlchemistV3._transmuterEarmarkAmount,
-    getStorage, setStorage, getMappingUint, setMappingUint,
+    getStorage, setStorage,
     Verity.bind, Bind.bind, Contract.run, ContractResult.snd]
 
 /-- Inactive branch of `_earmark()`: per-id projection unchanged. -/
@@ -1546,7 +1542,6 @@ private theorem _earmark_projectedEarmarked_active
     (hActive :
       _earmark_active (totalDebt s) (cumulativeEarmarked s) (s.storage 5) = true)
     (hLastEWNonZero : accounts_lastAccruedEarmarkWeight s id ≠ 0)
-    (hQ128MulOne : ∀ x : Uint256, mulQ128 x ONE_Q128 = x)
     (hQ128OneMul : ∀ x : Uint256, mulQ128 ONE_Q128 x = x)
     (hQ128MulComm : ∀ a b : Uint256, mulQ128 a b = mulQ128 b a)
     (hQ128MulAssoc : ∀ a b c : Uint256,
@@ -1594,7 +1589,7 @@ private theorem _earmark_projectedEarmarked_active
   rw [h2', h3', h100, h101, h102, h103]
   have hScale := survivalRatio_scales (s.storage 2) (s.storageMapUint 102 id)
     ratioApplied hLastEWNonZero
-    hQ128MulOne hQ128OneMul hQ128DivCommScale hQ128DivSelf hQ128MulCancelOne
+    hQ128OneMul hQ128DivCommScale hQ128DivSelf hQ128MulCancelOne
   change
     mulQ128
       (add (s.storageMapUint 101 id)
@@ -1685,7 +1680,6 @@ private theorem _earmark_projectedEarmarked_active
 theorem _earmark_preserves_invariant
     (s : ContractState)
     (ids : FiniteSet Uint256)
-    (hQ128MulOne : ∀ x : Uint256, mulQ128 x ONE_Q128 = x)
     (hQ128OneMul : ∀ x : Uint256, mulQ128 ONE_Q128 x = x)
     (hQ128MulComm : ∀ a b : Uint256, mulQ128 a b = mulQ128 b a)
     (hQ128MulAssoc : ∀ a b c : Uint256,
@@ -1732,7 +1726,7 @@ theorem _earmark_preserves_invariant
       intro id hMemId
       exact _earmark_projectedEarmarked_active s id hActive
         (hLastEWNonZero id hMemId)
-        hQ128MulOne hQ128OneMul hQ128MulComm hQ128MulAssoc hQ128MulLinear
+        hQ128OneMul hQ128MulComm hQ128MulAssoc hQ128MulLinear
         hQ128MulSubDistrib hQ128MulOneSub hQ128MulAppliedLe
         hQ128DivCommScale hQ128DivSelf hQ128MulCancelOne
     have hSplit :
