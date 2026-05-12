@@ -22,21 +22,22 @@ public views.
 because their parameter shapes carry nested dynamic members through struct
 arrays. The Verity macro reports
 "struct parameter projection from an ABI-dynamic root is not supported" at
-`Verity/Macro/Translate.lean:1715`. Once that lands (tracked in verity#1760
-P0), these can be filled in 1:1 from `UnlinkPool.sol`.
+`Verity/Macro/Translate.lean:1715`. Tracked dedicated under verity#1832
+(umbrella: verity#1760). Once that lands, these can be filled in 1:1
+from `UnlinkPool.sol`.
 
 ## Build status
 
 Case stage: `scoped`. The translation compiles incrementally — the four
 Lean files exist in the case skeleton and are valid against the lakefile-
-pinned Verity revision. Promotion to `build_green` happens when:
+pinned Verity revision (`f28f1ba4`, post-#1827). Promotion to
+`build_green` happens when:
 
-1. PR #1827 merges in lfglabs-dev/verity (BN254 precompile ECMs + keccak256_lit literal sugar).
+1. verity#1832 lands (struct parameter projection from an ABI-dynamic
+   root).
 2. The lakefile in this repo is bumped to the resulting verity commit.
-3. The four entry points that depend on those features (constructor /
-   initialize / hashNote / deposit) are wired through and pass `lake build`.
-4. The three blocked entry points carry explicit `BLOCKED(...)` markers so
-   the case has no unconstrained stubs.
+3. The three blocked entry points (`transfer`, `withdraw`,
+   `adapterWithdraw`) are wired through and pass `lake build`.
 
 ## Next milestones
 
