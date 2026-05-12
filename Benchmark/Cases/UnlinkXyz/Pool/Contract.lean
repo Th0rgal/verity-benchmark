@@ -48,8 +48,9 @@
   `Verity/Macro/Translate.lean:1715` "struct parameter projection from an
   ABI-dynamic root is not supported; use a static struct parameter or wait
   for nested-dynamic ABI decoding". This is the lead blocker recorded in
-  umbrella verity#1760. Once lifted, the three entry points can be filled
-  in 1:1 from `UnlinkPool.sol` lines 309-583.
+  dedicated tracking issue verity#1832 (umbrella: verity#1760). Once
+  lifted, the three entry points can be filled in 1:1 from
+  `UnlinkPool.sol` lines 309-583.
 -/
 import Verity
 import Benchmark.Cases.UnlinkXyz.Pool.Specs
@@ -251,7 +252,7 @@ verity_contract UnlinkPool where
 
 /-
   ============================================================================
-  BLOCKED(verity#1760-nested-dynamic): the three public ZK entry points
+  BLOCKED(verity#1832): the three public ZK entry points
 
     function transfer(Transaction[] calldata _transactions)
       external onlyRelayer nonReentrant;
@@ -286,10 +287,10 @@ verity_contract UnlinkPool where
   `_insertLeaves` / `_transferWithBalanceCheck` decomposition, the same
   per-token deltas).
 
-  See umbrella verity#1760 for the cross-tracking status of this gap.
+  Dedicated tracker: verity#1832. Umbrella status: verity#1760.
   ============================================================================
 
-  BLOCKED(verity#1760-nested-dynamic): `deposit(Note[] calldata _notes,
+  BLOCKED(verity#1832): `deposit(Note[] calldata _notes,
   Ciphertext[] calldata _ciphertexts, address _depositor, ...)` is on
   the borderline. `Note` is a static tuple of ABI words (npk uint256,
   token address, amount uint256) and `Note[]` already works as a macro
