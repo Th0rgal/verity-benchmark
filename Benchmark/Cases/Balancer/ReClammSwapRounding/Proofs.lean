@@ -99,6 +99,8 @@ theorem onSwap_fixed_virtual_balances_product_non_decreasing
     (balanceA balanceB virtualBalanceA virtualBalanceB : Uint256)
     (indexIn indexOut amountGivenScaled18 amountCalculatedScaled18 : Uint256)
     (s : ContractState)
+    -- Valid route condition for the two-token ReClamm pool: A -> B or B -> A.
+    -- The scalar model keeps this explicit because token indexes are raw inputs.
     (hTokenPair : (indexIn = 0 ∧ indexOut = 1) ∨ (indexIn = 1 ∧ indexOut = 0))
     (hNoOverflow :
       onSwap_no_overflow_assumptions exactIn balanceA balanceB
