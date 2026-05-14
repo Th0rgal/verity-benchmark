@@ -218,13 +218,10 @@ verity_contract UnlinkPool where
     PERMIT2 : Address := zeroAddress
 
   -- `VerifierRouter.getCircuit(circuitId)` returns
-  -- `(verifier, inputCount, outputCount, active)`. Single tuple-returning
-  -- external call (post-#1731), replacing the previous four-parallel-getter
-  -- workaround. The actual routee address is the storage word at
-  -- `stateVerifierRouter`; call sites thread it via `tryExternalCall`
-  -- against the stored address.
+  -- `(verifier, inputCount, outputCount, active)`. The first argument is the
+  -- stored router address that Solidity obtains through `_getVerifierRouter()`.
   linked_externals
-    external getCircuit(Uint256) -> (Uint256, Uint256, Uint256, Uint256)
+    external getCircuit(Address, Uint256) -> (Uint256, Uint256, Uint256, Uint256)
     external verifySpend(
       Uint256, Uint256, Uint256, Uint256, Uint256, Uint256, Uint256, Uint256,
       Uint256, Uint256, Uint256, Array Uint256, Array Uint256) -> (Bool)
@@ -431,8 +428,10 @@ verity_contract UnlinkPool where
     let txLen := arrayLength transactions
     requireError (txLen != 0) PoolEmptyTransactions()
     forEach "i" txLen (do
+      let verifierRouter ← getStorageAddr stateVerifierRouter
       let (success, verifier, inputCount, outputCount, active) ←
-        tryExternalCall "getCircuit" [(arrayElement transactions i).circuitId]
+        tryExternalCall "getCircuit"
+          [verifierRouter, (arrayElement transactions i).circuitId]
       let verifierWord := add verifier 0
       let activeWord := add active 0
       requireError success PoolCircuitNotRegistered()
@@ -496,8 +495,9 @@ verity_contract UnlinkPool where
       PoolInvalidWithdrawalRecipient()
     let selfAddr ← Verity.contractAddress
     requireError (recipient != selfAddr) PoolInvalidWithdrawalRecipient()
+    let verifierRouter ← getStorageAddr stateVerifierRouter
     let (success, verifier, inputCount, outputCount, active) ←
-      tryExternalCall "getCircuit" [txn.circuitId]
+      tryExternalCall "getCircuit" [verifierRouter, txn.circuitId]
     let verifierWord := add verifier 0
     let activeWord := add active 0
     requireError success PoolCircuitNotRegistered()
