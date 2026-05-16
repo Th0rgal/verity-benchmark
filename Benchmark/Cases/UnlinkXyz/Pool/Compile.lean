@@ -24,6 +24,12 @@ private def ciphertextParam : ParamType :=
 private def ciphertextArray : ParamType :=
   ParamType.array ciphertextParam
 
+private def tokenPermissionsParam : ParamType :=
+  ParamType.tuple [ParamType.address, ParamType.uint256]
+
+private def permitTransferFromParam : ParamType :=
+  ParamType.tuple [tokenPermissionsParam, ParamType.uint256, ParamType.uint256]
+
 private def eventParamEq (a b : EventParam) : Bool :=
   a.name == b.name && a.ty == b.ty && a.kind == b.kind
 
@@ -34,6 +40,20 @@ private def eventDefEq (name : String) (params : List EventParam) (eventDef : Ev
 
 private def hasEvent (name : String) (params : List EventParam) : Bool :=
   UnlinkPool.spec.events.any (eventDefEq name params)
+
+private def hasRouterEvent (name : String) (params : List EventParam) : Bool :=
+  VerifierRouter.spec.events.any (eventDefEq name params)
+
+private def hasRouterEntrypoint (name : String) : Bool :=
+  VerifierRouter.spec.functions.any (fun fn => fn.name == name && !fn.isInternal)
+
+private def stmtIsInternalCall (callee : String) : Stmt → Bool
+  | Stmt.internalCall name _ => name == callee || name == s!"internal_{callee}"
+  | Stmt.internalCallAssign _ name _ => name == callee || name == s!"internal_{callee}"
+  | _ => false
+
+private def stmtListHasInternalCall (callee : String) (body : List Stmt) : Bool :=
+  body.any (stmtIsInternalCall callee)
 
 def unlinkPoolEventMetadataMatchesSource : Bool :=
   hasEvent "Deposited" [
@@ -80,6 +100,90 @@ def unlinkPoolEventMetadataMatchesSource : Bool :=
   ]
 
 example : unlinkPoolEventMetadataMatchesSource = true := by native_decide
+
+def unlinkPoolTransferWithBalanceCheckMatchesSource : Bool :=
+  let helperOk :=
+    UnlinkPool.spec.functions.any (fun fn =>
+      fn.name == "transferWithBalanceCheck" &&
+        fn.params.map (fun param => param.ty) == [
+          permitTransferFromParam,
+          ParamType.address,
+          ParamType.bytes,
+          ParamType.uint256,
+          ParamType.bytes32
+        ] &&
+        fn.returns == [])
+  let depositCallsHelper :=
+    UnlinkPool.spec.functions.any (fun fn =>
+      fn.name == "deposit" &&
+        !fn.isInternal &&
+        stmtListHasInternalCall "transferWithBalanceCheck" fn.body)
+  helperOk && depositCallsHelper
+
+example : unlinkPoolTransferWithBalanceCheckMatchesSource = true := by native_decide
+
+private def hasPoolFieldSlot (name : String) (expectedSlot : Nat) : Bool :=
+  UnlinkPool.spec.fields.any (fun field => field.name == name && field.slot == some expectedSlot)
+
+def unlinkPoolStorageNamespacesMatchSource : Bool :=
+  hasPoolFieldSlot "stateMerkleRoot"
+    0xd7df6c02d48ad87762ead6689b0b308617a10b99ac21276cc6fd199681dcb000 &&
+  hasPoolFieldSlot "lazyMaxIndex"
+    0xd7df6c02d48ad87762ead6689b0b308617a10b99ac21276cc6fd199681dcb001 &&
+  hasPoolFieldSlot "lazyNumberOfLeaves"
+    0xd7df6c02d48ad87762ead6689b0b308617a10b99ac21276cc6fd199681dcb001 &&
+  hasPoolFieldSlot "lazyElements"
+    0xd7df6c02d48ad87762ead6689b0b308617a10b99ac21276cc6fd199681dcb002 &&
+  hasPoolFieldSlot "stateRootSeen"
+    0xd7df6c02d48ad87762ead6689b0b308617a10b99ac21276cc6fd199681dcb003 &&
+  hasPoolFieldSlot "stateNullifierHashes"
+    0xd7df6c02d48ad87762ead6689b0b308617a10b99ac21276cc6fd199681dcb004 &&
+  hasPoolFieldSlot "stateVerifierRouter"
+    0xd7df6c02d48ad87762ead6689b0b308617a10b99ac21276cc6fd199681dcb005 &&
+  hasPoolFieldSlot "relayersSlot"
+    0xd8b607728433c567965c4023813a35a19b26751353d5652c8798f8eea4b19b00
+
+example : unlinkPoolStorageNamespacesMatchSource = true := by native_decide
+
+def verifierRouterEventMetadataMatchesSource : Bool :=
+  hasRouterEvent "CircuitRegistered" [
+    { name := "circuitId", ty := ParamType.uint256, kind := EventParamKind.indexed },
+    { name := "verifier", ty := ParamType.address, kind := EventParamKind.unindexed },
+    { name := "inputCount", ty := ParamType.uint256, kind := EventParamKind.unindexed },
+    { name := "outputCount", ty := ParamType.uint256, kind := EventParamKind.unindexed }
+  ] &&
+  hasRouterEvent "CircuitActiveSet" [
+    { name := "circuitId", ty := ParamType.uint256, kind := EventParamKind.indexed },
+    { name := "active", ty := ParamType.uint256, kind := EventParamKind.unindexed }
+  ]
+
+example : verifierRouterEventMetadataMatchesSource = true := by native_decide
+
+def verifierRouterEntrypointsMatchSource : Bool :=
+  hasRouterEntrypoint "setCircuit" &&
+  hasRouterEntrypoint "pauseCircuit" &&
+  hasRouterEntrypoint "getCircuit" &&
+  hasRouterEntrypoint "verifierToCircuitId" &&
+  hasRouterEntrypoint "renounceOwnership" &&
+  hasRouterEntrypoint "owner" &&
+  hasRouterEntrypoint "pendingOwner" &&
+  hasRouterEntrypoint "transferOwnership" &&
+  hasRouterEntrypoint "acceptOwnership"
+
+example : verifierRouterEntrypointsMatchSource = true := by native_decide
+
+def verifierRouterCircuitStorageUsesMappingStruct : Bool :=
+  VerifierRouter.spec.fields.any (fun field =>
+    field.name == "circuits" &&
+      match field.ty with
+      | FieldType.mappingStruct MappingKeyType.uint256 members =>
+          members.any (fun member => member.name == "verifier" && member.wordOffset == 0) &&
+          members.any (fun member => member.name == "inputCount" && member.wordOffset == 0) &&
+          members.any (fun member => member.name == "outputCount" && member.wordOffset == 0) &&
+          members.any (fun member => member.name == "active" && member.wordOffset == 0)
+      | _ => false)
+
+example : verifierRouterCircuitStorageUsesMappingStruct = true := by native_decide
 
 def caseReady : Bool := true
 
