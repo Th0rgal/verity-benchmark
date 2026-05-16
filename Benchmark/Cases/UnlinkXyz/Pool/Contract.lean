@@ -24,7 +24,7 @@
     - `nonreentrant(reentrancyLockSlot)` (verity#1731)
     - `initializer(initializedSlot)` (verity#1731)
     - `immutables PERMIT2` (verity#1569)
-    - `storage_namespace` for ERC-7201 sections (verity#1731)
+    - multiple `storage_namespace erc7201` sections for ERC-7201 roots
     - `linked_externals` with a single tuple-returning `getCircuit`
       (verity#1731) — replaces the previous 4-parallel-getter workaround.
     - `Compiler.Modules.Precompiles.bn256{Add,ScalarMul,Pairing}` ECMs
@@ -202,8 +202,6 @@ open DepositHash
 /- ### Pool entry point: `UnlinkPool` -/
 
 verity_contract UnlinkPool where
-  storage_namespace "unlink.storage.UnlinkPoolRelayers"
-
   storage
     -- Initializable
     initializedSlot       : Uint256 := slot 0
@@ -213,18 +211,21 @@ verity_contract UnlinkPool where
     -- ReentrancyGuardTransient (transient storage modeled as a regular
     -- slot through the macro's `nonreentrant(slot)` function modifier).
     reentrancyLockSlot    : Uint256 := slot 3
-    -- State (inherited, flattened)
-    stateMerkleRoot       : Uint256 := slot 4
-    stateRootSeen         : Uint256 → Uint256 := slot 5
-    stateNullifierHashes  : Uint256 → Uint256 := slot 6
-    stateVerifierRouter   : Address := slot 7
-    -- LazyIMTData (inherited): split fields.
-    lazyMaxIndex          : Uint256 := slot 8
-    lazyNumberOfLeaves    : Uint256 := slot 9
-    lazyElements          : Uint256 → Uint256 := slot 10
-    -- RelayerStorage (ERC-7201 namespaced) — flattened over the storage
-    -- namespace declared at the top of this block.
-    relayersSlot          : Address → Uint256 := slot 11
+    -- StateStorage (ERC-7201 namespaced at unlink.storage.State).
+    storage_namespace erc7201 "unlink.storage.State"
+    stateMerkleRoot       : Uint256 := slot 0
+    -- LazyIMTData lives at StateStorage slot 1. Verity still lacks top-level
+    -- nested struct storage (#1758), so its packed uint40 fields remain split
+    -- as named fields while sharing the source base slot for layout audit.
+    lazyMaxIndex          : Uint256 := slot 1
+    lazyNumberOfLeaves    : Uint256 := slot 1
+    lazyElements          : Uint256 → Uint256 := slot 2
+    stateRootSeen         : Uint256 → Uint256 := slot 3
+    stateNullifierHashes  : Uint256 → Uint256 := slot 4
+    stateVerifierRouter   : Address := slot 5
+    -- RelayerStorage (ERC-7201 namespaced at unlink.storage.UnlinkPoolRelayers).
+    storage_namespace erc7201 "unlink.storage.UnlinkPoolRelayers"
+    relayersSlot          : Address → Uint256 := slot 0
 
   struct Proof where
     pA : FixedArray Uint256 2,
@@ -813,6 +814,29 @@ verity_contract UnlinkPool where
     requireError ((sub poolBefore poolAfter) == amount) PoolWithdrawBalanceMismatch()
     requireError ((sub recipientAfter recipientBefore) == amount) PoolWithdrawBalanceMismatch()
 
+  function transferWithBalanceCheck
+      (permit : PermitTransferFrom, depositor : Address, signature : Bytes,
+       totalAmount : Uint256, witness : Bytes32) : Unit := do
+    let selfAddr ← Verity.contractAddress
+    let token := permit.permitted.token
+    let balBefore ← balanceOf token selfAddr
+    let (permitCallOk, permitAccepted) ← tryExternalCall "permitWitnessTransferFrom"
+      [PERMIT2,
+       token,
+       permit.permitted.amount,
+       permit.nonce,
+       permit.deadline,
+       selfAddr,
+       totalAmount,
+       depositor,
+       witness,
+       signature]
+    requireError permitCallOk PoolDepositBalanceMismatch()
+    requireError permitAccepted PoolDepositBalanceMismatch()
+    let balAfter ← balanceOf token selfAddr
+    requireError ((sub balAfter balBefore) == totalAmount)
+      PoolDepositBalanceMismatch()
+
   /- `function deposit(address _depositor, Note[] calldata _notes,
       Ciphertext[] calldata _ciphertexts, PermitTransferFrom calldata _permit,
       bytes calldata _signature) external onlyRelayer nonReentrant`
@@ -834,24 +858,7 @@ verity_contract UnlinkPool where
     let witness ← ecmCall
       (fun resultVar => abiEncodePackedWordsModule resultVar 3)
       [DEPOSIT_WITNESS_TYPEHASH, addressToWord selfAddr, notesHash]
-    let token := permit.permitted.token
-    let balBefore ← balanceOf token selfAddr
-    let (permitCallOk, permitAccepted) ← tryExternalCall "permitWitnessTransferFrom"
-      [PERMIT2,
-       token,
-       permit.permitted.amount,
-       permit.nonce,
-       permit.deadline,
-       selfAddr,
-       totalAmount,
-       depositor,
-       witness,
-       signature]
-    requireError permitCallOk PoolDepositBalanceMismatch()
-    requireError permitAccepted PoolDepositBalanceMismatch()
-    let balAfter ← balanceOf token selfAddr
-    requireError ((sub balAfter balBefore) == totalAmount)
-      PoolDepositBalanceMismatch()
+    transferWithBalanceCheck permit depositor signature totalAmount witness
     let startIndex ← nextLeafIndex
     let newRoot ← insertLeaves newLeaves
     emit "Deposited"
