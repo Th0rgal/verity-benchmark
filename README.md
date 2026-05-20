@@ -1,21 +1,32 @@
 <h1 align="center">Verity Benchmark</h1>
 
 <p align="center">
-  <strong>Measuring AI agents at formally verifying smart contracts.</strong>
+  <strong>Measuring AI agents at formally verifying smart contracts in Lean 4.</strong>
 </p>
 
 <p align="center">
+  <a href="https://veritylang.com"><img src="https://img.shields.io/badge/docs-veritylang.com-0a7d7d.svg" alt="Verity documentation"></a>
   <a href="https://github.com/lfglabs-dev/verity-benchmark"><img src="https://img.shields.io/badge/built%20with-Lean%204-blueviolet.svg" alt="Built with Lean 4"></a>
   <a href="https://github.com/lfglabs-dev/verity-benchmark/actions"><img src="https://img.shields.io/github/actions/workflow/status/lfglabs-dev/verity-benchmark/check.yml?label=check" alt="Check"></a>
+</p>
+
+<p align="center">
+  <a href="https://veritylang.com">Documentation</a>
+  &nbsp;·&nbsp;
+  <a href="https://github.com/lfglabs-dev/verity">Verity compiler</a>
+  &nbsp;·&nbsp;
+  <a href="https://lfglabs.dev/research/verity-benchmark">Research note</a>
+  &nbsp;·&nbsp;
+  <a href="https://lfglabs.dev/papers/verity.pdf">Paper (PDF)</a>
 </p>
 
 ---
 
 ## What is this?
 
-Verity Benchmark measures the ability of AI agents to prove that a smart contract implementation matches its formal specification, using [Lean 4](https://lean-lang.org/) and the [Verity](https://github.com/Th0rgal/verity) framework.
+**Verity Benchmark** is an open evaluation suite that measures how well AI agents can produce **formal proofs** of smart contract correctness in [Lean 4](https://lean-lang.org/), on top of the [Verity](https://github.com/lfglabs-dev/verity) formally verified smart contract compiler. Cases are drawn from real-world Ethereum protocols (Ethereum deposit contract, Lido, Nexus Mutual, Kleros, Paladin, Damn Vulnerable DeFi).
 
-[Verity](https://github.com/Th0rgal/verity) is a formally verified smart contract compiler. It lets you write contracts, state what they should do, prove correctness, and compile to EVM bytecode with machine-checked proofs that compilation preserves semantics. This benchmark is an initiative made in partnership with the **Ethereum Foundation** and various protocols of the ecosystem.
+[Verity](https://veritylang.com) lets you write smart contracts, state what they should do, prove correctness, and compile to EVM bytecode with machine-checked proofs that compilation preserves semantics. This benchmark is an initiative made in partnership with the **Ethereum Foundation** and various protocols of the ecosystem. Full documentation lives at [**veritylang.com**](https://veritylang.com); the team behind it is [**LFG Labs**](https://lfglabs.dev).
 
 Each benchmark task gives an agent:
 - A fixed contract implementation
