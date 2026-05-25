@@ -10,30 +10,31 @@
     "backlog_tasks": "backlog/*/*/tasks/*.yaml"
   },
   "summary": {
-    "family_count": 18,
-    "implementation_count": 18,
-    "active_case_count": 15,
+    "family_count": 19,
+    "implementation_count": 19,
+    "active_case_count": 16,
     "backlog_case_count": 3,
-    "active_task_count": 97,
+    "active_task_count": 99,
     "backlog_task_count": 8,
-    "buildable_case_count": 17,
-    "runnable_task_count": 105,
+    "buildable_case_count": 18,
+    "runnable_task_count": 107,
     "case_stage_counts": {
-      "build_green": 15,
+      "build_green": 16,
       "candidate": 1,
       "proof_complete": 2
     },
     "translation_status_counts": {
       "blocked": 1,
+      "generated": 1,
       "translated": 17
     },
     "proof_status_counts": {
       "blocked": 1,
       "complete": 10,
-      "partial": 7
+      "partial": 8
     },
     "task_track_counts": {
-      "proof-only": 105
+      "proof-only": 107
     },
     "task_property_class_counts": {
       "accounting_bound": 16,
@@ -46,7 +47,9 @@
       "balance_credit_update": 2,
       "balance_update": 1,
       "exploit_trace": 1,
+      "formal_audit_ap_ic_delivery": 1,
       "frame_property": 2,
+      "generated_artifact_integrity": 1,
       "guarded_solvency": 7,
       "isOwner_effect": 3,
       "linked_list_acyclicity": 4,
@@ -74,13 +77,13 @@
     },
     "task_proof_family_counts": {
       "authorization_enablement": 14,
-      "functional_correctness": 27,
-      "protocol_transition_correctness": 22,
+      "functional_correctness": 28,
+      "protocol_transition_correctness": 23,
       "refinement_equivalence": 9,
       "state_preservation_local_effects": 33
     },
     "family_split_counts": {
-      "active": 15,
+      "active": 16,
       "backlog": 3
     }
   },
@@ -339,6 +342,24 @@
         "solidity"
       ],
       "manifest_path": "families/uniswap_v2/family.yaml"
+    },
+    {
+      "family_id": "unlink_xyz",
+      "display_name": "Unlink.xyz",
+      "split": "active",
+      "status": "active",
+      "description": "Benchmark family for the Unlink.xyz pool, using Verity-generated pool bytecode and limiting oracle replacements to external cryptographic and Permit2/router boundaries.",
+      "implementation_ids": [
+        "pool"
+      ],
+      "case_ids": [
+        "unlink_xyz/pool"
+      ],
+      "source_languages": [
+        "solidity",
+        "yul"
+      ],
+      "manifest_path": "families/unlink_xyz/family.yaml"
     },
     {
       "family_id": "usual",
@@ -634,6 +655,22 @@
       "manifest_path": "families/uniswap_v2/implementations/v2_core/implementation.yaml"
     },
     {
+      "family_id": "unlink_xyz",
+      "implementation_id": "pool",
+      "display_name": "Unlink Pool",
+      "split": "active",
+      "status": "generated",
+      "upstream_repo": "https://github.com/unlink-xyz/monorepo",
+      "upstream_commit": "4bc46c1fffbc0e146dccfff5b9fe00167121b27b",
+      "source_language": "solidity",
+      "source_artifact_path": "artifacts/yul/UnlinkPool.yul",
+      "case_ids": [
+        "unlink_xyz/pool"
+      ],
+      "notes": "The benchmark artifact is the Verity-generated UnlinkPool Yul output. The linked boundary file supplies only the external Poseidon, Permit2, verifier router, and Groth16 verifier replacements required at the pool boundary.",
+      "manifest_path": "families/unlink_xyz/implementations/pool/implementation.yaml"
+    },
+    {
       "family_id": "usual",
       "implementation_id": "private_repo",
       "display_name": "Usual Private Repository",
@@ -701,6 +738,7 @@
       "upstream_repo": "https://github.com/alchemix-finance/v3",
       "upstream_commit": "117c95b6ee11a75221d6fbdc79f16ac6acdb96f5",
       "original_contract_path": "src/AlchemistV3.sol",
+      "generated_artifact_path": null,
       "source_ref": "https://github.com/alchemix-finance/v3@117c95b6ee11a75221d6fbdc79f16ac6acdb96f5:src/AlchemistV3.sol",
       "selected_functions": [
         "_earmark",
@@ -752,6 +790,7 @@
       "upstream_repo": "https://github.com/balancer/reclamm",
       "upstream_commit": "cff18033d401a61326a2d6c078507084cbdc864b",
       "original_contract_path": "contracts/lib/ReClammMath.sol",
+      "generated_artifact_path": null,
       "source_ref": "https://github.com/balancer/reclamm@cff18033d401a61326a2d6c078507084cbdc864b:contracts/lib/ReClammMath.sol",
       "selected_functions": [
         "computeOutGivenIn",
@@ -801,6 +840,7 @@
       "upstream_repo": "https://github.com/Cork-Technology/phoenix",
       "upstream_commit": "40d9b173c4b",
       "original_contract_path": "contracts/libraries/PoolLib.sol",
+      "generated_artifact_path": null,
       "source_ref": "https://github.com/Cork-Technology/phoenix@40d9b173c4b:contracts/libraries/PoolLib.sol",
       "selected_functions": [
         "previewUnwindExerciseOther",
@@ -843,6 +883,7 @@
       "upstream_repo": "https://github.com/OpenZeppelin/damn-vulnerable-defi",
       "upstream_commit": "6797353c7cb5409e3d388e9e8f13954f9bb5f609",
       "original_contract_path": "contracts/side-entrance/SideEntranceLenderPool.sol",
+      "generated_artifact_path": null,
       "source_ref": "https://github.com/OpenZeppelin/damn-vulnerable-defi@6797353c7cb5409e3d388e9e8f13954f9bb5f609:contracts/side-entrance/SideEntranceLenderPool.sol",
       "selected_functions": [
         "deposit",
@@ -886,6 +927,7 @@
       "upstream_repo": "https://github.com/ethereum/deposit_contract",
       "upstream_commit": "691feb18330d3d102b5a4b3d4434fac7571f51b8",
       "original_contract_path": "deposit_contract/contracts/validator_registration.v.py",
+      "generated_artifact_path": null,
       "source_ref": "https://github.com/ethereum/deposit_contract@691feb18330d3d102b5a4b3d4434fac7571f51b8:deposit_contract/contracts/validator_registration.v.py",
       "selected_functions": [
         "deposit"
@@ -926,6 +968,7 @@
       "upstream_repo": "https://etherscan.io/address/0xf1d326d806fa5d0d1f3747505397553cd31b191a#code",
       "upstream_commit": "etherscan-verified-source",
       "original_contract_path": "TokenGateway.sol",
+      "generated_artifact_path": null,
       "source_ref": "https://etherscan.io/address/0xf1d326d806fa5d0d1f3747505397553cd31b191a#code@etherscan-verified-source:TokenGateway.sol",
       "selected_functions": [
         "deposit",
@@ -976,6 +1019,7 @@
       "upstream_repo": "https://github.com/kleros/kleros-v2",
       "upstream_commit": "75125dfa54eee723cac239f20e5746d15786196b",
       "original_contract_path": "contracts/src/libraries/SortitionTrees.sol",
+      "generated_artifact_path": null,
       "source_ref": "https://github.com/kleros/kleros-v2@75125dfa54eee723cac239f20e5746d15786196b:contracts/src/libraries/SortitionTrees.sol",
       "selected_functions": [
         "set",
@@ -1018,6 +1062,7 @@
       "upstream_repo": "https://github.com/lidofinance/core",
       "upstream_commit": "96738395ca3bffd6513700a45d4c9389662c5835",
       "original_contract_path": "contracts/0.8.25/vaults/VaultHub.sol",
+      "generated_artifact_path": null,
       "source_ref": "https://github.com/lidofinance/core@96738395ca3bffd6513700a45d4c9389662c5835:contracts/0.8.25/vaults/VaultHub.sol",
       "selected_functions": [
         "_locked",
@@ -1060,6 +1105,7 @@
       "upstream_repo": "https://github.com/NexusMutual/smart-contracts",
       "upstream_commit": "ad212043a78953a2cd98cd02b06c8e3e354c6023",
       "original_contract_path": "contracts/modules/capital/Ramm.sol",
+      "generated_artifact_path": null,
       "source_ref": "https://github.com/NexusMutual/smart-contracts@ad212043a78953a2cd98cd02b06c8e3e354c6023:contracts/modules/capital/Ramm.sol",
       "selected_functions": [
         "calculateNxm",
@@ -1103,6 +1149,7 @@
       "upstream_repo": "https://github.com/Figu3/sonic-earn-recovery-system",
       "upstream_commit": "699cbbc79def374cab9739e451acbbf866293d12",
       "original_contract_path": "src/StreamRecoveryClaim.sol",
+      "generated_artifact_path": null,
       "source_ref": "https://github.com/Figu3/sonic-earn-recovery-system@699cbbc79def374cab9739e451acbbf866293d12:src/StreamRecoveryClaim.sol",
       "selected_functions": [
         "claimUsdc",
@@ -1146,6 +1193,7 @@
       "upstream_repo": "https://github.com/reserve-protocol/dtfs",
       "upstream_commit": "14f75d18856d587adfaff24e77e5b20dda7c7267",
       "original_contract_path": "contracts/utils/RebalancingLib.sol",
+      "generated_artifact_path": null,
       "source_ref": "https://github.com/reserve-protocol/dtfs@14f75d18856d587adfaff24e77e5b20dda7c7267:contracts/utils/RebalancingLib.sol",
       "selected_functions": [
         "_price"
@@ -1186,6 +1234,7 @@
       "upstream_repo": "https://github.com/safe-global/safe-smart-account",
       "upstream_commit": "a2e19c6aa42a45ceec68057f3fa387f169c5b321",
       "original_contract_path": "contracts/base/OwnerManager.sol",
+      "generated_artifact_path": null,
       "source_ref": "https://github.com/safe-global/safe-smart-account@a2e19c6aa42a45ceec68057f3fa387f169c5b321:contracts/base/OwnerManager.sol",
       "selected_functions": [
         "addOwnerWithThreshold",
@@ -1227,6 +1276,7 @@
       "upstream_repo": "https://github.com/term-structure/termmax-contract-v2",
       "upstream_commit": "64bd47b98e064c7fb91ab4a59b70520e0ec285d5",
       "original_contract_path": "contracts/v2/TermMaxOrderV2.sol",
+      "generated_artifact_path": null,
       "source_ref": "https://github.com/term-structure/termmax-contract-v2@64bd47b98e064c7fb91ab4a59b70520e0ec285d5:contracts/v2/TermMaxOrderV2.sol",
       "selected_functions": [
         "swapExactTokenToToken",
@@ -1268,6 +1318,55 @@
       "proof_target": "Benchmark.Cases.TermMax.OrderV2BuyXtSingleSegment.Proofs"
     },
     {
+      "case_id": "unlink_xyz/pool",
+      "project": "unlink_xyz",
+      "case_name": "pool",
+      "suite": "active",
+      "schema_version": 1,
+      "manifest_path": "cases/unlink_xyz/pool/case.yaml",
+      "split": "active",
+      "family_id": "unlink_xyz",
+      "implementation_id": "pool",
+      "stage": "build_green",
+      "translation_status": "generated",
+      "spec_status": "frozen",
+      "proof_status": "partial",
+      "source_language": "solidity",
+      "upstream_repo": "https://github.com/unlink-xyz/monorepo",
+      "upstream_commit": "4bc46c1fffbc0e146dccfff5b9fe00167121b27b",
+      "original_contract_path": "protocol/contracts/src/UnlinkPool.sol",
+      "generated_artifact_path": "artifacts/yul/UnlinkPool.yul",
+      "source_ref": "https://github.com/unlink-xyz/monorepo@4bc46c1fffbc0e146dccfff5b9fe00167121b27b:protocol/contracts/src/UnlinkPool.sol",
+      "selected_functions": [
+        "initialize",
+        "deposit",
+        "transfer",
+        "withdraw",
+        "emergencyWithdraw",
+        "addRelayer",
+        "removeRelayer",
+        "setVerifierRouter"
+      ],
+      "lean_target": "Benchmark.Cases.UnlinkXyz.Pool.Compile",
+      "failure_reason": null,
+      "notes": "Build-green case for the generated UnlinkPool artifact and its boundary catalog. The upstream Solidity source remains the audit reference, not the executed artifact claimed by the harness.",
+      "buildable": true,
+      "verity_commit": "820553c7f88e2b7605392a6f822ea373d029f3e3",
+      "lean_toolchain": "leanprover/lean4:v4.22.0",
+      "abstraction_level": "generated_bytecode_with_external_boundaries",
+      "abstraction_tags": [
+        "generated_bytecode",
+        "poseidon_boundary",
+        "permit2_boundary",
+        "verifier_router_boundary",
+        "groth16_boundary"
+      ],
+      "abstraction_notes": "The whole pool is compiled from the Verity contract model. Replacement code is linked only for external cryptographic, Permit2, verifier-router, and verifier-call boundaries; pool storage, entrypoints, events, access control, and state transitions remain in the generated artifact.",
+      "unsupported_feature_codes": [],
+      "spec_target": "Benchmark.Cases.UnlinkXyz.Pool.Specs",
+      "proof_target": "Benchmark.Cases.UnlinkXyz.Pool.Proofs"
+    },
+    {
       "case_id": "wildcat/borrow_liquidity_safety",
       "project": "wildcat",
       "case_name": "borrow_liquidity_safety",
@@ -1285,6 +1384,7 @@
       "upstream_repo": "https://github.com/wildcat-finance/v2-protocol",
       "upstream_commit": "a70f297fbd1b1ab597e0e9a3458a2d13a34b4657",
       "original_contract_path": "src/market/WildcatMarket.sol",
+      "generated_artifact_path": null,
       "source_ref": "https://github.com/wildcat-finance/v2-protocol@a70f297fbd1b1ab597e0e9a3458a2d13a34b4657:src/market/WildcatMarket.sol",
       "selected_functions": [
         "borrow",
@@ -1328,6 +1428,7 @@
       "upstream_repo": "https://github.com/OpenZeppelin/openzeppelin-confidential-contracts",
       "upstream_commit": "master",
       "original_contract_path": "contracts/token/ERC7984/ERC7984.sol",
+      "generated_artifact_path": null,
       "source_ref": "https://github.com/OpenZeppelin/openzeppelin-confidential-contracts@master:contracts/token/ERC7984/ERC7984.sol",
       "selected_functions": [
         "_update",
@@ -1380,6 +1481,7 @@
       "upstream_repo": "https://github.com/OpenZeppelin/openzeppelin-contracts",
       "upstream_commit": "45f032d1bcf1a88b7bc90154d7eef76c87bf9d45",
       "original_contract_path": "contracts/token/ERC20/extensions/ERC4626.sol",
+      "generated_artifact_path": null,
       "source_ref": "https://github.com/OpenZeppelin/openzeppelin-contracts@45f032d1bcf1a88b7bc90154d7eef76c87bf9d45:contracts/token/ERC20/extensions/ERC4626.sol",
       "selected_functions": [
         "previewDeposit",
@@ -1422,6 +1524,7 @@
       "upstream_repo": "https://github.com/Uniswap/v2-core",
       "upstream_commit": "ee547b17853e71ed4e0101ccfd52e70d5acded58",
       "original_contract_path": "contracts/UniswapV2Pair.sol",
+      "generated_artifact_path": null,
       "source_ref": "https://github.com/Uniswap/v2-core@ee547b17853e71ed4e0101ccfd52e70d5acded58:contracts/UniswapV2Pair.sol",
       "selected_functions": [
         "swap"
@@ -1463,6 +1566,7 @@
       "upstream_repo": null,
       "upstream_commit": null,
       "original_contract_path": "TBD",
+      "generated_artifact_path": null,
       "source_ref": "unresolved:usual/private_repo@unknown:TBD",
       "selected_functions": [],
       "lean_target": null,
@@ -1530,7 +1634,7 @@
       "readiness": {
         "prompt_context": "ready",
         "editable_proof": "ready",
-        "reference_solution": "ready"
+        "reference_solution": "blocked"
       }
     },
     {
@@ -1578,7 +1682,7 @@
       "readiness": {
         "prompt_context": "ready",
         "editable_proof": "ready",
-        "reference_solution": "ready"
+        "reference_solution": "blocked"
       }
     },
     {
@@ -1626,7 +1730,7 @@
       "readiness": {
         "prompt_context": "ready",
         "editable_proof": "ready",
-        "reference_solution": "ready"
+        "reference_solution": "blocked"
       }
     },
     {
@@ -1674,7 +1778,7 @@
       "readiness": {
         "prompt_context": "ready",
         "editable_proof": "ready",
-        "reference_solution": "ready"
+        "reference_solution": "blocked"
       }
     },
     {
@@ -1722,7 +1826,7 @@
       "readiness": {
         "prompt_context": "ready",
         "editable_proof": "ready",
-        "reference_solution": "ready"
+        "reference_solution": "blocked"
       }
     },
     {
@@ -1772,7 +1876,7 @@
       "readiness": {
         "prompt_context": "ready",
         "editable_proof": "ready",
-        "reference_solution": "ready"
+        "reference_solution": "blocked"
       }
     },
     {
@@ -1817,7 +1921,7 @@
       "readiness": {
         "prompt_context": "ready",
         "editable_proof": "ready",
-        "reference_solution": "ready"
+        "reference_solution": "blocked"
       }
     },
     {
@@ -1862,7 +1966,7 @@
       "readiness": {
         "prompt_context": "ready",
         "editable_proof": "ready",
-        "reference_solution": "ready"
+        "reference_solution": "blocked"
       }
     },
     {
@@ -1907,7 +2011,7 @@
       "readiness": {
         "prompt_context": "ready",
         "editable_proof": "ready",
-        "reference_solution": "ready"
+        "reference_solution": "blocked"
       }
     },
     {
@@ -1952,7 +2056,7 @@
       "readiness": {
         "prompt_context": "ready",
         "editable_proof": "ready",
-        "reference_solution": "ready"
+        "reference_solution": "blocked"
       }
     },
     {
@@ -1997,7 +2101,7 @@
       "readiness": {
         "prompt_context": "ready",
         "editable_proof": "ready",
-        "reference_solution": "ready"
+        "reference_solution": "blocked"
       }
     },
     {
@@ -2042,7 +2146,7 @@
       "readiness": {
         "prompt_context": "ready",
         "editable_proof": "ready",
-        "reference_solution": "ready"
+        "reference_solution": "blocked"
       }
     },
     {
@@ -2087,7 +2191,7 @@
       "readiness": {
         "prompt_context": "ready",
         "editable_proof": "ready",
-        "reference_solution": "ready"
+        "reference_solution": "blocked"
       }
     },
     {
@@ -2132,7 +2236,7 @@
       "readiness": {
         "prompt_context": "ready",
         "editable_proof": "ready",
-        "reference_solution": "ready"
+        "reference_solution": "blocked"
       }
     },
     {
@@ -2177,7 +2281,7 @@
       "readiness": {
         "prompt_context": "ready",
         "editable_proof": "ready",
-        "reference_solution": "ready"
+        "reference_solution": "blocked"
       }
     },
     {
@@ -2222,7 +2326,7 @@
       "readiness": {
         "prompt_context": "ready",
         "editable_proof": "ready",
-        "reference_solution": "ready"
+        "reference_solution": "blocked"
       }
     },
     {
@@ -2267,7 +2371,7 @@
       "readiness": {
         "prompt_context": "ready",
         "editable_proof": "ready",
-        "reference_solution": "ready"
+        "reference_solution": "blocked"
       }
     },
     {
@@ -2316,7 +2420,7 @@
       "readiness": {
         "prompt_context": "ready",
         "editable_proof": "ready",
-        "reference_solution": "ready"
+        "reference_solution": "blocked"
       }
     },
     {
@@ -2365,7 +2469,7 @@
       "readiness": {
         "prompt_context": "ready",
         "editable_proof": "ready",
-        "reference_solution": "ready"
+        "reference_solution": "blocked"
       }
     },
     {
@@ -2414,7 +2518,7 @@
       "readiness": {
         "prompt_context": "ready",
         "editable_proof": "ready",
-        "reference_solution": "ready"
+        "reference_solution": "blocked"
       }
     },
     {
@@ -2463,7 +2567,7 @@
       "readiness": {
         "prompt_context": "ready",
         "editable_proof": "ready",
-        "reference_solution": "ready"
+        "reference_solution": "blocked"
       }
     },
     {
@@ -2512,7 +2616,7 @@
       "readiness": {
         "prompt_context": "ready",
         "editable_proof": "ready",
-        "reference_solution": "ready"
+        "reference_solution": "blocked"
       }
     },
     {
@@ -2561,7 +2665,7 @@
       "readiness": {
         "prompt_context": "ready",
         "editable_proof": "ready",
-        "reference_solution": "ready"
+        "reference_solution": "blocked"
       }
     },
     {
@@ -2610,7 +2714,7 @@
       "readiness": {
         "prompt_context": "ready",
         "editable_proof": "ready",
-        "reference_solution": "ready"
+        "reference_solution": "blocked"
       }
     },
     {
@@ -2655,7 +2759,7 @@
       "readiness": {
         "prompt_context": "ready",
         "editable_proof": "ready",
-        "reference_solution": "ready"
+        "reference_solution": "blocked"
       }
     },
     {
@@ -2700,7 +2804,7 @@
       "readiness": {
         "prompt_context": "ready",
         "editable_proof": "ready",
-        "reference_solution": "ready"
+        "reference_solution": "blocked"
       }
     },
     {
@@ -2745,7 +2849,7 @@
       "readiness": {
         "prompt_context": "ready",
         "editable_proof": "ready",
-        "reference_solution": "ready"
+        "reference_solution": "blocked"
       }
     },
     {
@@ -2790,7 +2894,7 @@
       "readiness": {
         "prompt_context": "ready",
         "editable_proof": "ready",
-        "reference_solution": "ready"
+        "reference_solution": "blocked"
       }
     },
     {
@@ -2835,7 +2939,7 @@
       "readiness": {
         "prompt_context": "ready",
         "editable_proof": "ready",
-        "reference_solution": "ready"
+        "reference_solution": "blocked"
       }
     },
     {
@@ -2880,7 +2984,7 @@
       "readiness": {
         "prompt_context": "ready",
         "editable_proof": "ready",
-        "reference_solution": "ready"
+        "reference_solution": "blocked"
       }
     },
     {
@@ -2925,7 +3029,7 @@
       "readiness": {
         "prompt_context": "ready",
         "editable_proof": "ready",
-        "reference_solution": "ready"
+        "reference_solution": "blocked"
       }
     },
     {
@@ -2970,7 +3074,7 @@
       "readiness": {
         "prompt_context": "ready",
         "editable_proof": "ready",
-        "reference_solution": "ready"
+        "reference_solution": "blocked"
       }
     },
     {
@@ -3015,7 +3119,7 @@
       "readiness": {
         "prompt_context": "ready",
         "editable_proof": "ready",
-        "reference_solution": "ready"
+        "reference_solution": "blocked"
       }
     },
     {
@@ -3060,7 +3164,7 @@
       "readiness": {
         "prompt_context": "ready",
         "editable_proof": "ready",
-        "reference_solution": "ready"
+        "reference_solution": "blocked"
       }
     },
     {
@@ -3105,7 +3209,7 @@
       "readiness": {
         "prompt_context": "ready",
         "editable_proof": "ready",
-        "reference_solution": "ready"
+        "reference_solution": "blocked"
       }
     },
     {
@@ -3150,7 +3254,7 @@
       "readiness": {
         "prompt_context": "ready",
         "editable_proof": "ready",
-        "reference_solution": "ready"
+        "reference_solution": "blocked"
       }
     },
     {
@@ -3195,7 +3299,7 @@
       "readiness": {
         "prompt_context": "ready",
         "editable_proof": "ready",
-        "reference_solution": "ready"
+        "reference_solution": "blocked"
       }
     },
     {
@@ -3240,7 +3344,7 @@
       "readiness": {
         "prompt_context": "ready",
         "editable_proof": "ready",
-        "reference_solution": "ready"
+        "reference_solution": "blocked"
       }
     },
     {
@@ -3285,7 +3389,7 @@
       "readiness": {
         "prompt_context": "ready",
         "editable_proof": "ready",
-        "reference_solution": "ready"
+        "reference_solution": "blocked"
       }
     },
     {
@@ -3330,7 +3434,7 @@
       "readiness": {
         "prompt_context": "ready",
         "editable_proof": "ready",
-        "reference_solution": "ready"
+        "reference_solution": "blocked"
       }
     },
     {
@@ -3375,7 +3479,7 @@
       "readiness": {
         "prompt_context": "ready",
         "editable_proof": "ready",
-        "reference_solution": "ready"
+        "reference_solution": "blocked"
       }
     },
     {
@@ -3420,7 +3524,7 @@
       "readiness": {
         "prompt_context": "ready",
         "editable_proof": "ready",
-        "reference_solution": "ready"
+        "reference_solution": "blocked"
       }
     },
     {
@@ -3465,7 +3569,7 @@
       "readiness": {
         "prompt_context": "ready",
         "editable_proof": "ready",
-        "reference_solution": "ready"
+        "reference_solution": "blocked"
       }
     },
     {
@@ -3510,7 +3614,7 @@
       "readiness": {
         "prompt_context": "ready",
         "editable_proof": "ready",
-        "reference_solution": "ready"
+        "reference_solution": "blocked"
       }
     },
     {
@@ -3555,7 +3659,7 @@
       "readiness": {
         "prompt_context": "ready",
         "editable_proof": "ready",
-        "reference_solution": "ready"
+        "reference_solution": "blocked"
       }
     },
     {
@@ -3600,7 +3704,7 @@
       "readiness": {
         "prompt_context": "ready",
         "editable_proof": "ready",
-        "reference_solution": "ready"
+        "reference_solution": "blocked"
       }
     },
     {
@@ -3645,7 +3749,7 @@
       "readiness": {
         "prompt_context": "ready",
         "editable_proof": "ready",
-        "reference_solution": "ready"
+        "reference_solution": "blocked"
       }
     },
     {
@@ -3690,7 +3794,7 @@
       "readiness": {
         "prompt_context": "ready",
         "editable_proof": "ready",
-        "reference_solution": "ready"
+        "reference_solution": "blocked"
       }
     },
     {
@@ -3735,7 +3839,7 @@
       "readiness": {
         "prompt_context": "ready",
         "editable_proof": "ready",
-        "reference_solution": "ready"
+        "reference_solution": "blocked"
       }
     },
     {
@@ -3780,7 +3884,7 @@
       "readiness": {
         "prompt_context": "ready",
         "editable_proof": "ready",
-        "reference_solution": "ready"
+        "reference_solution": "blocked"
       }
     },
     {
@@ -3825,7 +3929,7 @@
       "readiness": {
         "prompt_context": "ready",
         "editable_proof": "ready",
-        "reference_solution": "ready"
+        "reference_solution": "blocked"
       }
     },
     {
@@ -3870,7 +3974,7 @@
       "readiness": {
         "prompt_context": "ready",
         "editable_proof": "ready",
-        "reference_solution": "ready"
+        "reference_solution": "blocked"
       }
     },
     {
@@ -3915,7 +4019,7 @@
       "readiness": {
         "prompt_context": "ready",
         "editable_proof": "ready",
-        "reference_solution": "ready"
+        "reference_solution": "blocked"
       }
     },
     {
@@ -3960,7 +4064,7 @@
       "readiness": {
         "prompt_context": "ready",
         "editable_proof": "ready",
-        "reference_solution": "ready"
+        "reference_solution": "blocked"
       }
     },
     {
@@ -4005,7 +4109,7 @@
       "readiness": {
         "prompt_context": "ready",
         "editable_proof": "ready",
-        "reference_solution": "ready"
+        "reference_solution": "blocked"
       }
     },
     {
@@ -4050,7 +4154,7 @@
       "readiness": {
         "prompt_context": "ready",
         "editable_proof": "ready",
-        "reference_solution": "ready"
+        "reference_solution": "blocked"
       }
     },
     {
@@ -4095,7 +4199,7 @@
       "readiness": {
         "prompt_context": "ready",
         "editable_proof": "ready",
-        "reference_solution": "ready"
+        "reference_solution": "blocked"
       }
     },
     {
@@ -4140,7 +4244,7 @@
       "readiness": {
         "prompt_context": "ready",
         "editable_proof": "ready",
-        "reference_solution": "ready"
+        "reference_solution": "blocked"
       }
     },
     {
@@ -4185,7 +4289,7 @@
       "readiness": {
         "prompt_context": "ready",
         "editable_proof": "ready",
-        "reference_solution": "ready"
+        "reference_solution": "blocked"
       }
     },
     {
@@ -4230,7 +4334,7 @@
       "readiness": {
         "prompt_context": "ready",
         "editable_proof": "ready",
-        "reference_solution": "ready"
+        "reference_solution": "blocked"
       }
     },
     {
@@ -4275,7 +4379,7 @@
       "readiness": {
         "prompt_context": "ready",
         "editable_proof": "ready",
-        "reference_solution": "ready"
+        "reference_solution": "blocked"
       }
     },
     {
@@ -4320,7 +4424,7 @@
       "readiness": {
         "prompt_context": "ready",
         "editable_proof": "ready",
-        "reference_solution": "ready"
+        "reference_solution": "blocked"
       }
     },
     {
@@ -4365,7 +4469,7 @@
       "readiness": {
         "prompt_context": "ready",
         "editable_proof": "ready",
-        "reference_solution": "ready"
+        "reference_solution": "blocked"
       }
     },
     {
@@ -4410,7 +4514,7 @@
       "readiness": {
         "prompt_context": "ready",
         "editable_proof": "ready",
-        "reference_solution": "ready"
+        "reference_solution": "blocked"
       }
     },
     {
@@ -4455,7 +4559,7 @@
       "readiness": {
         "prompt_context": "ready",
         "editable_proof": "ready",
-        "reference_solution": "ready"
+        "reference_solution": "blocked"
       }
     },
     {
@@ -4500,7 +4604,7 @@
       "readiness": {
         "prompt_context": "ready",
         "editable_proof": "ready",
-        "reference_solution": "ready"
+        "reference_solution": "blocked"
       }
     },
     {
@@ -4545,7 +4649,7 @@
       "readiness": {
         "prompt_context": "ready",
         "editable_proof": "ready",
-        "reference_solution": "ready"
+        "reference_solution": "blocked"
       }
     },
     {
@@ -4590,7 +4694,7 @@
       "readiness": {
         "prompt_context": "ready",
         "editable_proof": "ready",
-        "reference_solution": "ready"
+        "reference_solution": "blocked"
       }
     },
     {
@@ -4635,7 +4739,7 @@
       "readiness": {
         "prompt_context": "ready",
         "editable_proof": "ready",
-        "reference_solution": "ready"
+        "reference_solution": "blocked"
       }
     },
     {
@@ -4680,7 +4784,7 @@
       "readiness": {
         "prompt_context": "ready",
         "editable_proof": "ready",
-        "reference_solution": "ready"
+        "reference_solution": "blocked"
       }
     },
     {
@@ -4725,7 +4829,7 @@
       "readiness": {
         "prompt_context": "ready",
         "editable_proof": "ready",
-        "reference_solution": "ready"
+        "reference_solution": "blocked"
       }
     },
     {
@@ -4770,7 +4874,7 @@
       "readiness": {
         "prompt_context": "ready",
         "editable_proof": "ready",
-        "reference_solution": "ready"
+        "reference_solution": "blocked"
       }
     },
     {
@@ -4815,7 +4919,7 @@
       "readiness": {
         "prompt_context": "ready",
         "editable_proof": "ready",
-        "reference_solution": "ready"
+        "reference_solution": "blocked"
       }
     },
     {
@@ -4860,7 +4964,7 @@
       "readiness": {
         "prompt_context": "ready",
         "editable_proof": "ready",
-        "reference_solution": "ready"
+        "reference_solution": "blocked"
       }
     },
     {
@@ -4905,7 +5009,7 @@
       "readiness": {
         "prompt_context": "ready",
         "editable_proof": "ready",
-        "reference_solution": "ready"
+        "reference_solution": "blocked"
       }
     },
     {
@@ -4950,7 +5054,7 @@
       "readiness": {
         "prompt_context": "ready",
         "editable_proof": "ready",
-        "reference_solution": "ready"
+        "reference_solution": "blocked"
       }
     },
     {
@@ -4995,7 +5099,7 @@
       "readiness": {
         "prompt_context": "ready",
         "editable_proof": "ready",
-        "reference_solution": "ready"
+        "reference_solution": "blocked"
       }
     },
     {
@@ -5040,7 +5144,7 @@
       "readiness": {
         "prompt_context": "ready",
         "editable_proof": "ready",
-        "reference_solution": "ready"
+        "reference_solution": "blocked"
       }
     },
     {
@@ -5085,7 +5189,7 @@
       "readiness": {
         "prompt_context": "ready",
         "editable_proof": "ready",
-        "reference_solution": "ready"
+        "reference_solution": "blocked"
       }
     },
     {
@@ -5130,7 +5234,7 @@
       "readiness": {
         "prompt_context": "ready",
         "editable_proof": "ready",
-        "reference_solution": "ready"
+        "reference_solution": "blocked"
       }
     },
     {
@@ -5175,7 +5279,7 @@
       "readiness": {
         "prompt_context": "ready",
         "editable_proof": "ready",
-        "reference_solution": "ready"
+        "reference_solution": "blocked"
       }
     },
     {
@@ -5220,7 +5324,7 @@
       "readiness": {
         "prompt_context": "ready",
         "editable_proof": "ready",
-        "reference_solution": "ready"
+        "reference_solution": "blocked"
       }
     },
     {
@@ -5265,7 +5369,7 @@
       "readiness": {
         "prompt_context": "ready",
         "editable_proof": "ready",
-        "reference_solution": "ready"
+        "reference_solution": "blocked"
       }
     },
     {
@@ -5310,7 +5414,7 @@
       "readiness": {
         "prompt_context": "ready",
         "editable_proof": "ready",
-        "reference_solution": "ready"
+        "reference_solution": "blocked"
       }
     },
     {
@@ -5351,6 +5455,111 @@
         "higher_order_function_param_specialized"
       ],
       "reference_solution_module": "Benchmark.Cases.TermMax.OrderV2BuyXtSingleSegment.Proofs",
+      "evaluation": {
+        "engine": "lean_proof_generation",
+        "target_kind": "proof_generation"
+      },
+      "readiness": {
+        "prompt_context": "ready",
+        "editable_proof": "ready",
+        "reference_solution": "blocked"
+      }
+    },
+    {
+      "task_ref": "unlink_xyz/pool/artifact_builds",
+      "task_id": "artifact_builds",
+      "case_id": "unlink_xyz/pool",
+      "suite": "active",
+      "schema_version": 1,
+      "manifest_path": "cases/unlink_xyz/pool/tasks/artifact_builds.yaml",
+      "split": "active",
+      "family_id": "unlink_xyz",
+      "implementation_id": "pool",
+      "source_ref": "https://github.com/unlink-xyz/monorepo@4bc46c1fffbc0e146dccfff5b9fe00167121b27b:protocol/contracts/src/UnlinkPool.sol",
+      "task_interface_version": 2,
+      "track": "proof-only",
+      "property_class": "generated_artifact_integrity",
+      "category": "build-integrity",
+      "difficulty": "easy",
+      "theorem_name": "Benchmark.Cases.UnlinkXyz.Pool.artifactBuilds_compile_gate",
+      "proof_family": "functional_correctness",
+      "translation_status": "generated",
+      "proof_status": "complete",
+      "implementation_files": [
+        "cases/unlink_xyz/pool/verity/Contract.lean",
+        "Benchmark/Cases/UnlinkXyz/Pool/Contract.lean",
+        "Benchmark/Cases/UnlinkXyz/Pool/VerifierRouter.lean",
+        "Benchmark/Cases/UnlinkXyz/Pool/Compile.lean",
+        "Benchmark/Cases/UnlinkXyz/Pool/UnlinkPoolArtifact/UnlinkPoolArtifact.lean"
+      ],
+      "specification_files": [
+        "cases/unlink_xyz/pool/verity/Specs.lean",
+        "Benchmark/Cases/UnlinkXyz/Pool/Specs.lean"
+      ],
+      "editable_files": [
+        "Benchmark/Generated/UnlinkXyz/Pool/Tasks/ArtifactBuilds.lean"
+      ],
+      "abstraction_level": "generated_bytecode_with_external_boundaries",
+      "abstraction_notes": "This task keeps the generated pool artifact on the benchmark execution path. The replacement Yul is limited to external cryptographic, Permit2, router, and verifier-call boundaries.",
+      "unsupported_feature_codes": [],
+      "reference_solution_module": "Benchmark.Generated.UnlinkXyz.Pool.Tasks.ArtifactBuilds",
+      "evaluation": {
+        "engine": "lean_proof_generation",
+        "target_kind": "proof_generation"
+      },
+      "readiness": {
+        "prompt_context": "ready",
+        "editable_proof": "ready",
+        "reference_solution": "ready"
+      }
+    },
+    {
+      "task_ref": "unlink_xyz/pool/formal_audit_ready",
+      "task_id": "formal_audit_ready",
+      "case_id": "unlink_xyz/pool",
+      "suite": "active",
+      "schema_version": 1,
+      "manifest_path": "cases/unlink_xyz/pool/tasks/formal_audit_ready.yaml",
+      "split": "active",
+      "family_id": "unlink_xyz",
+      "implementation_id": "pool",
+      "source_ref": "https://github.com/unlink-xyz/monorepo@4bc46c1fffbc0e146dccfff5b9fe00167121b27b:protocol/contracts/src/UnlinkPool.sol",
+      "task_interface_version": 2,
+      "track": "proof-only",
+      "property_class": "formal_audit_ap_ic_delivery",
+      "category": "generated-artifact-audit",
+      "difficulty": "hard",
+      "theorem_name": "Benchmark.Cases.UnlinkXyz.Pool.FormalAudit.formal_audit_ready_for_delivery",
+      "proof_family": "protocol_transition_correctness",
+      "translation_status": "generated",
+      "proof_status": "complete",
+      "implementation_files": [
+        "cases/unlink_xyz/pool/verity/Contract.lean",
+        "Benchmark/Cases/UnlinkXyz/Pool/Contract.lean",
+        "Benchmark/Cases/UnlinkXyz/Pool/State.lean",
+        "Benchmark/Cases/UnlinkXyz/Pool/Compile.lean",
+        "Benchmark/Cases/UnlinkXyz/Pool/UnlinkPoolArtifact/UnlinkPoolArtifact.lean",
+        "Benchmark/Cases/UnlinkXyz/Pool/VerifierRouterArtifact/VerifierRouterArtifact.lean"
+      ],
+      "specification_files": [
+        "cases/unlink_xyz/pool/verity/Specs.lean",
+        "Benchmark/Cases/UnlinkXyz/Pool/Specs.lean",
+        "Benchmark/Cases/UnlinkXyz/Pool/FormalAudit.lean"
+      ],
+      "editable_files": [
+        "Benchmark/Generated/UnlinkXyz/Pool/Tasks/FormalAuditReady.lean"
+      ],
+      "abstraction_level": "generated_bytecode_with_external_boundaries",
+      "abstraction_notes": "Delivery gate for the UnlinkPool AP/IC audit. The theorem packages all AP/IC items marked proved-from-concrete, proving them from generated UnlinkPool entrypoint metadata, generated StateStorage helper execution, and generated artifact structure. Items that need cryptographic, token, governance, liveness, privacy, or EVM transaction semantics remain explicit assumptions or residual boundaries rather than arbitrary Step theorems.",
+      "unsupported_feature_codes": [
+        "groth16_soundness_boundary",
+        "permit2_token_semantics_boundary",
+        "route_governance_boundary",
+        "chain_liveness_boundary",
+        "evm_transaction_atomicity_boundary",
+        "privacy_game_boundary"
+      ],
+      "reference_solution_module": "Benchmark.Cases.UnlinkXyz.Pool.FormalAudit",
       "evaluation": {
         "engine": "lean_proof_generation",
         "target_kind": "proof_generation"
@@ -5403,7 +5612,7 @@
       "readiness": {
         "prompt_context": "ready",
         "editable_proof": "ready",
-        "reference_solution": "ready"
+        "reference_solution": "blocked"
       }
     },
     {
@@ -5448,7 +5657,7 @@
       "readiness": {
         "prompt_context": "ready",
         "editable_proof": "ready",
-        "reference_solution": "ready"
+        "reference_solution": "blocked"
       }
     },
     {
@@ -5493,7 +5702,7 @@
       "readiness": {
         "prompt_context": "ready",
         "editable_proof": "ready",
-        "reference_solution": "ready"
+        "reference_solution": "blocked"
       }
     },
     {
@@ -5538,7 +5747,7 @@
       "readiness": {
         "prompt_context": "ready",
         "editable_proof": "ready",
-        "reference_solution": "ready"
+        "reference_solution": "blocked"
       }
     },
     {
@@ -5583,7 +5792,7 @@
       "readiness": {
         "prompt_context": "ready",
         "editable_proof": "ready",
-        "reference_solution": "ready"
+        "reference_solution": "blocked"
       }
     },
     {
@@ -5628,7 +5837,7 @@
       "readiness": {
         "prompt_context": "ready",
         "editable_proof": "ready",
-        "reference_solution": "ready"
+        "reference_solution": "blocked"
       }
     },
     {
@@ -5673,7 +5882,7 @@
       "readiness": {
         "prompt_context": "ready",
         "editable_proof": "ready",
-        "reference_solution": "ready"
+        "reference_solution": "blocked"
       }
     },
     {
@@ -5718,7 +5927,7 @@
       "readiness": {
         "prompt_context": "ready",
         "editable_proof": "ready",
-        "reference_solution": "ready"
+        "reference_solution": "blocked"
       }
     },
     {
@@ -5763,7 +5972,7 @@
       "readiness": {
         "prompt_context": "ready",
         "editable_proof": "ready",
-        "reference_solution": "ready"
+        "reference_solution": "blocked"
       }
     },
     {
@@ -5808,7 +6017,7 @@
       "readiness": {
         "prompt_context": "ready",
         "editable_proof": "ready",
-        "reference_solution": "ready"
+        "reference_solution": "blocked"
       }
     },
     {
@@ -5853,7 +6062,7 @@
       "readiness": {
         "prompt_context": "ready",
         "editable_proof": "ready",
-        "reference_solution": "ready"
+        "reference_solution": "blocked"
       }
     },
     {
@@ -5898,7 +6107,7 @@
       "readiness": {
         "prompt_context": "ready",
         "editable_proof": "ready",
-        "reference_solution": "ready"
+        "reference_solution": "blocked"
       }
     }
   ],
@@ -5945,7 +6154,7 @@
       "readiness": {
         "prompt_context": "ready",
         "editable_proof": "ready",
-        "reference_solution": "ready"
+        "reference_solution": "blocked"
       }
     },
     {
@@ -5990,7 +6199,7 @@
       "readiness": {
         "prompt_context": "ready",
         "editable_proof": "ready",
-        "reference_solution": "ready"
+        "reference_solution": "blocked"
       }
     },
     {
@@ -6035,7 +6244,7 @@
       "readiness": {
         "prompt_context": "ready",
         "editable_proof": "ready",
-        "reference_solution": "ready"
+        "reference_solution": "blocked"
       }
     },
     {
@@ -6080,7 +6289,7 @@
       "readiness": {
         "prompt_context": "ready",
         "editable_proof": "ready",
-        "reference_solution": "ready"
+        "reference_solution": "blocked"
       }
     },
     {
@@ -6125,7 +6334,7 @@
       "readiness": {
         "prompt_context": "ready",
         "editable_proof": "ready",
-        "reference_solution": "ready"
+        "reference_solution": "blocked"
       }
     },
     {
@@ -6170,7 +6379,7 @@
       "readiness": {
         "prompt_context": "ready",
         "editable_proof": "ready",
-        "reference_solution": "ready"
+        "reference_solution": "blocked"
       }
     },
     {
@@ -6215,7 +6424,7 @@
       "readiness": {
         "prompt_context": "ready",
         "editable_proof": "ready",
-        "reference_solution": "ready"
+        "reference_solution": "blocked"
       }
     },
     {
@@ -6260,9 +6469,9 @@
       "readiness": {
         "prompt_context": "ready",
         "editable_proof": "ready",
-        "reference_solution": "ready"
+        "reference_solution": "blocked"
       }
     }
   ],
-  "generated_at": "2026-05-17T01:20:05.622809+00:00"
+  "generated_at": "2026-05-22T17:44:22.927002+00:00"
 }

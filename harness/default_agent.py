@@ -1800,6 +1800,11 @@ def execute_agent_task(
 ) -> tuple[int, Path]:
     config = resolved_config or resolve_config(config_path, require_secrets=not dry_run, profile=profile)
     task = resolve_task(task_ref)
+    if task["translation_status"] != "generated":
+        raise SystemExit(
+            f"{task_ref}: translation_status must be 'generated' for Verity-executed harness runs "
+            f"(got {task['translation_status']!r})"
+        )
     messages = build_messages(config, task)
     if dry_run:
         result = build_result(task_ref, config, task, messages, dry_run=dry_run, elapsed_seconds=0.0)

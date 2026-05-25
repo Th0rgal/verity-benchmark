@@ -167,6 +167,14 @@ def main() -> int:
                 implementation_case_refs[(family_id, implementation_id)] = {
                     case_id for case_id in case_ids if isinstance(case_id, str)
                 }
+        if data.get("status") == "generated":
+            artifact_path = resolve_repo_file(data.get("source_artifact_path"))
+            if artifact_path is None:
+                errors.append(f"{rel}: generated source_artifact_path must resolve inside the repository")
+            elif not artifact_path.is_file():
+                errors.append(f"{rel}: generated source_artifact_path must exist: {data.get('source_artifact_path')}")
+            elif artifact_path.suffix == ".sol":
+                errors.append(f"{rel}: generated source_artifact_path must not point at a Solidity oracle artifact")
 
     for path in case_manifests:
         data = load_manifest(path)
@@ -203,6 +211,22 @@ def main() -> int:
             errors.append(f"{rel}: implementation reference is incomplete")
         elif (family_id, implementation_id) not in implementations:
             errors.append(f"{rel}: unknown implementation {(family_id, implementation_id)!r}")
+        elif data.get("translation_status") == "generated" and implementations[(family_id, implementation_id)].get("status") != "generated":
+            errors.append(f"{rel}: generated cases require implementation status 'generated'")
+        if data.get("translation_status") == "generated":
+            generated_artifact = data.get("generated_artifact_path")
+            if not isinstance(generated_artifact, str) or not generated_artifact:
+                errors.append(f"{rel}: generated cases require generated_artifact_path")
+            else:
+                generated_path = resolve_repo_file(generated_artifact)
+                if generated_path is None or not generated_path.is_file():
+                    errors.append(f"{rel}: generated_artifact_path must be an existing repository file")
+                elif isinstance(family_id, str) and isinstance(implementation_id, str) and (family_id, implementation_id) in implementations:
+                    implementation_artifact = implementations[(family_id, implementation_id)].get("source_artifact_path")
+                    if generated_artifact != implementation_artifact:
+                        errors.append(
+                            f"{rel}: generated_artifact_path must match implementation source_artifact_path"
+                        )
 
     for path in task_manifests:
         data = load_manifest(path)
@@ -250,6 +274,8 @@ def main() -> int:
             errors.append(f"{rel}: implementation reference is incomplete")
         elif (family_id, implementation_id) not in implementations:
             errors.append(f"{rel}: unknown implementation {(family_id, implementation_id)!r}")
+        elif data.get("translation_status") == "generated" and implementations[(family_id, implementation_id)].get("status") != "generated":
+            errors.append(f"{rel}: generated tasks require implementation status 'generated'")
         interface_version = data.get("task_interface_version")
         if not isinstance(interface_version, int) or interface_version < 1:
             errors.append(f"{rel}: task_interface_version must be an integer >= 1")
