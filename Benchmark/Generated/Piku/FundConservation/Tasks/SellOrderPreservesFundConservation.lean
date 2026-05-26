@@ -8,11 +8,8 @@ open Verity.EVM.Uint256
 /--
 Piku redemption-order creation preserves the accounting decomposition:
 distributed backing + queued redemption backing + remaining backing +
-protocol fees + project fees = initial backing.
-
-The arithmetic hypothesis exposes the real proof boundary: the Solidity
-fee split uses integer division, so exact conservation requires a no-rounding
-condition.
+protocol fees + project fees = initial backing. The reference proof discharges
+the Uint256 fee-split and bucket arithmetic directly.
 -/
 theorem _sellOrder_preserves_fund_conservation
     (total protocolFeeBps : Uint256) (s : ContractState)

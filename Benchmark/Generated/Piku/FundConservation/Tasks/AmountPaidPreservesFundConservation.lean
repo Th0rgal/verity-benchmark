@@ -7,8 +7,8 @@ open Verity.EVM.Uint256
 
 /--
 Manual queue payment execution preserves the same backing decomposition
-when the queued amount splits exactly into user distribution plus protocol
-treasury fee.
+when the queued amount is split into user distribution plus protocol treasury
+fee. The reference proof discharges that Uint256 split arithmetic directly.
 -/
 theorem amountPaid_preserves_fund_conservation
     (amount protocolFeeAmount_ : Uint256) (s : ContractState)
