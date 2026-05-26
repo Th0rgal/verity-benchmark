@@ -5,10 +5,10 @@ This report is generated from the benchmark manifests.
 ## Summary
 
 - Families: 19
-- Implementations: 19
-- Active cases: 16
-- Buildable active cases: 16
-- Active tasks: 99
+- Implementations: 21
+- Active cases: 17
+- Buildable active cases: 17
+- Active tasks: 105
 - Backlog cases: 3
 
 ## Buildable active cases
@@ -146,13 +146,22 @@ This report is generated from the benchmark manifests.
 ### `unlink_xyz/pool`
 - Family / implementation: `unlink_xyz` / `pool`
 - Stage: `build_green`
-- Status dimensions: translation=`generated`, spec=`frozen`, proof=`partial`
+- Status dimensions: translation=`translated`, spec=`draft`, proof=`not_started`
 - Lean target: `Benchmark.Cases.UnlinkXyz.Pool.Compile`
 - Source ref: `https://github.com/unlink-xyz/monorepo@4bc46c1fffbc0e146dccfff5b9fe00167121b27b:protocol/contracts/src/UnlinkPool.sol`
-- Selected functions: `initialize`, `deposit`, `transfer`, `withdraw`, `emergencyWithdraw`, `addRelayer`, `removeRelayer`, `setVerifierRouter`
+- Selected functions: `constructor`, `initialize`, `deposit`, `transfer`, `withdraw`, `emergencyWithdraw`, `hashNote`, `isRelayer`, `addRelayer`, `removeRelayer`, `setVerifierRouter`, `transferOwnership`, `acceptOwnership`, `renounceOwnership`, `VerifierRouter.owner`, `VerifierRouter.pendingOwner`, `VerifierRouter.transferOwnership`, `VerifierRouter.acceptOwnership`, `VerifierRouter.renounceOwnership`, `VerifierRouter.setCircuit`, `VerifierRouter.pauseCircuit`, `VerifierRouter.getCircuit`, `VerifierRouter.verifierToCircuitId`
 - Upstream source artifact: `protocol/contracts/src/UnlinkPool.sol`
-- Generated execution artifact: `artifacts/yul/UnlinkPool.yul`
-- Notes: Build-green case for the generated UnlinkPool artifact and its boundary catalog. The upstream Solidity source remains the audit reference, not the executed artifact claimed by the harness.
+- Notes: This case replaces the previous `backlog/unlink_xyz/placeholder` entry, which was blocked on `upstream_unavailable`. The upstream is now resolved and the case targets the pinned commit of `unlink-xyz/monorepo`. The original local research scratchpad that informed this translation lived in `lfglabs-dev/verity:Contracts/UnlinkPool/` (untracked) and was rewritten here to use the new Verity feature surface end-to-end.
+
+### `usual/dao_collateral`
+- Family / implementation: `usual` / `verified_proxy`
+- Stage: `build_green`
+- Status dimensions: translation=`translated`, spec=`frozen`, proof=`complete`
+- Lean target: `Benchmark.Cases.Usual.DaoCollateral.Compile`
+- Source ref: `https://etherscan.io/address/0x0eec861d49f15f585d6bb4301fc4f89bce22af4e#code`
+- Selected functions: `swap`, `redeem`, `_calculateFee`, `_burnStableTokenAndTransferCollateral`, `_getTokenAmountForAmountInUSD`
+- Upstream source artifact: `src/daoCollateral/DaoCollateral.sol`
+- Notes: Usual USD0 DaoCollateral conservation case. It verifies that no direct swap/redeem transition can create unaccounted USD0 or debit more collateral than the contract's modeled accounting permits, modulo configured redeem fee, oracle price, CBR coefficient, token decimals, and floor rounding.
 
 ### `wildcat/borrow_liquidity_safety`
 - Family / implementation: `wildcat` / `v2_protocol`
@@ -1040,6 +1049,16 @@ This report is generated from the benchmark manifests.
 - Editable proof file: `Benchmark/Generated/UnlinkXyz/Pool/Tasks/ArtifactBuilds.lean`
 - Hidden reference solution: `Benchmark.Generated.UnlinkXyz.Pool.Tasks.ArtifactBuilds`
 
+### `unlink_xyz/pool/build_green`
+- Track / property class / proof family: `translation-only` / `compilation` / `functional_correctness`
+- Readiness: prompt_context=`ready`, editable_proof=`blocked`, reference_solution=`blocked`
+- Theorem target: `Benchmark.Cases.UnlinkXyz.Pool.unlinkPool_compiles`
+- Evaluation: engine=`lean_proof_generation`, target_kind=`proof_generation`
+- Implementation files: `cases/unlink_xyz/pool/verity/Contract.lean`, `Benchmark/Cases/UnlinkXyz/Pool/Contract.lean`, `Benchmark/Cases/UnlinkXyz/Pool/VerifierRouter.lean`
+- Specification files: `cases/unlink_xyz/pool/verity/Specs.lean`, `Benchmark/Cases/UnlinkXyz/Pool/Specs.lean`
+- Editable proof file: `Benchmark/Generated/UnlinkXyz/Pool/Tasks/BuildGreen.lean`
+- Hidden reference solution: `Benchmark.Cases.UnlinkXyz.Pool.Proofs`
+
 ### `unlink_xyz/pool/formal_audit_ready`
 - Track / property class / proof family: `proof-only` / `formal_audit_ap_ic_delivery` / `protocol_transition_correctness`
 - Readiness: prompt_context=`ready`, editable_proof=`ready`, reference_solution=`ready`
@@ -1049,6 +1068,56 @@ This report is generated from the benchmark manifests.
 - Specification files: `cases/unlink_xyz/pool/verity/Specs.lean`, `Benchmark/Cases/UnlinkXyz/Pool/Specs.lean`, `Benchmark/Cases/UnlinkXyz/Pool/FormalAudit.lean`
 - Editable proof file: `Benchmark/Generated/UnlinkXyz/Pool/Tasks/FormalAuditReady.lean`
 - Hidden reference solution: `Benchmark.Cases.UnlinkXyz.Pool.FormalAudit`
+
+### `usual/dao_collateral/redeem_conservation`
+- Track / property class / proof family: `proof-only` / `accounting_conservation` / `state_preservation_local_effects`
+- Readiness: prompt_context=`ready`, editable_proof=`ready`, reference_solution=`blocked`
+- Theorem target: `Benchmark.Cases.Usual.DaoCollateral.redeem_conservation`
+- Evaluation: engine=`lean_proof_generation`, target_kind=`proof_generation`
+- Implementation files: `cases/usual/dao_collateral/verity/Contract.lean`, `Benchmark/Cases/Usual/DaoCollateral/Contract.lean`
+- Specification files: `cases/usual/dao_collateral/verity/Specs.lean`, `Benchmark/Cases/Usual/DaoCollateral/Specs.lean`
+- Editable proof file: `Benchmark/Generated/Usual/DaoCollateral/Tasks/RedeemConservation.lean`
+- Hidden reference solution: `Benchmark.Cases.Usual.DaoCollateral.Proofs`
+
+### `usual/dao_collateral/redeem_fee_formula`
+- Track / property class / proof family: `proof-only` / `arithmetic_rounding` / `functional_correctness`
+- Readiness: prompt_context=`ready`, editable_proof=`ready`, reference_solution=`blocked`
+- Theorem target: `Benchmark.Cases.Usual.DaoCollateral.redeem_fee_formula`
+- Evaluation: engine=`lean_proof_generation`, target_kind=`proof_generation`
+- Implementation files: `cases/usual/dao_collateral/verity/Contract.lean`, `Benchmark/Cases/Usual/DaoCollateral/Contract.lean`
+- Specification files: `cases/usual/dao_collateral/verity/Specs.lean`, `Benchmark/Cases/Usual/DaoCollateral/Specs.lean`
+- Editable proof file: `Benchmark/Generated/Usual/DaoCollateral/Tasks/RedeemFeeFormula.lean`
+- Hidden reference solution: `Benchmark.Cases.Usual.DaoCollateral.Proofs`
+
+### `usual/dao_collateral/redeem_return_formula`
+- Track / property class / proof family: `proof-only` / `arithmetic_rounding` / `functional_correctness`
+- Readiness: prompt_context=`ready`, editable_proof=`ready`, reference_solution=`blocked`
+- Theorem target: `Benchmark.Cases.Usual.DaoCollateral.redeem_return_formula`
+- Evaluation: engine=`lean_proof_generation`, target_kind=`proof_generation`
+- Implementation files: `cases/usual/dao_collateral/verity/Contract.lean`, `Benchmark/Cases/Usual/DaoCollateral/Contract.lean`
+- Specification files: `cases/usual/dao_collateral/verity/Specs.lean`, `Benchmark/Cases/Usual/DaoCollateral/Specs.lean`
+- Editable proof file: `Benchmark/Generated/Usual/DaoCollateral/Tasks/RedeemReturnFormula.lean`
+- Hidden reference solution: `Benchmark.Cases.Usual.DaoCollateral.Proofs`
+
+### `usual/dao_collateral/swap_conservation`
+- Track / property class / proof family: `proof-only` / `accounting_conservation` / `state_preservation_local_effects`
+- Readiness: prompt_context=`ready`, editable_proof=`ready`, reference_solution=`blocked`
+- Theorem target: `Benchmark.Cases.Usual.DaoCollateral.swap_conservation`
+- Evaluation: engine=`lean_proof_generation`, target_kind=`proof_generation`
+- Implementation files: `cases/usual/dao_collateral/verity/Contract.lean`, `Benchmark/Cases/Usual/DaoCollateral/Contract.lean`
+- Specification files: `cases/usual/dao_collateral/verity/Specs.lean`, `Benchmark/Cases/Usual/DaoCollateral/Specs.lean`
+- Editable proof file: `Benchmark/Generated/Usual/DaoCollateral/Tasks/SwapConservation.lean`
+- Hidden reference solution: `Benchmark.Cases.Usual.DaoCollateral.Proofs`
+
+### `usual/dao_collateral/swap_value_conservation`
+- Track / property class / proof family: `proof-only` / `accounting_conservation` / `state_preservation_local_effects`
+- Readiness: prompt_context=`ready`, editable_proof=`ready`, reference_solution=`blocked`
+- Theorem target: `Benchmark.Cases.Usual.DaoCollateral.swap_value_conservation`
+- Evaluation: engine=`lean_proof_generation`, target_kind=`proof_generation`
+- Implementation files: `cases/usual/dao_collateral/verity/Contract.lean`, `Benchmark/Cases/Usual/DaoCollateral/Contract.lean`
+- Specification files: `cases/usual/dao_collateral/verity/Specs.lean`, `Benchmark/Cases/Usual/DaoCollateral/Specs.lean`
+- Editable proof file: `Benchmark/Generated/Usual/DaoCollateral/Tasks/SwapValueConservation.lean`
+- Hidden reference solution: `Benchmark.Cases.Usual.DaoCollateral.Proofs`
 
 ### `wildcat/borrow_liquidity_safety/positive_borrow_preserves_required_liquidity`
 - Track / property class / proof family: `proof-only` / `accounting_bound` / `functional_correctness`
