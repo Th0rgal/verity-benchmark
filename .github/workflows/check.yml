@@ -3,8 +3,6 @@ name: check
 on:
   repository_dispatch:
     types:
-      - unlink-solidity-changed
-      - unlink-zk-changed
       - benchmark-case-changed
   push:
     branches:
