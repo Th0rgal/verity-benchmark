@@ -5,7 +5,7 @@ case_id: lagoon/guardrails
 split: active
 family_id: lagoon
 implementation_id: v0_6_0
-source_ref: https://github.com/hopperlabsxyz/lagoon-v0/blob/a8e73f5a5276aa4047b901083cbce127d7f7b470/src/v0.6.0/libraries/GuardrailsLib.sol
+source_ref: https://github.com/hopperlabsxyz/lagoon-v0@a8e73f5a5276aa4047b901083cbce127d7f7b470:src/v0.6.0/libraries/GuardrailsLib.sol
 task_interface_version: 2
 theorem_name: Benchmark.Cases.Lagoon.Guardrails.guardrails_exact_compliance
 proof_family: functional_correctness
@@ -14,7 +14,7 @@ difficulty: medium
 category: arithmetic-invariant
 track: proof-only
 translation_status: translated
-proof_status: proved
+proof_status: complete
 evaluation_engine: lean_proof_generation
 implementation_files:
   - cases/lagoon/guardrails/verity/Contract.lean

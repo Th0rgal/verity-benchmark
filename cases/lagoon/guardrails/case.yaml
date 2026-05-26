@@ -8,11 +8,11 @@ implementation_id: v0_6_0
 stage: build_green
 translation_status: translated
 spec_status: frozen
-proof_status: proved
+proof_status: complete
 upstream_repo: https://github.com/hopperlabsxyz/lagoon-v0
 upstream_commit: a8e73f5a5276aa4047b901083cbce127d7f7b470
 original_contract_path: src/v0.6.0/libraries/GuardrailsLib.sol
-source_ref: https://github.com/hopperlabsxyz/lagoon-v0/blob/a8e73f5a5276aa4047b901083cbce127d7f7b470/src/v0.6.0/libraries/GuardrailsLib.sol
+source_ref: https://github.com/hopperlabsxyz/lagoon-v0@a8e73f5a5276aa4047b901083cbce127d7f7b470:src/v0.6.0/libraries/GuardrailsLib.sol
 lean_target: Benchmark.Cases.Lagoon.Guardrails.Compile
 selected_functions:
   - isCompliant
