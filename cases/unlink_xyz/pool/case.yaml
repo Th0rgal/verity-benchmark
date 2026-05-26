@@ -41,7 +41,7 @@ selected_functions:
   - VerifierRouter.getCircuit
   - VerifierRouter.verifierToCircuitId
 source_language: solidity
-verity_version: d71bf23d908a7a952bf041ee5ebe41ba68b54426
+verity_version: 7d0ae8b2152d2da6cbafc3480e73fb1b2364670f
 lean_toolchain: leanprover/lean4:v4.22.0
 abstraction_level: protocol_slice
 abstraction_tags:
