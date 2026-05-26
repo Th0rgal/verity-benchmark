@@ -24,6 +24,11 @@ simplify the successful path under the explicit source-aligned preconditions:
 - deposit value covers `value + callFee + gasFee`
 - checked-addition successful paths hold for deposit required amount, LP
   penalty timing, and fallback balance credits
+- user refunds satisfy the Solidity expiry gate through `quoteExpireDate` and
+  `quoteExpireBlock`
+- refund recipient inputs match the stored Solidity quote recipients, recorded
+  as opaque explicit assumptions because the benchmark flattens the quote and
+  leaves recipient identity at the theorem boundary
 
 The refund proofs split on the modeled external transfer result and, for LP
 refund, on the modeled penalty branch. In the failed-transfer branch they prove
@@ -39,9 +44,12 @@ lake build Benchmark.Cases.Rootstock.FlyoverQuoteLifecycle.Contract
 lake build Benchmark.Cases.Rootstock.FlyoverQuoteLifecycle.Specs
 lake build Benchmark.Cases.Rootstock.FlyoverQuoteLifecycle.Proofs
 lake build Benchmark.Cases.Rootstock.FlyoverQuoteLifecycle.Compile
-lake build Benchmark.Generated.Rootstock.FlyoverQuoteLifecycle.Tasks.DepositPegOutRegistersRequiredAmount Benchmark.Generated.Rootstock.FlyoverQuoteLifecycle.Tasks.RefundPegOutConservesQuoteAmount Benchmark.Generated.Rootstock.FlyoverQuoteLifecycle.Tasks.RefundUserPegOutConservesQuoteAmount
 lake build
 ```
 
-All commands completed successfully. The full `lake build` emitted warnings from
-pre-existing non-Rootstock cases, but no Rootstock warnings or errors remained.
+The Rootstock contract, spec, proof, and compile targets completed
+successfully. The generated task files are agent-facing placeholders ending in
+`exact ?_`, so they are intentionally not complete proof modules. A full
+`lake build` emitted warnings from pre-existing non-Rootstock cases and
+completed successfully after fixing the unrelated
+`Benchmark.Cases.UnlinkXyz.Pool.Compile` ABI metadata mismatch.

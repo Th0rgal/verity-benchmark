@@ -42,12 +42,50 @@ def registered (s : ContractState) (quoteHash : Address) : Uint256 :=
 def depositTimestampOf (s : ContractState) (quoteHash : Address) : Uint256 :=
   s.storageMap 8 quoteHash
 
+/-- Stored quote expiration timestamp used by the user refund gate. -/
+def expireDateOf (s : ContractState) (quoteHash : Address) : Uint256 :=
+  s.storageMap 9 quoteHash
+
+/-- Stored quote expiration block used by the user refund gate. -/
+def expireBlockOf (s : ContractState) (quoteHash : Address) : Uint256 :=
+  s.storageMap 10 quoteHash
+
+/-- Opaque boundary: the LP recipient input is the stored quote LP address. -/
+opaque lpRecipientMatchesStoredQuote : Address → Address → Prop
+
+/-- Opaque boundary: the user recipient input is the stored quote refund address. -/
+opaque userRecipientMatchesStoredQuote : Address → Address → Prop
+
 /-- The external slash call is reached with the explicit quote penalty when it occurs. -/
 def slashCallMatchesPenalty (s s' : ContractState) (quoteHash : Address) (slashed : Bool) : Prop :=
   if slashed then
     slashCallAmountOf s' quoteHash = penaltyAmount s quoteHash
   else
     slashCallAmountOf s' quoteHash = slashCallAmountOf s quoteHash
+
+/-- LP-side quote amount assignment through direct payment or fallback balance. -/
+def lpQuoteAmountAssigned
+    (s s' : ContractState) (quoteHash : Address) (lpRskAddress : Address)
+    (transferSucceeds : Bool) : Prop :=
+  if transferSucceeds then
+    paidToLp s' quoteHash = depositedAmount s quoteHash ∧
+      fallbackBalance s' lpRskAddress = fallbackBalance s lpRskAddress
+  else
+    paidToLp s' quoteHash = paidToLp s quoteHash ∧
+      fallbackBalance s' lpRskAddress =
+        add (fallbackBalance s lpRskAddress) (depositedAmount s quoteHash)
+
+/-- User-side quote amount assignment through direct payment or fallback balance. -/
+def userQuoteAmountAssigned
+    (s s' : ContractState) (quoteHash : Address) (rskRefundAddress : Address)
+    (transferSucceeds : Bool) : Prop :=
+  if transferSucceeds then
+    paidToUser s' quoteHash = depositedAmount s quoteHash ∧
+      fallbackBalance s' rskRefundAddress = fallbackBalance s rskRefundAddress
+  else
+    paidToUser s' quoteHash = paidToUser s quoteHash ∧
+      fallbackBalance s' rskRefundAddress =
+        add (fallbackBalance s rskRefundAddress) (depositedAmount s quoteHash)
 
 /-- Deposit stores exactly `value + callFee + gasFee` for this quote. -/
 def depositPegOut_registers_required_amount_spec
@@ -56,9 +94,12 @@ def depositPegOut_registers_required_amount_spec
     (_penaltyFee _msgValue _dustThreshold : Uint256)
     (_changeRefundSucceeds : Bool)
     (blockTimestamp : Uint256)
+    (expireDate expireBlock : Uint256)
     (_s s' : ContractState) : Prop :=
   depositedAmount s' quoteHash = add (add value callFee) gasFee ∧
-    depositTimestampOf s' quoteHash = blockTimestamp
+    depositTimestampOf s' quoteHash = blockTimestamp ∧
+    expireDateOf s' quoteHash = expireDate ∧
+    expireBlockOf s' quoteHash = expireBlock
 
 /-- LP settlement assigns the quote amount once, either as a transfer or fallback balance. -/
 def refundPegOut_conserves_quote_amount_spec
@@ -76,13 +117,7 @@ def refundPegOut_conserves_quote_amount_spec
       (currentBlock > expireBlock)
   completed s' quoteHash = completedFlag ∧
     registered s' quoteHash = 0 ∧
-    (if transferSucceeds then
-      paidToLp s' quoteHash = depositedAmount s quoteHash ∧
-        fallbackBalance s' lpRskAddress = fallbackBalance s lpRskAddress
-    else
-      paidToLp s' quoteHash = paidToLp s quoteHash ∧
-        fallbackBalance s' lpRskAddress =
-          add (fallbackBalance s lpRskAddress) (depositedAmount s quoteHash)) ∧
+    lpQuoteAmountAssigned s s' quoteHash lpRskAddress transferSucceeds ∧
     slashCallMatchesPenalty s s' quoteHash shouldPenalize
 
 /-- User settlement assigns the quote amount once, either as a transfer or fallback balance. -/
@@ -90,16 +125,13 @@ def refundUserPegOut_conserves_quote_amount_spec
     (quoteHash : Address)
     (rskRefundAddress : Address)
     (transferSucceeds : Bool)
+    (currentTimestamp currentBlock : Uint256)
     (s s' : ContractState) : Prop :=
-  completed s' quoteHash = completedFlag ∧
+  (currentTimestamp > expireDateOf s quoteHash) = true ∧
+    (currentBlock > expireBlockOf s quoteHash) = true ∧
+    completed s' quoteHash = completedFlag ∧
     registered s' quoteHash = 0 ∧
-    (if transferSucceeds then
-      paidToUser s' quoteHash = depositedAmount s quoteHash ∧
-        fallbackBalance s' rskRefundAddress = fallbackBalance s rskRefundAddress
-    else
-      paidToUser s' quoteHash = paidToUser s quoteHash ∧
-        fallbackBalance s' rskRefundAddress =
-          add (fallbackBalance s rskRefundAddress) (depositedAmount s quoteHash)) ∧
+    userQuoteAmountAssigned s s' quoteHash rskRefundAddress transferSucceeds ∧
     slashCallAmountOf s' quoteHash = penaltyAmount s quoteHash
 
 end Benchmark.Cases.Rootstock.FlyoverQuoteLifecycle

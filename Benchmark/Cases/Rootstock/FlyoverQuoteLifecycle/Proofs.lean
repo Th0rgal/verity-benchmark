@@ -12,6 +12,7 @@ theorem depositPegOut_registers_required_amount
     (value callFee gasFee penaltyFee msgValue dustThreshold : Uint256)
     (changeRefundSucceeds : Bool)
     (blockTimestamp : Uint256)
+    (expireDate expireBlock : Uint256)
     (s : ContractState)
     (hValueAndCallNoOverflow : (add value callFee >= value) = true)
     (hRequiredNoOverflow : (add (add value callFee) gasFee >= add value callFee) = true)
@@ -23,26 +24,31 @@ theorem depositPegOut_registers_required_amount
         changeRefundSucceeds
       else
         true) = true) :
-    let s' := ((PegOutLifecycle.depositPegOut quoteHash value callFee gasFee penaltyFee msgValue
-      dustThreshold changeRefundSucceeds blockTimestamp).run s).snd
+    let s' := ((PegOutLifecycle.depositPegOut quoteHash value callFee gasFee
+      penaltyFee msgValue dustThreshold changeRefundSucceeds blockTimestamp
+      expireDate expireBlock).run s).snd
     depositPegOut_registers_required_amount_spec
       quoteHash value callFee gasFee penaltyFee msgValue dustThreshold changeRefundSucceeds
-      blockTimestamp s s' := by
+      blockTimestamp expireDate expireBlock s s' := by
   by_cases hChange : sub msgValue (add (add value callFee) gasFee) >= dustThreshold
   · have hRefundSucceeds : changeRefundSucceeds = true := by
       simpa [hChange] using hChangeRefund
     simp [depositPegOut_registers_required_amount_spec, depositedAmount, depositTimestampOf,
+      expireDateOf, expireBlockOf,
       PegOutLifecycle.depositPegOut, PegOutLifecycle.quoteAmount,
       PegOutLifecycle.quotePenalty, PegOutLifecycle.quoteCompleted,
       PegOutLifecycle.quoteRegistered, PegOutLifecycle.quoteDepositTimestamp,
+      PegOutLifecycle.quoteExpireDate, PegOutLifecycle.quoteExpireBlock,
       hValueAndCallNoOverflow, hRequiredNoOverflow, hFresh, hIncomplete, hEnough,
       hChange, hRefundSucceeds,
       getMapping, setMapping, Verity.require, Verity.bind, Bind.bind,
       Contract.run, ContractResult.snd]
   · simp [depositPegOut_registers_required_amount_spec, depositedAmount, depositTimestampOf,
+      expireDateOf, expireBlockOf,
       PegOutLifecycle.depositPegOut, PegOutLifecycle.quoteAmount,
       PegOutLifecycle.quotePenalty, PegOutLifecycle.quoteCompleted,
       PegOutLifecycle.quoteRegistered, PegOutLifecycle.quoteDepositTimestamp,
+      PegOutLifecycle.quoteExpireDate, PegOutLifecycle.quoteExpireBlock,
       hValueAndCallNoOverflow, hRequiredNoOverflow, hFresh, hIncomplete, hEnough,
       hChange, getMapping, setMapping, Verity.require, Verity.bind, Bind.bind,
       Pure.pure, Contract.run, ContractResult.snd]
@@ -62,6 +68,7 @@ theorem refundPegOut_conserves_quote_amount
     (hFallbackNoOverflow :
       add (s.storageMap 5 lpRskAddress) (s.storageMap 0 quoteHash) >=
         s.storageMap 5 lpRskAddress)
+    (_hLpRecipient : lpRecipientMatchesStoredQuote quoteHash lpRskAddress)
     (hRegistered : (s.storageMap 7 quoteHash == completedFlag) = true)
     (hIncomplete : (s.storageMap 2 quoteHash == 0) = true) :
     let s' := ((PegOutLifecycle.refundPegOut quoteHash lpRskAddress transferSucceeds transferTime
@@ -88,6 +95,7 @@ theorem refundPegOut_conserves_quote_amount
         expireDate.val < currentTimestamp.val) ∨
         expireBlock.val < currentBlock.val) <;>
     simp [refundPegOut_conserves_quote_amount_spec, slashCallMatchesPenalty,
+      lpQuoteAmountAssigned,
       depositedAmount, penaltyAmount, completed, registered,
       paidToLp, fallbackBalance, slashCallAmountOf, depositTimestampOf, completedFlag,
       PegOutLifecycle.refundPegOut, PegOutLifecycle.quoteAmount,
@@ -104,14 +112,18 @@ theorem refundUserPegOut_conserves_quote_amount
     (quoteHash : Address)
     (rskRefundAddress : Address)
     (transferSucceeds : Bool)
+    (currentTimestamp currentBlock : Uint256)
     (s : ContractState)
     (hFallbackNoOverflow :
       add (s.storageMap 5 rskRefundAddress) (s.storageMap 0 quoteHash) >=
         s.storageMap 5 rskRefundAddress)
+    (_hUserRecipient : userRecipientMatchesStoredQuote quoteHash rskRefundAddress)
     (hRegistered : (s.storageMap 7 quoteHash == completedFlag) = true)
+    (hExpiredDate : (currentTimestamp > s.storageMap 9 quoteHash) = true)
+    (hExpiredBlock : (currentBlock > s.storageMap 10 quoteHash) = true)
     :
-    let s' := ((PegOutLifecycle.refundUserPegOut quoteHash rskRefundAddress transferSucceeds).run s).snd
-    refundUserPegOut_conserves_quote_amount_spec quoteHash rskRefundAddress transferSucceeds s s' := by
+    let s' := ((PegOutLifecycle.refundUserPegOut quoteHash rskRefundAddress transferSucceeds currentTimestamp currentBlock).run s).snd
+    refundUserPegOut_conserves_quote_amount_spec quoteHash rskRefundAddress transferSucceeds currentTimestamp currentBlock s s' := by
   have hRegistered' : (s.storageMap 7 quoteHash == 1) = true := by
     simpa [completedFlag] using hRegistered
   have hFallbackNoOverflow' :
@@ -120,14 +132,16 @@ theorem refundUserPegOut_conserves_quote_amount
     simpa [GE.ge] using hFallbackNoOverflow
   cases transferSucceeds <;>
     simp [refundUserPegOut_conserves_quote_amount_spec,
+      userQuoteAmountAssigned,
       depositedAmount, penaltyAmount, completed, registered,
       paidToUser, fallbackBalance, slashCallAmountOf, completedFlag,
+      expireDateOf, expireBlockOf,
       PegOutLifecycle.refundUserPegOut, PegOutLifecycle.quoteAmount,
       PegOutLifecycle.quotePenalty, PegOutLifecycle.quoteCompleted,
       PegOutLifecycle.userPaid,
       PegOutLifecycle.internalBalance, PegOutLifecycle.slashCallAmount,
-      PegOutLifecycle.quoteRegistered,
-      hRegistered', hFallbackNoOverflow', getMapping, setMapping,
+      PegOutLifecycle.quoteRegistered, PegOutLifecycle.quoteExpireDate, PegOutLifecycle.quoteExpireBlock,
+      hRegistered', hExpiredDate, hExpiredBlock, hFallbackNoOverflow', getMapping, setMapping,
       Verity.require, Verity.bind, Bind.bind,
       Contract.run, ContractResult.snd]
 

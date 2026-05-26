@@ -28,10 +28,10 @@ reference_solution_module: Benchmark.Cases.Rootstock.FlyoverQuoteLifecycle.Proof
 reference_solution_declaration: Benchmark.Cases.Rootstock.FlyoverQuoteLifecycle.refundUserPegOut_conserves_quote_amount
 abstraction_level: protocol_slice
 abstraction_notes: >
-  Proves the successful user refund path completes and clears a registered
+  Proves the successful expired user refund path completes and clears a registered
   quote, assigns the registered amount either to the user transfer witness or
-  recipient fallback balance, and records the external collateral slash-call
-  amount with the quote penalty.
+  recipient fallback balance under the named stored-recipient assumption, and
+  records the external collateral slash-call amount with the quote penalty.
 unsupported_feature_codes:
   - bytes32_quote_hash_modeled_as_address_key
   - external_bridge_calls_as_preconditions

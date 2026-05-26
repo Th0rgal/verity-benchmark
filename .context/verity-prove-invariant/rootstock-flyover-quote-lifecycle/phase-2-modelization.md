@@ -14,7 +14,12 @@ The model keeps the storage effects of `depositPegOut`, `refundPegOut`, and
 flag, completion flag, direct LP assignment, direct user assignment,
 recipient-keyed internal fallback balance, and explicit collateral slash call
 amount. It also stores the quote deposit timestamp so the LP penalty branch is
-computed from the same timing inputs used by Solidity.
+computed from the same timing inputs used by Solidity. It stores the quote
+expiry timestamp and block used by `refundUserPegOut`. Refund recipient identity
+is represented as an explicit theorem assumption because the benchmark flattens
+the quote to the fields needed for lifecycle conservation rather than modeling
+the full quote struct. The opaque assumptions are `lpRecipientMatchesStoredQuote`
+and `userRecipientMatchesStoredQuote`.
 
 The source contract calls external systems for provider registration, signature
 checking, Bitcoin transaction validation, bridge confirmations, and collateral
@@ -34,6 +39,8 @@ or above `dustThreshold` requires a successful change refund.
 - slot 6: `slashCallAmount`
 - slot 7: `quoteRegistered`
 - slot 8: `quoteDepositTimestamp`
+- slot 9: `quoteExpireDate`
+- slot 10: `quoteExpireBlock`
 
 ## Spec alignment
 
@@ -48,6 +55,12 @@ or above `dustThreshold` requires a successful change refund.
 - `slashCallAmountOf`
 - `registered`
 - `depositTimestampOf`
+- `expireDateOf`
+- `expireBlockOf`
+- `lpQuoteAmountAssigned`
+- `userQuoteAmountAssigned`
+- `lpRecipientMatchesStoredQuote`
+- `userRecipientMatchesStoredQuote`
 - `slashCallMatchesPenalty`
 
 The three theorem-facing specs are:
@@ -68,9 +81,10 @@ lake build Benchmark.Cases.Rootstock.FlyoverQuoteLifecycle.Compile
 lake build
 ```
 
+The Rootstock contract, spec, proof, and compile targets build successfully.
 The full repository build emitted warnings from pre-existing non-Rootstock
-cases; the Rootstock case built without warnings after proof simplification
-cleanup.
+cases and completed successfully after fixing the unrelated
+`Benchmark.Cases.UnlinkXyz.Pool.Compile` ABI metadata mismatch.
 
 ## Review-driven corrections
 

@@ -30,8 +30,9 @@ abstraction_level: protocol_slice
 abstraction_notes: >
   Proves the successful LP refund path completes and clears a registered quote,
   assigns the registered amount either to the LP transfer witness or recipient
-  fallback balance, and records the external collateral slash-call amount when
-  the computed timing predicate penalizes the LP.
+  fallback balance under the named stored-recipient assumption, and records the
+  external collateral slash-call amount when the computed timing predicate
+  penalizes the LP.
 unsupported_feature_codes:
   - bytes32_quote_hash_modeled_as_address_key
   - external_bridge_calls_as_preconditions

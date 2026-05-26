@@ -22,12 +22,14 @@ selected_functions:
   - refundUserPegOut
   - _increaseBalance
 source_language: solidity
-verity_version: d71bf23d908a7a952bf041ee5ebe41ba68b54426
+verity_version: a1ea6e1989f1eb6c51623661fd216f1d3580fbab
 lean_toolchain: leanprover/lean4:v4.22.0
 abstraction_level: protocol_slice
 abstraction_tags:
   - quote_hash_address_keyed
   - quote_struct_flattened_to_accounting_fields
+  - quote_recipient_identity_as_explicit_assumption
+  - user_refund_expiry_stored_explicitly
   - bridge_and_signature_checks_as_preconditions
   - external_call_success_as_boolean
   - deposit_checked_addition_guards
@@ -35,14 +37,18 @@ abstraction_tags:
   - computed_lp_penalty_timing
 abstraction_notes: >
   The benchmark targets the compact peg-out quote lifecycle in PegOutContract:
-  depositPegOut registers the Rootstock-side quote amount, refundPegOut settles
-  it to the LP or fallback balance, and refundUserPegOut settles it to the user
-  or fallback balance while recording the external collateral slash call amount
-  as separate penalty accounting. Cryptographic quote validation, Bitcoin transaction
-  parsing, and bridge confirmation checks are modeled as success preconditions
-  because they gate the lifecycle but do not change the conserved Rootstock-side
-  amount after a quote is accepted. Deposit overpayment refund behavior and the
-  LP penalty timing predicate are modeled explicitly.
+  depositPegOut registers the Rootstock-side quote amount and user-refund expiry
+  fields. refundPegOut settles the quote to the LP or fallback balance, and
+  refundUserPegOut settles an expired quote to the user refund recipient or
+  fallback balance while recording the external collateral slash call amount as
+  separate penalty accounting. Refund recipient identity is a named theorem
+  assumption because the benchmark flattens the quote and leaves those omitted
+  quote fields at the theorem boundary.
+  Cryptographic quote validation, Bitcoin transaction parsing, and bridge
+  confirmation checks are modeled as success preconditions because they gate the
+  lifecycle but do not change the conserved Rootstock-side amount after a quote
+  is accepted. Deposit overpayment refund behavior and the LP penalty timing
+  predicate are modeled explicitly.
 unsupported_feature_codes:
   - bytes32_quote_hash_modeled_as_address_key
   - struct_calldata_flattened

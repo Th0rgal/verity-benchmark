@@ -33,7 +33,8 @@ open Verity.Stdlib.Math
 
   What was simplified:
   - `Quotes.PegOutQuote` is flattened to the fields that affect Rootstock-side
-    quote conservation: `value`, `callFee`, `gasFee`, and `penaltyFee`.
+    quote conservation: `value`, `callFee`, `gasFee`, `penaltyFee`,
+    `lpRskAddress`, `rskRefundAddress`, `expireDate`, and `expireBlock`.
   Why:
   - The omitted fields feed quote validation, Bitcoin destination checks, and
     deadlines. They do not alter the conserved RBTC amount once a quote is
@@ -89,13 +90,16 @@ verity_contract PegOutLifecycle where
     slashCallAmount : Address → Uint256 := slot 6
     quoteRegistered : Address → Uint256 := slot 7
     quoteDepositTimestamp : Address → Uint256 := slot 8
+    quoteExpireDate : Address → Uint256 := slot 9
+    quoteExpireBlock : Address → Uint256 := slot 10
 
   function depositPegOut
       (quoteHash : Address,
        value : Uint256, callFee : Uint256, gasFee : Uint256,
        penaltyFee : Uint256, msgValue : Uint256,
        dustThreshold : Uint256, changeRefundSucceeds : Bool,
-       blockTimestamp : Uint256) : Unit := do
+       blockTimestamp : Uint256,
+       expireDate : Uint256, expireBlock : Uint256) : Unit := do
     let oldRegistered ← getMapping quoteRegistered quoteHash
     let oldCompleted ← getMapping quoteCompleted quoteHash
     let valueAndCallFee := add value callFee
@@ -119,6 +123,8 @@ verity_contract PegOutLifecycle where
     setMapping quotePenalty quoteHash penaltyFee
     setMapping quoteRegistered quoteHash 1
     setMapping quoteDepositTimestamp quoteHash blockTimestamp
+    setMapping quoteExpireDate quoteHash expireDate
+    setMapping quoteExpireBlock quoteHash expireBlock
 
   function refundPegOut
       (quoteHash : Address, lpRskAddress : Address,
@@ -163,12 +169,17 @@ verity_contract PegOutLifecycle where
 
   function refundUserPegOut
       (quoteHash : Address, rskRefundAddress : Address,
-       transferSucceeds : Bool) : Unit := do
+       transferSucceeds : Bool,
+       currentTimestamp : Uint256, currentBlock : Uint256) : Unit := do
     let registered ← getMapping quoteRegistered quoteHash
     let amount ← getMapping quoteAmount quoteHash
     let penalty ← getMapping quotePenalty quoteHash
+    let expireDate ← getMapping quoteExpireDate quoteHash
+    let expireBlock ← getMapping quoteExpireBlock quoteHash
 
     require (registered == 1) "QuoteNotFound"
+    require ((currentTimestamp > expireDate) && (currentBlock > expireBlock))
+      "QuoteNotExpired"
 
     setMapping quoteAmount quoteHash 0
     setMapping quoteRegistered quoteHash 0

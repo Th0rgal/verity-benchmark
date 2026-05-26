@@ -297,7 +297,7 @@ def unlinkPoolEmergencyWithdrawIsPermissionless : Bool :=
 example : unlinkPoolEmergencyWithdrawIsPermissionless = true := by native_decide
 
 private def uint16Param : ParamType :=
-  ParamType.newtypeOf "Uint16" ParamType.uint256
+  ParamType.uint16
 
 def verifierRouterModelEventMetadataMatchesSource : Bool :=
   hasRouterEvent "CircuitRegistered" [
