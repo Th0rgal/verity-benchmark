@@ -4,11 +4,11 @@ This report is generated from the benchmark manifests.
 
 ## Summary
 
-- Families: 21
-- Implementations: 22
-- Active cases: 19
-- Buildable active cases: 19
-- Active tasks: 117
+- Families: 22
+- Implementations: 23
+- Active cases: 20
+- Buildable active cases: 20
+- Active tasks: 121
 - Backlog cases: 3
 
 ## Buildable active cases
@@ -132,6 +132,16 @@ This report is generated from the benchmark manifests.
 - Selected functions: `claimUsdc`, `_claimUsdc`, `claimWeth`, `_claimWeth`, `claimBoth`
 - Upstream source artifact: `src/StreamRecoveryClaim.sol`
 - Notes: Single-round accounting slice of the full USDC/WETH claim surface, including `claimBoth`. Merkle verification is abstracted as a boolean witness and token transfer side effects are omitted.
+
+### `piku/fund_conservation`
+- Family / implementation: `piku` / `inverter_oracle_queue`
+- Stage: `build_green`
+- Status dimensions: translation=`translated`, spec=`frozen`, proof=`complete`
+- Lean target: `Benchmark.Cases.Piku.FundConservation.Compile`
+- Source ref: `https://github.com/InverterNetwork/contracts@8b7bc438344d646bab05b751c8eb4a7f0c8ca588:src/modules/fundingManager/oracle/FM_PC_Oracle_Redeeming_v1.sol`
+- Selected functions: `_sellOrder`, `_createAndEmitOrder`, `_addToOpenRedemptionAmount`, `amountPaid`, `processPayments`, `executePaymentQueue`
+- Upstream source artifact: `src/modules/fundingManager/oracle/FM_PC_Oracle_Redeeming_v1.sol`
+- Notes: Fund-conservation benchmark for Piku's oracle-priced queued redemption flow: distributed backing + queued redemption backing + remaining backing + protocol treasury fees + project treasury fees equals initial backing. Queue execution functions are source context; the modeled settlement transition is the successful `amountPaid` callback.
 
 ### `polygon/agglayer_bridge`
 - Family / implementation: `polygon` / `agglayer_bridge`
@@ -988,6 +998,46 @@ This report is generated from the benchmark manifests.
 - Specification files: `cases/paladin_votes/stream_recovery_claim_usdc/verity/Specs.lean`, `Benchmark/Cases/PaladinVotes/StreamRecoveryClaimUsdc/Specs.lean`
 - Editable proof file: `Benchmark/Generated/PaladinVotes/StreamRecoveryClaimUsdc/Tasks/WethPreservesUsdcState.lean`
 - Hidden reference solution: `Benchmark.Cases.PaladinVotes.StreamRecoveryClaimUsdc.Proofs`
+
+### `piku/fund_conservation/amount_paid_preserves_fund_conservation`
+- Track / property class / proof family: `proof-only` / `accounting_conservation` / `state_preservation_local_effects`
+- Readiness: prompt_context=`ready`, editable_proof=`ready`, reference_solution=`ready`
+- Theorem target: `Benchmark.Cases.Piku.FundConservation.amountPaid_preserves_fund_conservation`
+- Evaluation: engine=`lean_proof_generation`, target_kind=`proof_generation`
+- Implementation files: `cases/piku/fund_conservation/verity/Contract.lean`, `Benchmark/Cases/Piku/FundConservation/Contract.lean`
+- Specification files: `cases/piku/fund_conservation/verity/Specs.lean`, `Benchmark/Cases/Piku/FundConservation/Specs.lean`
+- Editable proof file: `Benchmark/Generated/Piku/FundConservation/Tasks/AmountPaidPreservesFundConservation.lean`
+- Hidden reference solution: `Benchmark.Cases.Piku.FundConservation.Proofs`
+
+### `piku/fund_conservation/amount_paid_records_distribution`
+- Track / property class / proof family: `proof-only` / `accounting_effect` / `state_preservation_local_effects`
+- Readiness: prompt_context=`ready`, editable_proof=`ready`, reference_solution=`ready`
+- Theorem target: `Benchmark.Cases.Piku.FundConservation.amountPaid_records_distribution`
+- Evaluation: engine=`lean_proof_generation`, target_kind=`proof_generation`
+- Implementation files: `cases/piku/fund_conservation/verity/Contract.lean`, `Benchmark/Cases/Piku/FundConservation/Contract.lean`
+- Specification files: `cases/piku/fund_conservation/verity/Specs.lean`, `Benchmark/Cases/Piku/FundConservation/Specs.lean`
+- Editable proof file: `Benchmark/Generated/Piku/FundConservation/Tasks/AmountPaidRecordsDistribution.lean`
+- Hidden reference solution: `Benchmark.Cases.Piku.FundConservation.Proofs`
+
+### `piku/fund_conservation/sell_order_preserves_fund_conservation`
+- Track / property class / proof family: `proof-only` / `accounting_conservation` / `state_preservation_local_effects`
+- Readiness: prompt_context=`ready`, editable_proof=`ready`, reference_solution=`ready`
+- Theorem target: `Benchmark.Cases.Piku.FundConservation._sellOrder_preserves_fund_conservation`
+- Evaluation: engine=`lean_proof_generation`, target_kind=`proof_generation`
+- Implementation files: `cases/piku/fund_conservation/verity/Contract.lean`, `Benchmark/Cases/Piku/FundConservation/Contract.lean`
+- Specification files: `cases/piku/fund_conservation/verity/Specs.lean`, `Benchmark/Cases/Piku/FundConservation/Specs.lean`
+- Editable proof file: `Benchmark/Generated/Piku/FundConservation/Tasks/SellOrderPreservesFundConservation.lean`
+- Hidden reference solution: `Benchmark.Cases.Piku.FundConservation.Proofs`
+
+### `piku/fund_conservation/sell_order_records_redemption_buckets`
+- Track / property class / proof family: `proof-only` / `accounting_effect` / `state_preservation_local_effects`
+- Readiness: prompt_context=`ready`, editable_proof=`ready`, reference_solution=`ready`
+- Theorem target: `Benchmark.Cases.Piku.FundConservation._sellOrder_records_redemption_buckets`
+- Evaluation: engine=`lean_proof_generation`, target_kind=`proof_generation`
+- Implementation files: `cases/piku/fund_conservation/verity/Contract.lean`, `Benchmark/Cases/Piku/FundConservation/Contract.lean`
+- Specification files: `cases/piku/fund_conservation/verity/Specs.lean`, `Benchmark/Cases/Piku/FundConservation/Specs.lean`
+- Editable proof file: `Benchmark/Generated/Piku/FundConservation/Tasks/SellOrderRecordsRedemptionBuckets.lean`
+- Hidden reference solution: `Benchmark.Cases.Piku.FundConservation.Proofs`
 
 ### `polygon/agglayer_bridge/claimAsset_valid_leaf_and_consumes_unique_nullifier`
 - Track / property class / proof family: `proof-only` / `authorization_state` / `state_preservation_local_effects`

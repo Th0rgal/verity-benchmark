@@ -34,9 +34,10 @@ theorem swap_value_conservation
     (hMin : wadQuoteInUSD >= minAmountOut)
     (hArithmetic : successfulSwapArithmetic rwaToken amount wadQuoteInUSD price tokenUnit s) :
     let s' := ((DaoCollateral.swapDirect rwaToken amount wadQuoteInUSD minAmountOut).run s).snd
-    swap_value_conservation_spec rwaToken amount wadQuoteInUSD price tokenUnit s s' := by
+  swap_value_conservation_spec rwaToken amount wadQuoteInUSD price tokenUnit s s' := by
   rcases hArithmetic with
-    ⟨hTokenUnit, hAmountMax, hQuoteNonzero, hMul, hQuote, hSupplyAdd, hCollateralAdd⟩
+    ⟨hSupportedUnit, hTokenUnit, hAmountMax, hQuoteNonzero, hMul, hQuote, hSupplyAdd,
+      hCollateralAdd⟩
   have hQuoteNonzero' : expectedSwapUsdQuote amount price tokenUnit ≠ 0 := by
     intro h
     apply hQuoteNonzero
@@ -82,17 +83,19 @@ theorem redeem_return_formula
     redeem_return_formula_spec result.fst stableAmount price tokenUnit s := by
   by_cases hCbr : s.storage 3 = 0
   · rcases hArithmetic with
-      ⟨hConfig, hFeeMul, hFeeLe, hNetMul, hCbrMul, hSupplyAdd, hSupplyLe, hCollateralLe⟩
+      ⟨hSupportedUnit, hConfig, hFeeMul, hFeeLe, hNetMul, hCbrMul, hSupplyAdd, hSupplyLe,
+        hCollateralLe⟩
     simp [successfulRedeemArithmetic, redeemFeeBpsOf, cbrCoefOf, isCBROnState,
       expectedReturnedCollateral, expectedFeeUsd0, SCALAR_ONE, SCALAR_TEN_KWEI,
-      hCbr] at hConfig hFeeLe hNetMul hSupplyAdd hSupplyLe hCollateralLe
+      supportedTokenUnit, hCbr] at hSupportedUnit hConfig hFeeLe hNetMul hSupplyAdd hSupplyLe hCollateralLe
     simp [redeem_return_formula_spec,
       redeemFeeBpsOf, cbrCoefOf, isCBROnState, expectedReturnedCollateral,
       expectedFeeUsd0, SCALAR_ONE, SCALAR_TEN_KWEI, hCbr] at hReturnedNonzero hMin
     simp [redeem_return_formula_spec,
       redeemFeeBpsOf, cbrCoefOf, isCBROnState, expectedReturnedCollateral,
       expectedFeeUsd0, SCALAR_ONE, SCALAR_TEN_KWEI, hCbr,
-      DaoCollateral.redeemDirect, hAmount, hPrice, hTokenUnit, hReturnedNonzero, hMin,
+      DaoCollateral.redeemDirect, hAmount, hPrice, hTokenUnit, hSupportedUnit,
+      hReturnedNonzero, hMin,
       hConfig, hFeeLe, hSupplyAdd, hSupplyLe, hCollateralLe, addDoesNotWrap,
       daoConfigBounds,
       DaoCollateral.usd0Supply, DaoCollateral.treasuryCollateral,
@@ -100,17 +103,19 @@ theorem redeem_return_formula
       Verity.require, Verity.bind, Bind.bind, Contract.run, ContractResult.fst,
       Verity.pure, Pure.pure, getStorage, setStorage, getMapping, setMapping]
   · rcases hArithmetic with
-      ⟨hConfig, hFeeMul, hFeeLe, hNetMul, hCbrMul, hSupplyAdd, hSupplyLe, hCollateralLe⟩
+      ⟨hSupportedUnit, hConfig, hFeeMul, hFeeLe, hNetMul, hCbrMul, hSupplyAdd, hSupplyLe,
+        hCollateralLe⟩
     simp [successfulRedeemArithmetic, redeemFeeBpsOf, cbrCoefOf, isCBROnState,
       expectedReturnedCollateral, expectedFeeUsd0, SCALAR_ONE, SCALAR_TEN_KWEI,
-      hCbr] at hConfig hFeeLe hNetMul hCbrMul hSupplyAdd hSupplyLe hCollateralLe
+      supportedTokenUnit, hCbr] at hSupportedUnit hConfig hFeeLe hNetMul hCbrMul hSupplyAdd hSupplyLe hCollateralLe
     simp [redeem_return_formula_spec,
       redeemFeeBpsOf, cbrCoefOf, isCBROnState, expectedReturnedCollateral,
       expectedFeeUsd0, SCALAR_ONE, SCALAR_TEN_KWEI, hCbr] at hReturnedNonzero hMin
     simp [redeem_return_formula_spec,
       redeemFeeBpsOf, cbrCoefOf, isCBROnState, expectedReturnedCollateral,
       expectedFeeUsd0, SCALAR_ONE, SCALAR_TEN_KWEI, hCbr,
-      DaoCollateral.redeemDirect, hAmount, hPrice, hTokenUnit, hReturnedNonzero, hMin,
+      DaoCollateral.redeemDirect, hAmount, hPrice, hTokenUnit, hSupportedUnit,
+      hReturnedNonzero, hMin,
       hConfig, hFeeLe, hSupplyAdd, hSupplyLe, hCollateralLe, addDoesNotWrap,
       daoConfigBounds,
       DaoCollateral.usd0Supply, DaoCollateral.treasuryCollateral,
@@ -137,10 +142,11 @@ theorem redeem_conservation
     redeem_conservation_spec rwaToken stableAmount price tokenUnit s s' := by
   by_cases hCbr : s.storage 3 = 0
   · rcases hArithmetic with
-      ⟨hConfig, hFeeMul, hFeeLe, hNetMul, hCbrMul, hSupplyAdd, hSupplyLe, hCollateralLe⟩
+      ⟨hSupportedUnit, hConfig, hFeeMul, hFeeLe, hNetMul, hCbrMul, hSupplyAdd, hSupplyLe,
+        hCollateralLe⟩
     simp [successfulRedeemArithmetic, redeemFeeBpsOf, cbrCoefOf, isCBROnState,
       expectedReturnedCollateral, expectedFeeUsd0, SCALAR_ONE, SCALAR_TEN_KWEI,
-      hCbr] at hConfig hFeeLe hNetMul hSupplyAdd hSupplyLe hCollateralLe
+      supportedTokenUnit, hCbr] at hSupportedUnit hConfig hFeeLe hNetMul hSupplyAdd hSupplyLe hCollateralLe
     simp [redeem_conservation_spec, feeMintedUsd0,
       feeUsd0, usd0SupplyOf, treasuryCollateralOf, redeemFeeBpsOf,
       cbrCoefOf, isCBROnState, expectedReturnedCollateral, expectedFeeUsd0,
@@ -149,7 +155,8 @@ theorem redeem_conservation
       feeUsd0, usd0SupplyOf, treasuryCollateralOf, redeemFeeBpsOf,
       cbrCoefOf, isCBROnState, expectedReturnedCollateral, expectedFeeUsd0,
       redeemFeeAmount, floorMulDiv, SCALAR_ONE, SCALAR_TEN_KWEI, hCbr,
-      DaoCollateral.redeemDirect, hAmount, hPrice, hTokenUnit, hReturnedNonzero, hMin,
+      DaoCollateral.redeemDirect, hAmount, hPrice, hTokenUnit, hSupportedUnit,
+      hReturnedNonzero, hMin,
       hConfig, hFeeLe, hSupplyAdd, hSupplyLe, hCollateralLe, addDoesNotWrap,
       daoConfigBounds,
       DaoCollateral.usd0Supply, DaoCollateral.treasuryCollateral,
@@ -157,10 +164,11 @@ theorem redeem_conservation
       Verity.require, Verity.bind, Bind.bind, Contract.run, ContractResult.snd,
       Verity.pure, Pure.pure, getStorage, setStorage, getMapping, setMapping]
   · rcases hArithmetic with
-      ⟨hConfig, hFeeMul, hFeeLe, hNetMul, hCbrMul, hSupplyAdd, hSupplyLe, hCollateralLe⟩
+      ⟨hSupportedUnit, hConfig, hFeeMul, hFeeLe, hNetMul, hCbrMul, hSupplyAdd, hSupplyLe,
+        hCollateralLe⟩
     simp [successfulRedeemArithmetic, redeemFeeBpsOf, cbrCoefOf, isCBROnState,
       expectedReturnedCollateral, expectedFeeUsd0, SCALAR_ONE, SCALAR_TEN_KWEI,
-      hCbr] at hConfig hFeeLe hNetMul hCbrMul hSupplyAdd hSupplyLe hCollateralLe
+      supportedTokenUnit, hCbr] at hSupportedUnit hConfig hFeeLe hNetMul hCbrMul hSupplyAdd hSupplyLe hCollateralLe
     simp [redeem_conservation_spec, feeMintedUsd0,
       feeUsd0, usd0SupplyOf, treasuryCollateralOf, redeemFeeBpsOf,
       cbrCoefOf, isCBROnState, expectedReturnedCollateral, expectedFeeUsd0,
@@ -169,7 +177,8 @@ theorem redeem_conservation
       feeUsd0, usd0SupplyOf, treasuryCollateralOf, redeemFeeBpsOf,
       cbrCoefOf, isCBROnState, expectedReturnedCollateral, expectedFeeUsd0,
       redeemFeeAmount, floorMulDiv, SCALAR_ONE, SCALAR_TEN_KWEI, hCbr,
-      DaoCollateral.redeemDirect, hAmount, hPrice, hTokenUnit, hReturnedNonzero, hMin,
+      DaoCollateral.redeemDirect, hAmount, hPrice, hTokenUnit, hSupportedUnit,
+      hReturnedNonzero, hMin,
       hConfig, hFeeLe, hSupplyAdd, hSupplyLe, hCollateralLe, addDoesNotWrap,
       daoConfigBounds,
       DaoCollateral.usd0Supply, DaoCollateral.treasuryCollateral,

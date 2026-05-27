@@ -10,35 +10,36 @@
     "backlog_tasks": "backlog/*/*/tasks/*.yaml"
   },
   "summary": {
-    "family_count": 21,
-    "implementation_count": 22,
-    "active_case_count": 19,
+    "family_count": 22,
+    "implementation_count": 23,
+    "active_case_count": 20,
     "backlog_case_count": 3,
-    "active_task_count": 117,
+    "active_task_count": 121,
     "backlog_task_count": 8,
-    "buildable_case_count": 21,
-    "runnable_task_count": 125,
+    "buildable_case_count": 22,
+    "runnable_task_count": 129,
     "case_stage_counts": {
-      "build_green": 18,
+      "build_green": 19,
       "candidate": 1,
       "proof_complete": 3
     },
     "translation_status_counts": {
       "blocked": 1,
-      "translated": 21
+      "translated": 22
     },
     "proof_status_counts": {
       "blocked": 1,
-      "complete": 14,
+      "complete": 15,
       "partial": 7
     },
     "task_track_counts": {
-      "proof-only": 125
+      "proof-only": 129
     },
     "task_property_class_counts": {
       "access_control_identity": 10,
       "accounting_bound": 16,
-      "accounting_conservation": 13,
+      "accounting_conservation": 15,
+      "accounting_effect": 2,
       "accounting_invariant_break": 1,
       "accounting_update": 6,
       "arithmetic_rounding": 3,
@@ -79,10 +80,10 @@
       "functional_correctness": 32,
       "protocol_transition_correctness": 22,
       "refinement_equivalence": 9,
-      "state_preservation_local_effects": 38
+      "state_preservation_local_effects": 42
     },
     "family_split_counts": {
-      "active": 18,
+      "active": 19,
       "backlog": 2,
       "mixed": 1
     }
@@ -308,6 +309,23 @@
         "solidity"
       ],
       "manifest_path": "families/paladin_votes/family.yaml"
+    },
+    {
+      "family_id": "piku",
+      "display_name": "Piku",
+      "split": "active",
+      "status": "active",
+      "description": "Piku USP accounting benchmarks over the Inverter oracle-priced funding manager and queued redemption processor.",
+      "implementation_ids": [
+        "inverter_oracle_queue"
+      ],
+      "case_ids": [
+        "piku/fund_conservation"
+      ],
+      "source_languages": [
+        "solidity"
+      ],
+      "manifest_path": "families/piku/family.yaml"
     },
     {
       "family_id": "polygon",
@@ -656,6 +674,22 @@
       ],
       "notes": "Claim accounting contract translated as a single-round slice with Merkle verification abstracted away from the benchmark.",
       "manifest_path": "families/paladin_votes/implementations/stream_recovery_claim/implementation.yaml"
+    },
+    {
+      "family_id": "piku",
+      "implementation_id": "inverter_oracle_queue",
+      "display_name": "Inverter Oracle Queue Funding Manager",
+      "split": "active",
+      "status": "translated",
+      "upstream_repo": "https://github.com/InverterNetwork/contracts",
+      "upstream_commit": "8b7bc438344d646bab05b751c8eb4a7f0c8ca588",
+      "source_language": "solidity",
+      "source_artifact_path": "src/modules/fundingManager/oracle/FM_PC_Oracle_Redeeming_v1.sol",
+      "case_ids": [
+        "piku/fund_conservation"
+      ],
+      "notes": "Docs-matching Piku workflow implementation: oracle-priced funding manager, manual queue payment processor, and manual oracle price module.",
+      "manifest_path": "families/piku/implementations/inverter_oracle_queue/implementation.yaml"
     },
     {
       "family_id": "polygon",
@@ -1348,6 +1382,61 @@
       "proof_target": "Benchmark.Cases.PaladinVotes.StreamRecoveryClaimUsdc.Proofs"
     },
     {
+      "case_id": "piku/fund_conservation",
+      "project": "piku",
+      "case_name": "fund_conservation",
+      "suite": "active",
+      "schema_version": 1,
+      "manifest_path": "cases/piku/fund_conservation/case.yaml",
+      "split": "active",
+      "family_id": "piku",
+      "implementation_id": "inverter_oracle_queue",
+      "stage": "build_green",
+      "translation_status": "translated",
+      "spec_status": "frozen",
+      "proof_status": "complete",
+      "source_language": "solidity",
+      "upstream_repo": "https://github.com/InverterNetwork/contracts",
+      "upstream_commit": "8b7bc438344d646bab05b751c8eb4a7f0c8ca588",
+      "original_contract_path": "src/modules/fundingManager/oracle/FM_PC_Oracle_Redeeming_v1.sol",
+      "generated_artifact_path": null,
+      "source_ref": "https://github.com/InverterNetwork/contracts@8b7bc438344d646bab05b751c8eb4a7f0c8ca588:src/modules/fundingManager/oracle/FM_PC_Oracle_Redeeming_v1.sol",
+      "selected_functions": [
+        "_sellOrder",
+        "_createAndEmitOrder",
+        "_addToOpenRedemptionAmount",
+        "amountPaid",
+        "processPayments",
+        "executePaymentQueue"
+      ],
+      "lean_target": "Benchmark.Cases.Piku.FundConservation.Compile",
+      "failure_reason": null,
+      "notes": "Fund-conservation benchmark for Piku's oracle-priced queued redemption flow: distributed backing + queued redemption backing + remaining backing + protocol treasury fees + project treasury fees equals initial backing. Queue execution functions are source context; the modeled settlement transition is the successful `amountPaid` callback.",
+      "buildable": true,
+      "verity_commit": "74d8fe20ffa2f5dbb94959f3dd40a62df6aa8224",
+      "lean_toolchain": "leanprover/lean4:v4.22.0",
+      "abstraction_level": "protocol_slice",
+      "abstraction_tags": [
+        "ghost_accounting_slots",
+        "oracle_price_abstracted",
+        "queue_shape_elided",
+        "external_calls_opaque",
+        "access_control_elided",
+        "erc20_transfers_abstracted",
+        "protocol_fee_recalculation_abstracted",
+        "ghost_solvency_precondition"
+      ],
+      "abstraction_notes": "Piku's docs-matching Inverter implementation stores `_openRedemptionAmount` but does not store cumulative distributed backing, remaining backing, or protocol/project treasury fee counters. The model introduces those as ghost slots so the team-proposed fund-conservation invariant is state-readable. Oracle pricing and decimal conversion are represented by the already-computed redemption amount. Queue linked-list shape, roles, ERC20 transfer mechanics, blacklisting fallback, and event payloads are elided.",
+      "unsupported_feature_codes": [
+        "event_only_fee_accounting_requires_ghost_slot",
+        "external_oracle_pricing_abstracted",
+        "protocol_fee_recalculation_abstracted",
+        "ghost_solvency_precondition"
+      ],
+      "spec_target": "Benchmark.Cases.Piku.FundConservation.Specs",
+      "proof_target": "Benchmark.Cases.Piku.FundConservation.Proofs"
+    },
+    {
       "case_id": "polygon/agglayer_bridge",
       "project": "polygon",
       "case_name": "agglayer_bridge",
@@ -1571,7 +1660,7 @@
       "failure_reason": null,
       "notes": "Usual USD0 DaoCollateral conservation case. It verifies that no direct swap/redeem transition can create unaccounted USD0 or debit more collateral than the contract's modeled accounting permits, modulo configured redeem fee, oracle price, CBR coefficient, token decimals, and floor rounding.",
       "buildable": true,
-      "verity_commit": "d71bf23d908a7a952bf041ee5ebe41ba68b54426",
+      "verity_commit": "9eaf64218be14b59f6253219c111a5abf958e7b7",
       "lean_toolchain": "leanprover/lean4:v4.22.0",
       "abstraction_level": "protocol_slice",
       "abstraction_tags": [
@@ -1580,13 +1669,15 @@
         "usd0_supply_effect_ghosted",
         "direct_swap_redeem_only",
         "cbr_redeem_branch_modeled",
+        "supported_token_decimals_0_to_18",
         "intent_paths_elided",
         "access_control_elided"
       ],
-      "abstraction_notes": "The benchmark targets DaoCollateral direct swap/redeem conservation. Oracle quotes and token decimal scale are explicit inputs. ERC20 transfers and USD0 mint/burn calls are represented by the treasury collateral balance and a ghosted USD0 supply effect, keeping the proof scoped to DaoCollateral rather than USD0 token correctness. The direct swap path credits exactly the RWA amount and mints exactly the oracle USD quote; a separate theorem ties that quote to the explicit floor(collateralAmount * price / tokenUnit) formula when oracle parameters are supplied. Successful-call hypotheses expose Solidity checked-arithmetic boundaries, nonzero quote, uint128 swap amount bound, treasury collateral sufficiency, and configured redeem fee / CBR coefficient bounds. The redeem path burns the user amount, remints only the non-CBR fee, and debits the exact collateral amount computed from net burned USD0, oracle price, token decimals, CBR flag, and floor rounding. SwapperEngine, intent matching, permits, role checks, pause gates, events, and registry lookups are elided because they do not alter this conservation equation.",
+      "abstraction_notes": "The benchmark targets DaoCollateral direct swap/redeem conservation. Oracle quotes and token decimal scale are explicit inputs. The token unit is now explicitly gated to Solidity's supported `10 ** decimals` values for collateral decimals `0..18`; larger decimal counts are outside this benchmark because Solidity's normalization takes a different division branch. ERC20 transfers and USD0 mint/burn calls are represented by the treasury collateral balance and a ghosted USD0 supply effect, keeping the proof scoped to DaoCollateral rather than USD0 token correctness. The direct swap path credits exactly the RWA amount and mints exactly the oracle USD quote; a separate theorem ties that quote to the explicit floor(collateralAmount * price / tokenUnit) formula when oracle parameters are supplied. Successful-call hypotheses expose Solidity checked-arithmetic boundaries, nonzero quote, uint128 swap amount bound, supported token unit, treasury collateral sufficiency, and configured redeem fee / CBR coefficient bounds. The redeem path burns the user amount, remints only the non-CBR fee, and debits the exact collateral amount computed from net burned USD0, oracle price, token decimals, CBR flag, and floor rounding. SwapperEngine, intent matching, permits, role checks, pause gates, events, and registry lookups are elided because they do not alter this conservation equation.",
       "unsupported_feature_codes": [
         "external_erc20_calls_ghosted",
         "oracle_reads_parameterized",
+        "supported_token_unit_preconditions",
         "checked_uint256_overflow_preconditions",
         "successful_call_preconditions"
       ],
@@ -5375,6 +5466,198 @@
       }
     },
     {
+      "task_ref": "piku/fund_conservation/amount_paid_preserves_fund_conservation",
+      "task_id": "amount_paid_preserves_fund_conservation",
+      "case_id": "piku/fund_conservation",
+      "suite": "active",
+      "schema_version": 1,
+      "manifest_path": "cases/piku/fund_conservation/tasks/amount_paid_preserves_fund_conservation.yaml",
+      "split": "active",
+      "family_id": "piku",
+      "implementation_id": "inverter_oracle_queue",
+      "source_ref": "https://github.com/InverterNetwork/contracts@8b7bc438344d646bab05b751c8eb4a7f0c8ca588:src/modules/fundingManager/oracle/FM_PC_Oracle_Redeeming_v1.sol",
+      "task_interface_version": 2,
+      "track": "proof-only",
+      "property_class": "accounting_conservation",
+      "category": "fund_conservation",
+      "difficulty": "medium",
+      "theorem_name": "Benchmark.Cases.Piku.FundConservation.amountPaid_preserves_fund_conservation",
+      "proof_family": "state_preservation_local_effects",
+      "translation_status": "translated",
+      "proof_status": "complete",
+      "implementation_files": [
+        "cases/piku/fund_conservation/verity/Contract.lean",
+        "Benchmark/Cases/Piku/FundConservation/Contract.lean"
+      ],
+      "specification_files": [
+        "cases/piku/fund_conservation/verity/Specs.lean",
+        "Benchmark/Cases/Piku/FundConservation/Specs.lean"
+      ],
+      "editable_files": [
+        "Benchmark/Generated/Piku/FundConservation/Tasks/AmountPaidPreservesFundConservation.lean"
+      ],
+      "abstraction_level": "protocol_slice",
+      "abstraction_notes": "Proves conservation for queue payment execution once queued collateral is split between the recipient and protocol treasury.",
+      "unsupported_feature_codes": [
+        "erc20_transfers_abstracted",
+        "protocol_fee_recalculation_abstracted"
+      ],
+      "reference_solution_module": "Benchmark.Cases.Piku.FundConservation.Proofs",
+      "evaluation": {
+        "engine": "lean_proof_generation",
+        "target_kind": "proof_generation"
+      },
+      "readiness": {
+        "prompt_context": "ready",
+        "editable_proof": "ready",
+        "reference_solution": "ready"
+      }
+    },
+    {
+      "task_ref": "piku/fund_conservation/amount_paid_records_distribution",
+      "task_id": "amount_paid_records_distribution",
+      "case_id": "piku/fund_conservation",
+      "suite": "active",
+      "schema_version": 1,
+      "manifest_path": "cases/piku/fund_conservation/tasks/amount_paid_records_distribution.yaml",
+      "split": "active",
+      "family_id": "piku",
+      "implementation_id": "inverter_oracle_queue",
+      "source_ref": "https://github.com/InverterNetwork/contracts@8b7bc438344d646bab05b751c8eb4a7f0c8ca588:src/modules/fundingManager/oracle/FM_PC_Oracle_Redeeming_v1.sol",
+      "task_interface_version": 2,
+      "track": "proof-only",
+      "property_class": "accounting_effect",
+      "category": "fund_conservation",
+      "difficulty": "easy",
+      "theorem_name": "Benchmark.Cases.Piku.FundConservation.amountPaid_records_distribution",
+      "proof_family": "state_preservation_local_effects",
+      "translation_status": "translated",
+      "proof_status": "complete",
+      "implementation_files": [
+        "cases/piku/fund_conservation/verity/Contract.lean",
+        "Benchmark/Cases/Piku/FundConservation/Contract.lean"
+      ],
+      "specification_files": [
+        "cases/piku/fund_conservation/verity/Specs.lean",
+        "Benchmark/Cases/Piku/FundConservation/Specs.lean"
+      ],
+      "editable_files": [
+        "Benchmark/Generated/Piku/FundConservation/Tasks/AmountPaidRecordsDistribution.lean"
+      ],
+      "abstraction_level": "protocol_slice",
+      "abstraction_notes": "Records the local accounting effect of queue settlement: queued redemption backing is split into user distribution and protocol treasury buckets.",
+      "unsupported_feature_codes": [
+        "erc20_transfers_abstracted",
+        "protocol_fee_recalculation_abstracted"
+      ],
+      "reference_solution_module": "Benchmark.Cases.Piku.FundConservation.Proofs",
+      "evaluation": {
+        "engine": "lean_proof_generation",
+        "target_kind": "proof_generation"
+      },
+      "readiness": {
+        "prompt_context": "ready",
+        "editable_proof": "ready",
+        "reference_solution": "ready"
+      }
+    },
+    {
+      "task_ref": "piku/fund_conservation/sell_order_preserves_fund_conservation",
+      "task_id": "sell_order_preserves_fund_conservation",
+      "case_id": "piku/fund_conservation",
+      "suite": "active",
+      "schema_version": 1,
+      "manifest_path": "cases/piku/fund_conservation/tasks/sell_order_preserves_fund_conservation.yaml",
+      "split": "active",
+      "family_id": "piku",
+      "implementation_id": "inverter_oracle_queue",
+      "source_ref": "https://github.com/InverterNetwork/contracts@8b7bc438344d646bab05b751c8eb4a7f0c8ca588:src/modules/fundingManager/oracle/FM_PC_Oracle_Redeeming_v1.sol",
+      "task_interface_version": 2,
+      "track": "proof-only",
+      "property_class": "accounting_conservation",
+      "category": "fund_conservation",
+      "difficulty": "medium",
+      "theorem_name": "Benchmark.Cases.Piku.FundConservation._sellOrder_preserves_fund_conservation",
+      "proof_family": "state_preservation_local_effects",
+      "translation_status": "translated",
+      "proof_status": "complete",
+      "implementation_files": [
+        "cases/piku/fund_conservation/verity/Contract.lean",
+        "Benchmark/Cases/Piku/FundConservation/Contract.lean"
+      ],
+      "specification_files": [
+        "cases/piku/fund_conservation/verity/Specs.lean",
+        "Benchmark/Cases/Piku/FundConservation/Specs.lean"
+      ],
+      "editable_files": [
+        "Benchmark/Generated/Piku/FundConservation/Tasks/SellOrderPreservesFundConservation.lean"
+      ],
+      "abstraction_level": "protocol_slice",
+      "abstraction_notes": "Proves conservation for redemption-order creation under an explicit fee split arithmetic hypothesis. Ghost accounting slots expose event-only fee and distribution effects.",
+      "unsupported_feature_codes": [
+        "event_only_fee_accounting_requires_ghost_slot",
+        "ghost_solvency_precondition"
+      ],
+      "reference_solution_module": "Benchmark.Cases.Piku.FundConservation.Proofs",
+      "evaluation": {
+        "engine": "lean_proof_generation",
+        "target_kind": "proof_generation"
+      },
+      "readiness": {
+        "prompt_context": "ready",
+        "editable_proof": "ready",
+        "reference_solution": "ready"
+      }
+    },
+    {
+      "task_ref": "piku/fund_conservation/sell_order_records_redemption_buckets",
+      "task_id": "sell_order_records_redemption_buckets",
+      "case_id": "piku/fund_conservation",
+      "suite": "active",
+      "schema_version": 1,
+      "manifest_path": "cases/piku/fund_conservation/tasks/sell_order_records_redemption_buckets.yaml",
+      "split": "active",
+      "family_id": "piku",
+      "implementation_id": "inverter_oracle_queue",
+      "source_ref": "https://github.com/InverterNetwork/contracts@8b7bc438344d646bab05b751c8eb4a7f0c8ca588:src/modules/fundingManager/oracle/FM_PC_Oracle_Redeeming_v1.sol",
+      "task_interface_version": 2,
+      "track": "proof-only",
+      "property_class": "accounting_effect",
+      "category": "fund_conservation",
+      "difficulty": "easy",
+      "theorem_name": "Benchmark.Cases.Piku.FundConservation._sellOrder_records_redemption_buckets",
+      "proof_family": "state_preservation_local_effects",
+      "translation_status": "translated",
+      "proof_status": "complete",
+      "implementation_files": [
+        "cases/piku/fund_conservation/verity/Contract.lean",
+        "Benchmark/Cases/Piku/FundConservation/Contract.lean"
+      ],
+      "specification_files": [
+        "cases/piku/fund_conservation/verity/Specs.lean",
+        "Benchmark/Cases/Piku/FundConservation/Specs.lean"
+      ],
+      "editable_files": [
+        "Benchmark/Generated/Piku/FundConservation/Tasks/SellOrderRecordsRedemptionBuckets.lean"
+      ],
+      "abstraction_level": "protocol_slice",
+      "abstraction_notes": "Records the local accounting effect of redemption-order creation: backing moves from the remaining bucket into queued redemption and project-fee buckets.",
+      "unsupported_feature_codes": [
+        "event_only_fee_accounting_requires_ghost_slot",
+        "ghost_solvency_precondition"
+      ],
+      "reference_solution_module": "Benchmark.Cases.Piku.FundConservation.Proofs",
+      "evaluation": {
+        "engine": "lean_proof_generation",
+        "target_kind": "proof_generation"
+      },
+      "readiness": {
+        "prompt_context": "ready",
+        "editable_proof": "ready",
+        "reference_solution": "ready"
+      }
+    },
+    {
       "task_ref": "polygon/agglayer_bridge/claimAsset_valid_leaf_and_consumes_unique_nullifier",
       "task_id": "claimAsset_valid_leaf_and_consumes_unique_nullifier",
       "case_id": "polygon/agglayer_bridge",
@@ -6399,10 +6682,11 @@
         "Benchmark/Generated/Usual/DaoCollateral/Tasks/RedeemConservation.lean"
       ],
       "abstraction_level": "protocol_slice",
-      "abstraction_notes": "Proves that a successful direct `redeem` decreases ghosted USD0 supply by the user amount net of the explicitly reminted non-CBR fee, and debits treasury collateral by the exact returned amount computed from net burned USD0, oracle price, token decimals, CBR state, and floor rounding. Successful-call hypotheses expose fee bounds, checked arithmetic, and treasury collateral sufficiency.",
+      "abstraction_notes": "Proves that a successful direct `redeem` decreases ghosted USD0 supply by the user amount net of the explicitly reminted non-CBR fee, and debits treasury collateral by the exact returned amount computed from net burned USD0, oracle price, supported token decimals `0..18`, CBR state, and floor rounding. Successful-call hypotheses expose fee bounds, checked arithmetic, supported token unit, and treasury collateral sufficiency.",
       "unsupported_feature_codes": [
         "external_erc20_calls_ghosted",
         "oracle_reads_parameterized",
+        "supported_token_unit_preconditions",
         "checked_uint256_overflow_preconditions",
         "successful_call_preconditions"
       ],
@@ -6449,8 +6733,9 @@
         "Benchmark/Generated/Usual/DaoCollateral/Tasks/RedeemFeeFormula.lean"
       ],
       "abstraction_level": "protocol_slice",
-      "abstraction_notes": "Proves the fee helper used by redeem matches the configured basis-point fee and the token-decimal normalization path modeled from `_calculateFee`.",
+      "abstraction_notes": "Proves the fee helper used by redeem matches the configured basis-point fee and the supported-token-decimal normalization path modeled from `_calculateFee`.",
       "unsupported_feature_codes": [
+        "supported_token_unit_preconditions",
         "checked_uint256_overflow_preconditions",
         "successful_call_preconditions"
       ],
@@ -6497,9 +6782,10 @@
         "Benchmark/Generated/Usual/DaoCollateral/Tasks/RedeemReturnFormula.lean"
       ],
       "abstraction_level": "protocol_slice",
-      "abstraction_notes": "Proves the returned collateral value is exactly the modeled formula: floor((stableAmount - fee) * tokenUnit / price), with the CBR coefficient applied by floor multiplication when CBR is active, under successful-call arithmetic and configuration-bound hypotheses.",
+      "abstraction_notes": "Proves the returned collateral value is exactly the modeled formula: floor((stableAmount - fee) * tokenUnit / price), with the CBR coefficient applied by floor multiplication when CBR is active, under successful-call arithmetic, supported token-unit, and configuration-bound hypotheses.",
       "unsupported_feature_codes": [
         "oracle_reads_parameterized",
+        "supported_token_unit_preconditions",
         "checked_uint256_overflow_preconditions",
         "successful_call_preconditions"
       ],
@@ -6595,10 +6881,11 @@
         "Benchmark/Generated/Usual/DaoCollateral/Tasks/SwapValueConservation.lean"
       ],
       "abstraction_level": "protocol_slice",
-      "abstraction_notes": "Strengthens local swap state preservation with an oracle-parameterized value condition: the theorem requires a nonzero token unit and successful-call arithmetic hypotheses, then proves the minted USD0 delta equals floor(collateralAmount * price / tokenUnit).",
+      "abstraction_notes": "Strengthens local swap state preservation with an oracle-parameterized value condition: the theorem requires a supported `10 ** decimals` token unit for collateral decimals `0..18` and successful-call arithmetic hypotheses, then proves the minted USD0 delta equals floor(collateralAmount * price / tokenUnit).",
       "unsupported_feature_codes": [
         "external_erc20_calls_ghosted",
         "oracle_reads_parameterized",
+        "supported_token_unit_preconditions",
         "successful_call_preconditions"
       ],
       "reference_solution_module": "Benchmark.Cases.Usual.DaoCollateral.Proofs",
@@ -7515,5 +7802,5 @@
       }
     }
   ],
-  "generated_at": "2026-05-27T14:36:59.559550+00:00"
+  "generated_at": "2026-05-27T15:52:10.576388+00:00"
 }

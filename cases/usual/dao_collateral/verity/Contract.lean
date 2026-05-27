@@ -21,7 +21,10 @@ open Verity.EVM.Uint256
   - ERC20 transfers and USD0 mint/burn calls are represented as updates to
     `treasuryCollateral` and `usd0Supply`, avoiding USD0 token correctness.
   - Oracle reads and token decimals are explicit parameters (`wadQuoteInUSD`,
-    `price`, `tokenUnit`). The proof records arithmetic after those reads.
+    `price`, `tokenUnit`). `tokenUnit` is required to be one of the Solidity
+    `10 ** decimals` values for supported collateral decimals `0..18`; larger
+    decimal counts would take a different normalization branch and are outside
+    this direct-market benchmark.
   - `Math.mulDiv(..., Floor)` is modeled by Uint256 `div` after `mul`. Overflow
     preconditions are theorem hypotheses instead of modeled Solidity reverts.
   - CBR is modeled only in redeem return calculation, where it changes the
@@ -30,6 +33,27 @@ open Verity.EVM.Uint256
 
 def SCALAR_ONE : Uint256 := 1000000000000000000
 def SCALAR_TEN_KWEI : Uint256 := 10000
+
+def supportedTokenUnit (tokenUnit : Uint256) : Bool :=
+  tokenUnit == 1 ||
+  tokenUnit == 10 ||
+  tokenUnit == 100 ||
+  tokenUnit == 1000 ||
+  tokenUnit == 10000 ||
+  tokenUnit == 100000 ||
+  tokenUnit == 1000000 ||
+  tokenUnit == 10000000 ||
+  tokenUnit == 100000000 ||
+  tokenUnit == 1000000000 ||
+  tokenUnit == 10000000000 ||
+  tokenUnit == 100000000000 ||
+  tokenUnit == 1000000000000 ||
+  tokenUnit == 10000000000000 ||
+  tokenUnit == 100000000000000 ||
+  tokenUnit == 1000000000000000 ||
+  tokenUnit == 10000000000000000 ||
+  tokenUnit == 100000000000000000 ||
+  tokenUnit == SCALAR_ONE
 
 def floorMulDiv (x y denominator : Uint256) : Uint256 :=
   div (mul x y) denominator
@@ -74,6 +98,27 @@ verity_contract DaoCollateral where
     require (stableAmount != 0) "AmountIsZero"
     require (price != 0) "InvalidOraclePrice"
     require (tokenUnit != 0) "InvalidTokenDecimals"
+    require
+      (tokenUnit == 1 ||
+      tokenUnit == 10 ||
+      tokenUnit == 100 ||
+      tokenUnit == 1000 ||
+      tokenUnit == 10000 ||
+      tokenUnit == 100000 ||
+      tokenUnit == 1000000 ||
+      tokenUnit == 10000000 ||
+      tokenUnit == 100000000 ||
+      tokenUnit == 1000000000 ||
+      tokenUnit == 10000000000 ||
+      tokenUnit == 100000000000 ||
+      tokenUnit == 1000000000000 ||
+      tokenUnit == 10000000000000 ||
+      tokenUnit == 100000000000000 ||
+      tokenUnit == 1000000000000000 ||
+      tokenUnit == 10000000000000000 ||
+      tokenUnit == 100000000000000000 ||
+      tokenUnit == 1000000000000000000)
+      "UnsupportedTokenDecimals"
 
     let feeBps ← getStorage redeemFeeBps
     let cbrCoef ← getStorage cbrCoefficient

@@ -29,10 +29,12 @@ reference_solution_declaration: Benchmark.Cases.Usual.DaoCollateral.swap_value_c
 abstraction_level: protocol_slice
 abstraction_notes: >
   Strengthens local swap state preservation with an oracle-parameterized value
-  condition: the theorem requires a nonzero token unit and successful-call
-  arithmetic hypotheses, then proves the minted USD0 delta equals
-  floor(collateralAmount * price / tokenUnit).
+  condition: the theorem requires a supported `10 ** decimals` token unit for
+  collateral decimals `0..18` and successful-call arithmetic hypotheses, then
+  proves the minted USD0 delta equals floor(collateralAmount * price /
+  tokenUnit).
 unsupported_feature_codes:
   - external_erc20_calls_ghosted
   - oracle_reads_parameterized
+  - supported_token_unit_preconditions
   - successful_call_preconditions

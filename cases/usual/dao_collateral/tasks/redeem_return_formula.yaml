@@ -31,8 +31,9 @@ abstraction_notes: >
   Proves the returned collateral value is exactly the modeled formula:
   floor((stableAmount - fee) * tokenUnit / price), with the CBR coefficient
   applied by floor multiplication when CBR is active, under successful-call
-  arithmetic and configuration-bound hypotheses.
+  arithmetic, supported token-unit, and configuration-bound hypotheses.
 unsupported_feature_codes:
   - oracle_reads_parameterized
+  - supported_token_unit_preconditions
   - checked_uint256_overflow_preconditions
   - successful_call_preconditions

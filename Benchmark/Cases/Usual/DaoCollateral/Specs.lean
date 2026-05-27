@@ -45,6 +45,7 @@ def expectedSwapUsdQuote
 def successfulSwapArithmetic
     (rwaToken : Address) (amount wadQuoteInUSD price tokenUnit : Uint256)
     (s : ContractState) : Prop :=
+  supportedTokenUnit tokenUnit = true ∧
   tokenUnit != 0 ∧
   amount <= 340282366920938463463374607431768211455 ∧
   wadQuoteInUSD ≠ 0 ∧
@@ -94,6 +95,7 @@ def successfulRedeemArithmetic
     expectedReturnedCollateral stableAmount price tokenUnit (redeemFeeBpsOf s)
       (cbrCoefOf s) (isCBROnState s)
   let feeMinted := if isCBROnState s then 0 else fee
+  supportedTokenUnit tokenUnit = true ∧
   daoConfigBounds (redeemFeeBpsOf s) (cbrCoefOf s) ∧
   mulDoesNotWrap stableAmount (redeemFeeBpsOf s) ∧
   fee <= stableAmount ∧
