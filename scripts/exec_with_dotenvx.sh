@@ -39,6 +39,7 @@ if [[ -f .env.local ]]; then
 fi
 
 if [[ "${#env_args[@]}" -eq 0 ]]; then
+  export VERITY_BENCHMARK_DOTENVX_LOADED=1
   exec "$@"
 fi
 
