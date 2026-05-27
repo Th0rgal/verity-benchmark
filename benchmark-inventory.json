@@ -11,36 +11,36 @@
   },
   "summary": {
     "family_count": 20,
-    "implementation_count": 20,
-    "active_case_count": 17,
+    "implementation_count": 21,
+    "active_case_count": 18,
     "backlog_case_count": 3,
-    "active_task_count": 102,
+    "active_task_count": 107,
     "backlog_task_count": 8,
-    "buildable_case_count": 19,
-    "runnable_task_count": 110,
+    "buildable_case_count": 20,
+    "runnable_task_count": 115,
     "case_stage_counts": {
-      "build_green": 16,
+      "build_green": 17,
       "candidate": 1,
       "proof_complete": 3
     },
     "translation_status_counts": {
       "blocked": 1,
-      "translated": 19
+      "translated": 20
     },
     "proof_status_counts": {
       "blocked": 1,
-      "complete": 12,
+      "complete": 13,
       "partial": 7
     },
     "task_track_counts": {
-      "proof-only": 110
+      "proof-only": 115
     },
     "task_property_class_counts": {
       "accounting_bound": 16,
-      "accounting_conservation": 10,
+      "accounting_conservation": 13,
       "accounting_invariant_break": 1,
       "accounting_update": 6,
-      "arithmetic_rounding": 1,
+      "arithmetic_rounding": 3,
       "authorization_state": 9,
       "balance_conservation": 2,
       "balance_credit_update": 2,
@@ -75,14 +75,15 @@
     },
     "task_proof_family_counts": {
       "authorization_enablement": 14,
-      "functional_correctness": 30,
+      "functional_correctness": 32,
       "protocol_transition_correctness": 22,
       "refinement_equivalence": 9,
-      "state_preservation_local_effects": 35
+      "state_preservation_local_effects": 38
     },
     "family_split_counts": {
       "active": 17,
-      "backlog": 3
+      "backlog": 2,
+      "mixed": 1
     }
   },
   "families": [
@@ -378,14 +379,16 @@
     {
       "family_id": "usual",
       "display_name": "Usual",
-      "split": "backlog",
-      "status": "backlog",
-      "description": "Backlog intake for a private upstream that cannot yet be pinned to a public benchmarkable contract artifact.",
+      "split": "mixed",
+      "status": "mixed",
+      "description": "Usual stablecoin/RWA protocol cases focused on collateralized mint and redeem accounting for USD0 and related collateral assets.",
       "implementation_ids": [
-        "private_repo"
+        "private_repo",
+        "verified_proxy"
       ],
       "case_ids": [
-        "usual/placeholder"
+        "usual/placeholder",
+        "usual/dao_collateral"
       ],
       "source_languages": [
         "solidity"
@@ -715,6 +718,22 @@
       ],
       "notes": "Intake is blocked on repository access, so no implementation artifact or case slice can be pinned yet.",
       "manifest_path": "families/usual/implementations/private_repo/implementation.yaml"
+    },
+    {
+      "family_id": "usual",
+      "implementation_id": "verified_proxy",
+      "display_name": "Usual USD0 DaoCollateral Verified Proxy",
+      "split": "active",
+      "status": "translated",
+      "upstream_repo": null,
+      "upstream_commit": null,
+      "source_language": "solidity",
+      "source_artifact_path": "https://etherscan.io/address/0x0eec861d49f15f585d6bb4301fc4f89bce22af4e#code",
+      "case_ids": [
+        "usual/dao_collateral"
+      ],
+      "notes": "Source was taken from the verified Etherscan implementation behind the public DaoCollateral proxy at 0xde6e1F680C4816446C8D515989E2358636A38b04.",
+      "manifest_path": "families/usual/implementations/verified_proxy/implementation.yaml"
     },
     {
       "family_id": "wildcat",
@@ -1437,6 +1456,59 @@
       ],
       "spec_target": "Benchmark.Cases.TermMax.OrderV2BuyXtSingleSegment.Specs",
       "proof_target": "Benchmark.Cases.TermMax.OrderV2BuyXtSingleSegment.Proofs"
+    },
+    {
+      "case_id": "usual/dao_collateral",
+      "project": "usual",
+      "case_name": "dao_collateral",
+      "suite": "active",
+      "schema_version": 1,
+      "manifest_path": "cases/usual/dao_collateral/case.yaml",
+      "split": "active",
+      "family_id": "usual",
+      "implementation_id": "verified_proxy",
+      "stage": "build_green",
+      "translation_status": "translated",
+      "spec_status": "frozen",
+      "proof_status": "complete",
+      "source_language": "solidity",
+      "upstream_repo": null,
+      "upstream_commit": null,
+      "original_contract_path": "src/daoCollateral/DaoCollateral.sol",
+      "generated_artifact_path": null,
+      "source_ref": "https://etherscan.io/address/0x0eec861d49f15f585d6bb4301fc4f89bce22af4e#code",
+      "selected_functions": [
+        "swap",
+        "redeem",
+        "_calculateFee",
+        "_burnStableTokenAndTransferCollateral",
+        "_getTokenAmountForAmountInUSD"
+      ],
+      "lean_target": "Benchmark.Cases.Usual.DaoCollateral.Compile",
+      "failure_reason": null,
+      "notes": "Usual USD0 DaoCollateral conservation case. It verifies that no direct swap/redeem transition can create unaccounted USD0 or debit more collateral than the contract's modeled accounting permits, modulo configured redeem fee, oracle price, CBR coefficient, token decimals, and floor rounding.",
+      "buildable": true,
+      "verity_commit": "d71bf23d908a7a952bf041ee5ebe41ba68b54426",
+      "lean_toolchain": "leanprover/lean4:v4.22.0",
+      "abstraction_level": "protocol_slice",
+      "abstraction_tags": [
+        "oracle_quote_explicit",
+        "erc20_calls_ghosted",
+        "usd0_supply_effect_ghosted",
+        "direct_swap_redeem_only",
+        "cbr_redeem_branch_modeled",
+        "intent_paths_elided",
+        "access_control_elided"
+      ],
+      "abstraction_notes": "The benchmark targets DaoCollateral direct swap/redeem conservation. Oracle quotes and token decimal scale are explicit inputs. ERC20 transfers and USD0 mint/burn calls are represented by the treasury collateral balance and a ghosted USD0 supply effect, keeping the proof scoped to DaoCollateral rather than USD0 token correctness. The direct swap path credits exactly the RWA amount and mints exactly the oracle USD quote; a separate theorem ties that quote to the explicit floor(collateralAmount * price / tokenUnit) formula when oracle parameters are supplied. Successful-call hypotheses expose Solidity checked-arithmetic boundaries, nonzero quote, uint128 swap amount bound, treasury collateral sufficiency, and configured redeem fee / CBR coefficient bounds. The redeem path burns the user amount, remints only the non-CBR fee, and debits the exact collateral amount computed from net burned USD0, oracle price, token decimals, CBR flag, and floor rounding. SwapperEngine, intent matching, permits, role checks, pause gates, events, and registry lookups are elided because they do not alter this conservation equation.",
+      "unsupported_feature_codes": [
+        "external_erc20_calls_ghosted",
+        "oracle_reads_parameterized",
+        "checked_uint256_overflow_preconditions",
+        "successful_call_preconditions"
+      ],
+      "spec_target": "Benchmark.Cases.Usual.DaoCollateral.Specs",
+      "proof_target": "Benchmark.Cases.Usual.DaoCollateral.Proofs"
     },
     {
       "case_id": "wildcat/borrow_liquidity_safety",
@@ -5763,6 +5835,251 @@
       }
     },
     {
+      "task_ref": "usual/dao_collateral/redeem_conservation",
+      "task_id": "redeem_conservation",
+      "case_id": "usual/dao_collateral",
+      "suite": "active",
+      "schema_version": 1,
+      "manifest_path": "cases/usual/dao_collateral/tasks/redeem_conservation.yaml",
+      "split": "active",
+      "family_id": "usual",
+      "implementation_id": "verified_proxy",
+      "source_ref": "https://etherscan.io/address/0x0eec861d49f15f585d6bb4301fc4f89bce22af4e#code",
+      "task_interface_version": 2,
+      "track": "proof-only",
+      "property_class": "accounting_conservation",
+      "category": "stablecoin_collateral_accounting",
+      "difficulty": "medium",
+      "theorem_name": "Benchmark.Cases.Usual.DaoCollateral.redeem_conservation",
+      "proof_family": "state_preservation_local_effects",
+      "translation_status": "translated",
+      "proof_status": "complete",
+      "implementation_files": [
+        "cases/usual/dao_collateral/verity/Contract.lean",
+        "Benchmark/Cases/Usual/DaoCollateral/Contract.lean"
+      ],
+      "specification_files": [
+        "cases/usual/dao_collateral/verity/Specs.lean",
+        "Benchmark/Cases/Usual/DaoCollateral/Specs.lean"
+      ],
+      "editable_files": [
+        "Benchmark/Generated/Usual/DaoCollateral/Tasks/RedeemConservation.lean"
+      ],
+      "abstraction_level": "protocol_slice",
+      "abstraction_notes": "Proves that a successful direct `redeem` decreases ghosted USD0 supply by the user amount net of the explicitly reminted non-CBR fee, and debits treasury collateral by the exact returned amount computed from net burned USD0, oracle price, token decimals, CBR state, and floor rounding. Successful-call hypotheses expose fee bounds, checked arithmetic, and treasury collateral sufficiency.",
+      "unsupported_feature_codes": [
+        "external_erc20_calls_ghosted",
+        "oracle_reads_parameterized",
+        "checked_uint256_overflow_preconditions",
+        "successful_call_preconditions"
+      ],
+      "reference_solution_module": "Benchmark.Cases.Usual.DaoCollateral.Proofs",
+      "evaluation": {
+        "engine": "lean_proof_generation",
+        "target_kind": "proof_generation"
+      },
+      "readiness": {
+        "prompt_context": "ready",
+        "editable_proof": "ready",
+        "reference_solution": "blocked"
+      }
+    },
+    {
+      "task_ref": "usual/dao_collateral/redeem_fee_formula",
+      "task_id": "redeem_fee_formula",
+      "case_id": "usual/dao_collateral",
+      "suite": "active",
+      "schema_version": 1,
+      "manifest_path": "cases/usual/dao_collateral/tasks/redeem_fee_formula.yaml",
+      "split": "active",
+      "family_id": "usual",
+      "implementation_id": "verified_proxy",
+      "source_ref": "https://etherscan.io/address/0x0eec861d49f15f585d6bb4301fc4f89bce22af4e#code",
+      "task_interface_version": 2,
+      "track": "proof-only",
+      "property_class": "arithmetic_rounding",
+      "category": "stablecoin_collateral_accounting",
+      "difficulty": "easy",
+      "theorem_name": "Benchmark.Cases.Usual.DaoCollateral.redeem_fee_formula",
+      "proof_family": "functional_correctness",
+      "translation_status": "translated",
+      "proof_status": "complete",
+      "implementation_files": [
+        "cases/usual/dao_collateral/verity/Contract.lean",
+        "Benchmark/Cases/Usual/DaoCollateral/Contract.lean"
+      ],
+      "specification_files": [
+        "cases/usual/dao_collateral/verity/Specs.lean",
+        "Benchmark/Cases/Usual/DaoCollateral/Specs.lean"
+      ],
+      "editable_files": [
+        "Benchmark/Generated/Usual/DaoCollateral/Tasks/RedeemFeeFormula.lean"
+      ],
+      "abstraction_level": "protocol_slice",
+      "abstraction_notes": "Proves the fee helper used by redeem matches the configured basis-point fee and the token-decimal normalization path modeled from `_calculateFee`.",
+      "unsupported_feature_codes": [
+        "checked_uint256_overflow_preconditions",
+        "successful_call_preconditions"
+      ],
+      "reference_solution_module": "Benchmark.Cases.Usual.DaoCollateral.Proofs",
+      "evaluation": {
+        "engine": "lean_proof_generation",
+        "target_kind": "proof_generation"
+      },
+      "readiness": {
+        "prompt_context": "ready",
+        "editable_proof": "ready",
+        "reference_solution": "blocked"
+      }
+    },
+    {
+      "task_ref": "usual/dao_collateral/redeem_return_formula",
+      "task_id": "redeem_return_formula",
+      "case_id": "usual/dao_collateral",
+      "suite": "active",
+      "schema_version": 1,
+      "manifest_path": "cases/usual/dao_collateral/tasks/redeem_return_formula.yaml",
+      "split": "active",
+      "family_id": "usual",
+      "implementation_id": "verified_proxy",
+      "source_ref": "https://etherscan.io/address/0x0eec861d49f15f585d6bb4301fc4f89bce22af4e#code",
+      "task_interface_version": 2,
+      "track": "proof-only",
+      "property_class": "arithmetic_rounding",
+      "category": "stablecoin_collateral_accounting",
+      "difficulty": "easy",
+      "theorem_name": "Benchmark.Cases.Usual.DaoCollateral.redeem_return_formula",
+      "proof_family": "functional_correctness",
+      "translation_status": "translated",
+      "proof_status": "complete",
+      "implementation_files": [
+        "cases/usual/dao_collateral/verity/Contract.lean",
+        "Benchmark/Cases/Usual/DaoCollateral/Contract.lean"
+      ],
+      "specification_files": [
+        "cases/usual/dao_collateral/verity/Specs.lean",
+        "Benchmark/Cases/Usual/DaoCollateral/Specs.lean"
+      ],
+      "editable_files": [
+        "Benchmark/Generated/Usual/DaoCollateral/Tasks/RedeemReturnFormula.lean"
+      ],
+      "abstraction_level": "protocol_slice",
+      "abstraction_notes": "Proves the returned collateral value is exactly the modeled formula: floor((stableAmount - fee) * tokenUnit / price), with the CBR coefficient applied by floor multiplication when CBR is active, under successful-call arithmetic and configuration-bound hypotheses.",
+      "unsupported_feature_codes": [
+        "oracle_reads_parameterized",
+        "checked_uint256_overflow_preconditions",
+        "successful_call_preconditions"
+      ],
+      "reference_solution_module": "Benchmark.Cases.Usual.DaoCollateral.Proofs",
+      "evaluation": {
+        "engine": "lean_proof_generation",
+        "target_kind": "proof_generation"
+      },
+      "readiness": {
+        "prompt_context": "ready",
+        "editable_proof": "ready",
+        "reference_solution": "blocked"
+      }
+    },
+    {
+      "task_ref": "usual/dao_collateral/swap_conservation",
+      "task_id": "swap_conservation",
+      "case_id": "usual/dao_collateral",
+      "suite": "active",
+      "schema_version": 1,
+      "manifest_path": "cases/usual/dao_collateral/tasks/swap_conservation.yaml",
+      "split": "active",
+      "family_id": "usual",
+      "implementation_id": "verified_proxy",
+      "source_ref": "https://etherscan.io/address/0x0eec861d49f15f585d6bb4301fc4f89bce22af4e#code",
+      "task_interface_version": 2,
+      "track": "proof-only",
+      "property_class": "accounting_conservation",
+      "category": "stablecoin_collateral_accounting",
+      "difficulty": "easy",
+      "theorem_name": "Benchmark.Cases.Usual.DaoCollateral.swap_conservation",
+      "proof_family": "state_preservation_local_effects",
+      "translation_status": "translated",
+      "proof_status": "complete",
+      "implementation_files": [
+        "cases/usual/dao_collateral/verity/Contract.lean",
+        "Benchmark/Cases/Usual/DaoCollateral/Contract.lean"
+      ],
+      "specification_files": [
+        "cases/usual/dao_collateral/verity/Specs.lean",
+        "Benchmark/Cases/Usual/DaoCollateral/Specs.lean"
+      ],
+      "editable_files": [
+        "Benchmark/Generated/Usual/DaoCollateral/Tasks/SwapConservation.lean"
+      ],
+      "abstraction_level": "protocol_slice",
+      "abstraction_notes": "Proves that a successful direct `swap` increases ghosted USD0 supply by the oracle quote and credits treasury collateral by the exact RWA amount received, under explicit successful-call assumptions for nonzero quote, uint128 amount bound, and checked addition.",
+      "unsupported_feature_codes": [
+        "external_erc20_calls_ghosted",
+        "oracle_reads_parameterized",
+        "successful_call_preconditions"
+      ],
+      "reference_solution_module": "Benchmark.Cases.Usual.DaoCollateral.Proofs",
+      "evaluation": {
+        "engine": "lean_proof_generation",
+        "target_kind": "proof_generation"
+      },
+      "readiness": {
+        "prompt_context": "ready",
+        "editable_proof": "ready",
+        "reference_solution": "blocked"
+      }
+    },
+    {
+      "task_ref": "usual/dao_collateral/swap_value_conservation",
+      "task_id": "swap_value_conservation",
+      "case_id": "usual/dao_collateral",
+      "suite": "active",
+      "schema_version": 1,
+      "manifest_path": "cases/usual/dao_collateral/tasks/swap_value_conservation.yaml",
+      "split": "active",
+      "family_id": "usual",
+      "implementation_id": "verified_proxy",
+      "source_ref": "https://etherscan.io/address/0x0eec861d49f15f585d6bb4301fc4f89bce22af4e#code",
+      "task_interface_version": 2,
+      "track": "proof-only",
+      "property_class": "accounting_conservation",
+      "category": "stablecoin_collateral_accounting",
+      "difficulty": "easy",
+      "theorem_name": "Benchmark.Cases.Usual.DaoCollateral.swap_value_conservation",
+      "proof_family": "state_preservation_local_effects",
+      "translation_status": "translated",
+      "proof_status": "complete",
+      "implementation_files": [
+        "cases/usual/dao_collateral/verity/Contract.lean",
+        "Benchmark/Cases/Usual/DaoCollateral/Contract.lean"
+      ],
+      "specification_files": [
+        "cases/usual/dao_collateral/verity/Specs.lean",
+        "Benchmark/Cases/Usual/DaoCollateral/Specs.lean"
+      ],
+      "editable_files": [
+        "Benchmark/Generated/Usual/DaoCollateral/Tasks/SwapValueConservation.lean"
+      ],
+      "abstraction_level": "protocol_slice",
+      "abstraction_notes": "Strengthens local swap state preservation with an oracle-parameterized value condition: the theorem requires a nonzero token unit and successful-call arithmetic hypotheses, then proves the minted USD0 delta equals floor(collateralAmount * price / tokenUnit).",
+      "unsupported_feature_codes": [
+        "external_erc20_calls_ghosted",
+        "oracle_reads_parameterized",
+        "successful_call_preconditions"
+      ],
+      "reference_solution_module": "Benchmark.Cases.Usual.DaoCollateral.Proofs",
+      "evaluation": {
+        "engine": "lean_proof_generation",
+        "target_kind": "proof_generation"
+      },
+      "readiness": {
+        "prompt_context": "ready",
+        "editable_proof": "ready",
+        "reference_solution": "blocked"
+      }
+    },
+    {
       "task_ref": "wildcat/borrow_liquidity_safety/positive_borrow_preserves_required_liquidity",
       "task_id": "positive_borrow_preserves_required_liquidity",
       "case_id": "wildcat/borrow_liquidity_safety",
@@ -6665,5 +6982,5 @@
       }
     }
   ],
-  "generated_at": "2026-05-26T13:49:29.549617+00:00"
+  "generated_at": "2026-05-27T13:36:02.261040+00:00"
 }

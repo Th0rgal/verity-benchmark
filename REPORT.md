@@ -5,10 +5,10 @@ This report is generated from the benchmark manifests.
 ## Summary
 
 - Families: 20
-- Implementations: 20
-- Active cases: 17
-- Buildable active cases: 17
-- Active tasks: 102
+- Implementations: 21
+- Active cases: 18
+- Buildable active cases: 18
+- Active tasks: 107
 - Backlog cases: 3
 
 ## Buildable active cases
@@ -162,6 +162,16 @@ This report is generated from the benchmark manifests.
 - Selected functions: `swapExactTokenToToken`, `_swapAndUpdateReserves`, `_buyToken`, `_buyXt`, `_buyXtStep`, `buyXt`, `cutsReverseIter`, `calcIntervalProps`, `plusInt256`
 - Upstream source artifact: `contracts/v2/TermMaxOrderV2.sol`
 - Notes: TermMax range-order AMM slice for pricing-state transition correctness. The proof target is the highest-signal easy theorem in this family: on the successful single-segment `debtToken -> XT` exact-input path, the stored `virtualXtReserve` decreases by exactly the XT amount implied by the curve.
+
+### `usual/dao_collateral`
+- Family / implementation: `usual` / `verified_proxy`
+- Stage: `build_green`
+- Status dimensions: translation=`translated`, spec=`frozen`, proof=`complete`
+- Lean target: `Benchmark.Cases.Usual.DaoCollateral.Compile`
+- Source ref: `https://etherscan.io/address/0x0eec861d49f15f585d6bb4301fc4f89bce22af4e#code`
+- Selected functions: `swap`, `redeem`, `_calculateFee`, `_burnStableTokenAndTransferCollateral`, `_getTokenAmountForAmountInUSD`
+- Upstream source artifact: `src/daoCollateral/DaoCollateral.sol`
+- Notes: Usual USD0 DaoCollateral conservation case. It verifies that no direct swap/redeem transition can create unaccounted USD0 or debit more collateral than the contract's modeled accounting permits, modulo configured redeem fee, oracle price, CBR coefficient, token decimals, and floor rounding.
 
 ### `wildcat/borrow_liquidity_safety`
 - Family / implementation: `wildcat` / `v2_protocol`
@@ -1088,6 +1098,56 @@ This report is generated from the benchmark manifests.
 - Specification files: `cases/termmax/order_v2_buy_xt_single_segment/verity/Specs.lean`, `Benchmark/Cases/TermMax/OrderV2BuyXtSingleSegment/Specs.lean`
 - Editable proof file: `Benchmark/Generated/TermMax/OrderV2BuyXtSingleSegment/Tasks/SwapDebtTokenToXtUpdatesVirtualXtReserve.lean`
 - Hidden reference solution: `Benchmark.Cases.TermMax.OrderV2BuyXtSingleSegment.Proofs`
+
+### `usual/dao_collateral/redeem_conservation`
+- Track / property class / proof family: `proof-only` / `accounting_conservation` / `state_preservation_local_effects`
+- Readiness: prompt_context=`ready`, editable_proof=`ready`, reference_solution=`blocked`
+- Theorem target: `Benchmark.Cases.Usual.DaoCollateral.redeem_conservation`
+- Evaluation: engine=`lean_proof_generation`, target_kind=`proof_generation`
+- Implementation files: `cases/usual/dao_collateral/verity/Contract.lean`, `Benchmark/Cases/Usual/DaoCollateral/Contract.lean`
+- Specification files: `cases/usual/dao_collateral/verity/Specs.lean`, `Benchmark/Cases/Usual/DaoCollateral/Specs.lean`
+- Editable proof file: `Benchmark/Generated/Usual/DaoCollateral/Tasks/RedeemConservation.lean`
+- Hidden reference solution: `Benchmark.Cases.Usual.DaoCollateral.Proofs`
+
+### `usual/dao_collateral/redeem_fee_formula`
+- Track / property class / proof family: `proof-only` / `arithmetic_rounding` / `functional_correctness`
+- Readiness: prompt_context=`ready`, editable_proof=`ready`, reference_solution=`blocked`
+- Theorem target: `Benchmark.Cases.Usual.DaoCollateral.redeem_fee_formula`
+- Evaluation: engine=`lean_proof_generation`, target_kind=`proof_generation`
+- Implementation files: `cases/usual/dao_collateral/verity/Contract.lean`, `Benchmark/Cases/Usual/DaoCollateral/Contract.lean`
+- Specification files: `cases/usual/dao_collateral/verity/Specs.lean`, `Benchmark/Cases/Usual/DaoCollateral/Specs.lean`
+- Editable proof file: `Benchmark/Generated/Usual/DaoCollateral/Tasks/RedeemFeeFormula.lean`
+- Hidden reference solution: `Benchmark.Cases.Usual.DaoCollateral.Proofs`
+
+### `usual/dao_collateral/redeem_return_formula`
+- Track / property class / proof family: `proof-only` / `arithmetic_rounding` / `functional_correctness`
+- Readiness: prompt_context=`ready`, editable_proof=`ready`, reference_solution=`blocked`
+- Theorem target: `Benchmark.Cases.Usual.DaoCollateral.redeem_return_formula`
+- Evaluation: engine=`lean_proof_generation`, target_kind=`proof_generation`
+- Implementation files: `cases/usual/dao_collateral/verity/Contract.lean`, `Benchmark/Cases/Usual/DaoCollateral/Contract.lean`
+- Specification files: `cases/usual/dao_collateral/verity/Specs.lean`, `Benchmark/Cases/Usual/DaoCollateral/Specs.lean`
+- Editable proof file: `Benchmark/Generated/Usual/DaoCollateral/Tasks/RedeemReturnFormula.lean`
+- Hidden reference solution: `Benchmark.Cases.Usual.DaoCollateral.Proofs`
+
+### `usual/dao_collateral/swap_conservation`
+- Track / property class / proof family: `proof-only` / `accounting_conservation` / `state_preservation_local_effects`
+- Readiness: prompt_context=`ready`, editable_proof=`ready`, reference_solution=`blocked`
+- Theorem target: `Benchmark.Cases.Usual.DaoCollateral.swap_conservation`
+- Evaluation: engine=`lean_proof_generation`, target_kind=`proof_generation`
+- Implementation files: `cases/usual/dao_collateral/verity/Contract.lean`, `Benchmark/Cases/Usual/DaoCollateral/Contract.lean`
+- Specification files: `cases/usual/dao_collateral/verity/Specs.lean`, `Benchmark/Cases/Usual/DaoCollateral/Specs.lean`
+- Editable proof file: `Benchmark/Generated/Usual/DaoCollateral/Tasks/SwapConservation.lean`
+- Hidden reference solution: `Benchmark.Cases.Usual.DaoCollateral.Proofs`
+
+### `usual/dao_collateral/swap_value_conservation`
+- Track / property class / proof family: `proof-only` / `accounting_conservation` / `state_preservation_local_effects`
+- Readiness: prompt_context=`ready`, editable_proof=`ready`, reference_solution=`blocked`
+- Theorem target: `Benchmark.Cases.Usual.DaoCollateral.swap_value_conservation`
+- Evaluation: engine=`lean_proof_generation`, target_kind=`proof_generation`
+- Implementation files: `cases/usual/dao_collateral/verity/Contract.lean`, `Benchmark/Cases/Usual/DaoCollateral/Contract.lean`
+- Specification files: `cases/usual/dao_collateral/verity/Specs.lean`, `Benchmark/Cases/Usual/DaoCollateral/Specs.lean`
+- Editable proof file: `Benchmark/Generated/Usual/DaoCollateral/Tasks/SwapValueConservation.lean`
+- Hidden reference solution: `Benchmark.Cases.Usual.DaoCollateral.Proofs`
 
 ### `wildcat/borrow_liquidity_safety/positive_borrow_preserves_required_liquidity`
 - Track / property class / proof family: `proof-only` / `accounting_bound` / `functional_correctness`

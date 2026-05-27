@@ -9,4 +9,5 @@ import Benchmark.Cases.Zama
 import Benchmark.Cases.Wildcat
 import Benchmark.Cases.Cork
 import Benchmark.Cases.Balancer
+import Benchmark.Cases.Usual
 import Benchmark.Cases.Lagoon
