@@ -10,30 +10,30 @@
     "backlog_tasks": "backlog/*/*/tasks/*.yaml"
   },
   "summary": {
-    "family_count": 22,
-    "implementation_count": 23,
-    "active_case_count": 20,
+    "family_count": 23,
+    "implementation_count": 24,
+    "active_case_count": 21,
     "backlog_case_count": 3,
-    "active_task_count": 121,
+    "active_task_count": 124,
     "backlog_task_count": 8,
-    "buildable_case_count": 22,
-    "runnable_task_count": 129,
+    "buildable_case_count": 23,
+    "runnable_task_count": 132,
     "case_stage_counts": {
-      "build_green": 19,
+      "build_green": 20,
       "candidate": 1,
       "proof_complete": 3
     },
     "translation_status_counts": {
       "blocked": 1,
-      "translated": 22
+      "translated": 23
     },
     "proof_status_counts": {
       "blocked": 1,
-      "complete": 15,
+      "complete": 16,
       "partial": 7
     },
     "task_track_counts": {
-      "proof-only": 129
+      "proof-only": 132
     },
     "task_property_class_counts": {
       "access_control_identity": 10,
@@ -52,6 +52,7 @@
       "frame_property": 2,
       "guarded_solvency": 7,
       "isOwner_effect": 3,
+      "lifecycle_accounting": 3,
       "linked_list_acyclicity": 4,
       "linked_list_invariant": 8,
       "mapping_consistency": 1,
@@ -80,10 +81,10 @@
       "functional_correctness": 32,
       "protocol_transition_correctness": 22,
       "refinement_equivalence": 9,
-      "state_preservation_local_effects": 42
+      "state_preservation_local_effects": 45
     },
     "family_split_counts": {
-      "active": 19,
+      "active": 20,
       "backlog": 2,
       "mixed": 1
     }
@@ -360,6 +361,23 @@
         "solidity"
       ],
       "manifest_path": "families/reserve/family.yaml"
+    },
+    {
+      "family_id": "rootstock",
+      "display_name": "Rootstock",
+      "split": "active",
+      "status": "active",
+      "description": "Benchmark family for Rootstock bridge and Flyover liquidity accounting invariants.",
+      "implementation_ids": [
+        "flyover-lbc"
+      ],
+      "case_ids": [
+        "rootstock/flyover_quote_lifecycle"
+      ],
+      "source_languages": [
+        "solidity"
+      ],
+      "manifest_path": "families/rootstock/family.yaml"
     },
     {
       "family_id": "safe",
@@ -722,6 +740,22 @@
       ],
       "notes": "Active implementation entry for Reserve's DTF Protocol repository, currently benchmarking the auction price-band slice on RebalancingLib._price.",
       "manifest_path": "families/reserve/implementations/dtfs/implementation.yaml"
+    },
+    {
+      "family_id": "rootstock",
+      "implementation_id": "flyover-lbc",
+      "display_name": "Rootstock Flyover LBC",
+      "split": "active",
+      "status": "translated",
+      "upstream_repo": "https://github.com/rsksmart/liquidity-bridge-contract",
+      "upstream_commit": "88a6d1ad64aeb3ad24e01042f4211ad8649784b9",
+      "source_language": "solidity",
+      "source_artifact_path": "src/PegOutContract.sol",
+      "case_ids": [
+        "rootstock/flyover_quote_lifecycle"
+      ],
+      "notes": "Flyover's Liquidity Bridge Contract accelerates Rootstock peg-ins and peg-outs through liquidity providers. This implementation entry covers the peg-out quote lifecycle in PegOutContract.",
+      "manifest_path": "families/rootstock/implementations/flyover-lbc/implementation.yaml"
     },
     {
       "family_id": "safe",
@@ -1527,6 +1561,62 @@
       "unsupported_feature_codes": [],
       "spec_target": "Benchmark.Cases.Reserve.AuctionPriceBand.Specs",
       "proof_target": "Benchmark.Cases.Reserve.AuctionPriceBand.Proofs"
+    },
+    {
+      "case_id": "rootstock/flyover_quote_lifecycle",
+      "project": "rootstock",
+      "case_name": "flyover_quote_lifecycle",
+      "suite": "active",
+      "schema_version": 1,
+      "manifest_path": "cases/rootstock/flyover_quote_lifecycle/case.yaml",
+      "split": "active",
+      "family_id": "rootstock",
+      "implementation_id": "flyover-lbc",
+      "stage": "build_green",
+      "translation_status": "translated",
+      "spec_status": "draft",
+      "proof_status": "complete",
+      "source_language": "solidity",
+      "upstream_repo": "https://github.com/rsksmart/liquidity-bridge-contract",
+      "upstream_commit": "88a6d1ad64aeb3ad24e01042f4211ad8649784b9",
+      "original_contract_path": "src/PegOutContract.sol",
+      "generated_artifact_path": null,
+      "source_ref": "https://github.com/rsksmart/liquidity-bridge-contract@88a6d1ad64aeb3ad24e01042f4211ad8649784b9:src/PegOutContract.sol",
+      "selected_functions": [
+        "depositPegOut",
+        "refundPegOut",
+        "refundUserPegOut",
+        "_increaseBalance"
+      ],
+      "lean_target": "Benchmark.Cases.Rootstock.FlyoverQuoteLifecycle.Compile",
+      "failure_reason": null,
+      "notes": "This case focuses on quote lifecycle conservation and single settlement for Rootstock Flyover / LBC peg-outs. The property proved here is not a Bitcoin proof verifier; it is the Rootstock-side accounting guarantee for the amount already registered by depositPegOut.",
+      "buildable": true,
+      "verity_commit": "9eaf64218be14b59f6253219c111a5abf958e7b7",
+      "lean_toolchain": "leanprover/lean4:v4.22.0",
+      "abstraction_level": "protocol_slice",
+      "abstraction_tags": [
+        "quote_hash_address_keyed",
+        "quote_struct_flattened_to_accounting_fields",
+        "quote_recipient_identity_stored_and_proven",
+        "user_refund_expiry_stored_explicitly",
+        "bridge_and_signature_checks_as_preconditions",
+        "external_call_success_as_boolean",
+        "deposit_checked_addition_guards",
+        "deposit_change_refund_branch",
+        "computed_lp_penalty_timing"
+      ],
+      "abstraction_notes": "The benchmark targets the compact peg-out quote lifecycle in PegOutContract: depositPegOut registers the Rootstock-side quote amount and user-refund expiry fields. refundPegOut settles the quote to the LP or fallback balance, and refundUserPegOut settles an expired quote to the user refund recipient or fallback balance while recording the external collateral slash call amount as separate penalty accounting. Refund recipient identity is modeled explicitly: depositPegOut stores the LP and user refund addresses, and the settlement proofs read those stored fields instead of taking recipient identity as a theorem assumption. Cryptographic quote validation, Bitcoin transaction parsing, and bridge confirmation checks are modeled as success preconditions because they gate the lifecycle but do not change the conserved Rootstock-side amount after a quote is accepted. Deposit overpayment refund behavior and the LP penalty timing predicate are modeled explicitly.",
+      "unsupported_feature_codes": [
+        "bytes32_quote_hash_modeled_as_address_key",
+        "struct_calldata_flattened",
+        "external_bridge_calls_as_preconditions",
+        "external_collateral_slash_call_as_witness",
+        "external_value_transfer_as_boolean",
+        "quote_hash_address_keyed"
+      ],
+      "spec_target": "Benchmark.Cases.Rootstock.FlyoverQuoteLifecycle.Specs",
+      "proof_target": "Benchmark.Cases.Rootstock.FlyoverQuoteLifecycle.Proofs"
     },
     {
       "case_id": "safe/owner_manager_reach",
@@ -5929,6 +6019,155 @@
       }
     },
     {
+      "task_ref": "rootstock/flyover_quote_lifecycle/deposit_peg_out_registers_required_amount",
+      "task_id": "deposit_peg_out_registers_required_amount",
+      "case_id": "rootstock/flyover_quote_lifecycle",
+      "suite": "active",
+      "schema_version": 1,
+      "manifest_path": "cases/rootstock/flyover_quote_lifecycle/tasks/deposit_peg_out_registers_required_amount.yaml",
+      "split": "active",
+      "family_id": "rootstock",
+      "implementation_id": "flyover-lbc",
+      "source_ref": "https://github.com/rsksmart/liquidity-bridge-contract@88a6d1ad64aeb3ad24e01042f4211ad8649784b9:src/PegOutContract.sol",
+      "task_interface_version": 2,
+      "track": "proof-only",
+      "property_class": "lifecycle_accounting",
+      "category": "bridge_quote_lifecycle",
+      "difficulty": "medium",
+      "theorem_name": "Benchmark.Cases.Rootstock.FlyoverQuoteLifecycle.depositPegOut_registers_required_amount",
+      "proof_family": "state_preservation_local_effects",
+      "translation_status": "translated",
+      "proof_status": "complete",
+      "implementation_files": [
+        "cases/rootstock/flyover_quote_lifecycle/verity/Contract.lean",
+        "Benchmark/Cases/Rootstock/FlyoverQuoteLifecycle/Contract.lean"
+      ],
+      "specification_files": [
+        "cases/rootstock/flyover_quote_lifecycle/verity/Specs.lean",
+        "Benchmark/Cases/Rootstock/FlyoverQuoteLifecycle/Specs.lean"
+      ],
+      "editable_files": [
+        "Benchmark/Generated/Rootstock/FlyoverQuoteLifecycle/Tasks/DepositPegOutRegistersRequiredAmount.lean"
+      ],
+      "abstraction_level": "protocol_slice",
+      "abstraction_notes": "Proves the successful deposit path records the required quote amount, deposit timestamp, LP recipient, user-refund recipient, and user-refund expiry fields after checked-addition guards and dust/change-refund handling. Signature, provider, and quote-hash validation are outside this proof task and handled as benchmark scope assumptions.",
+      "unsupported_feature_codes": [
+        "bytes32_quote_hash_modeled_as_address_key",
+        "struct_calldata_flattened",
+        "external_bridge_calls_as_preconditions"
+      ],
+      "reference_solution_module": "Benchmark.Cases.Rootstock.FlyoverQuoteLifecycle.Proofs",
+      "evaluation": {
+        "engine": "lean_proof_generation",
+        "target_kind": "proof_generation"
+      },
+      "readiness": {
+        "prompt_context": "ready",
+        "editable_proof": "ready",
+        "reference_solution": "ready"
+      }
+    },
+    {
+      "task_ref": "rootstock/flyover_quote_lifecycle/refund_peg_out_conserves_quote_amount",
+      "task_id": "refund_peg_out_conserves_quote_amount",
+      "case_id": "rootstock/flyover_quote_lifecycle",
+      "suite": "active",
+      "schema_version": 1,
+      "manifest_path": "cases/rootstock/flyover_quote_lifecycle/tasks/refund_peg_out_conserves_quote_amount.yaml",
+      "split": "active",
+      "family_id": "rootstock",
+      "implementation_id": "flyover-lbc",
+      "source_ref": "https://github.com/rsksmart/liquidity-bridge-contract@88a6d1ad64aeb3ad24e01042f4211ad8649784b9:src/PegOutContract.sol",
+      "task_interface_version": 2,
+      "track": "proof-only",
+      "property_class": "lifecycle_accounting",
+      "category": "bridge_quote_lifecycle",
+      "difficulty": "medium",
+      "theorem_name": "Benchmark.Cases.Rootstock.FlyoverQuoteLifecycle.refundPegOut_conserves_quote_amount",
+      "proof_family": "state_preservation_local_effects",
+      "translation_status": "translated",
+      "proof_status": "complete",
+      "implementation_files": [
+        "cases/rootstock/flyover_quote_lifecycle/verity/Contract.lean",
+        "Benchmark/Cases/Rootstock/FlyoverQuoteLifecycle/Contract.lean"
+      ],
+      "specification_files": [
+        "cases/rootstock/flyover_quote_lifecycle/verity/Specs.lean",
+        "Benchmark/Cases/Rootstock/FlyoverQuoteLifecycle/Specs.lean"
+      ],
+      "editable_files": [
+        "Benchmark/Generated/Rootstock/FlyoverQuoteLifecycle/Tasks/RefundPegOutConservesQuoteAmount.lean"
+      ],
+      "abstraction_level": "protocol_slice",
+      "abstraction_notes": "Proves the successful LP refund path completes and clears a registered quote, assigns the registered amount either to the stored LP recipient transfer witness or that recipient's fallback balance, and records the external collateral slash-call amount when the computed timing predicate penalizes the LP.",
+      "unsupported_feature_codes": [
+        "bytes32_quote_hash_modeled_as_address_key",
+        "external_bridge_calls_as_preconditions",
+        "external_value_transfer_as_boolean",
+        "external_collateral_slash_call_as_witness"
+      ],
+      "reference_solution_module": "Benchmark.Cases.Rootstock.FlyoverQuoteLifecycle.Proofs",
+      "evaluation": {
+        "engine": "lean_proof_generation",
+        "target_kind": "proof_generation"
+      },
+      "readiness": {
+        "prompt_context": "ready",
+        "editable_proof": "ready",
+        "reference_solution": "ready"
+      }
+    },
+    {
+      "task_ref": "rootstock/flyover_quote_lifecycle/refund_user_peg_out_conserves_quote_amount",
+      "task_id": "refund_user_peg_out_conserves_quote_amount",
+      "case_id": "rootstock/flyover_quote_lifecycle",
+      "suite": "active",
+      "schema_version": 1,
+      "manifest_path": "cases/rootstock/flyover_quote_lifecycle/tasks/refund_user_peg_out_conserves_quote_amount.yaml",
+      "split": "active",
+      "family_id": "rootstock",
+      "implementation_id": "flyover-lbc",
+      "source_ref": "https://github.com/rsksmart/liquidity-bridge-contract@88a6d1ad64aeb3ad24e01042f4211ad8649784b9:src/PegOutContract.sol",
+      "task_interface_version": 2,
+      "track": "proof-only",
+      "property_class": "lifecycle_accounting",
+      "category": "bridge_quote_lifecycle",
+      "difficulty": "medium",
+      "theorem_name": "Benchmark.Cases.Rootstock.FlyoverQuoteLifecycle.refundUserPegOut_conserves_quote_amount",
+      "proof_family": "state_preservation_local_effects",
+      "translation_status": "translated",
+      "proof_status": "complete",
+      "implementation_files": [
+        "cases/rootstock/flyover_quote_lifecycle/verity/Contract.lean",
+        "Benchmark/Cases/Rootstock/FlyoverQuoteLifecycle/Contract.lean"
+      ],
+      "specification_files": [
+        "cases/rootstock/flyover_quote_lifecycle/verity/Specs.lean",
+        "Benchmark/Cases/Rootstock/FlyoverQuoteLifecycle/Specs.lean"
+      ],
+      "editable_files": [
+        "Benchmark/Generated/Rootstock/FlyoverQuoteLifecycle/Tasks/RefundUserPegOutConservesQuoteAmount.lean"
+      ],
+      "abstraction_level": "protocol_slice",
+      "abstraction_notes": "Proves the successful expired user refund path completes and clears a registered quote, assigns the registered amount either to the stored user refund recipient transfer witness or that recipient's fallback balance, and records the external collateral slash-call amount with the quote penalty.",
+      "unsupported_feature_codes": [
+        "bytes32_quote_hash_modeled_as_address_key",
+        "external_bridge_calls_as_preconditions",
+        "external_value_transfer_as_boolean",
+        "external_collateral_slash_call_as_witness"
+      ],
+      "reference_solution_module": "Benchmark.Cases.Rootstock.FlyoverQuoteLifecycle.Proofs",
+      "evaluation": {
+        "engine": "lean_proof_generation",
+        "target_kind": "proof_generation"
+      },
+      "readiness": {
+        "prompt_context": "ready",
+        "editable_proof": "ready",
+        "reference_solution": "ready"
+      }
+    },
+    {
       "task_ref": "safe/owner_manager_reach/add_owner_acyclicity",
       "task_id": "add_owner_acyclicity",
       "case_id": "safe/owner_manager_reach",
@@ -7804,5 +8043,5 @@
       }
     }
   ],
-  "generated_at": "2026-05-27T15:52:31.506038+00:00"
+  "generated_at": "2026-05-27T16:38:28.487739+00:00"
 }

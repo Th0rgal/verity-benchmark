@@ -4,11 +4,11 @@ This report is generated from the benchmark manifests.
 
 ## Summary
 
-- Families: 22
-- Implementations: 23
-- Active cases: 20
-- Buildable active cases: 20
-- Active tasks: 121
+- Families: 23
+- Implementations: 24
+- Active cases: 21
+- Buildable active cases: 21
+- Active tasks: 124
 - Backlog cases: 3
 
 ## Buildable active cases
@@ -162,6 +162,16 @@ This report is generated from the benchmark manifests.
 - Selected functions: `_price`
 - Upstream source artifact: `contracts/utils/RebalancingLib.sol`
 - Notes: Auction price band slice of Reserve DTF Protocol's RebalancingLib._price. The Verity model keeps the start/end branching plus the interior exponential decay; storage I/O and external view calls (auction + rebalance state) are folded into pure parameters.
+
+### `rootstock/flyover_quote_lifecycle`
+- Family / implementation: `rootstock` / `flyover-lbc`
+- Stage: `build_green`
+- Status dimensions: translation=`translated`, spec=`draft`, proof=`complete`
+- Lean target: `Benchmark.Cases.Rootstock.FlyoverQuoteLifecycle.Compile`
+- Source ref: `https://github.com/rsksmart/liquidity-bridge-contract@88a6d1ad64aeb3ad24e01042f4211ad8649784b9:src/PegOutContract.sol`
+- Selected functions: `depositPegOut`, `refundPegOut`, `refundUserPegOut`, `_increaseBalance`
+- Upstream source artifact: `src/PegOutContract.sol`
+- Notes: This case focuses on quote lifecycle conservation and single settlement for Rootstock Flyover / LBC peg-outs. The property proved here is not a Bitcoin proof verifier; it is the Rootstock-side accounting guarantee for the amount already registered by depositPegOut.
 
 ### `safe/owner_manager_reach`
 - Family / implementation: `safe` / `smart_account`
@@ -1098,6 +1108,36 @@ This report is generated from the benchmark manifests.
 - Specification files: `cases/reserve/auction_price_band/verity/Specs.lean`, `Benchmark/Cases/Reserve/AuctionPriceBand/Specs.lean`
 - Editable proof file: `Benchmark/Generated/Reserve/AuctionPriceBand/Tasks/PriceUpperBound.lean`
 - Hidden reference solution: `Benchmark.Cases.Reserve.AuctionPriceBand.Proofs`
+
+### `rootstock/flyover_quote_lifecycle/deposit_peg_out_registers_required_amount`
+- Track / property class / proof family: `proof-only` / `lifecycle_accounting` / `state_preservation_local_effects`
+- Readiness: prompt_context=`ready`, editable_proof=`ready`, reference_solution=`ready`
+- Theorem target: `Benchmark.Cases.Rootstock.FlyoverQuoteLifecycle.depositPegOut_registers_required_amount`
+- Evaluation: engine=`lean_proof_generation`, target_kind=`proof_generation`
+- Implementation files: `cases/rootstock/flyover_quote_lifecycle/verity/Contract.lean`, `Benchmark/Cases/Rootstock/FlyoverQuoteLifecycle/Contract.lean`
+- Specification files: `cases/rootstock/flyover_quote_lifecycle/verity/Specs.lean`, `Benchmark/Cases/Rootstock/FlyoverQuoteLifecycle/Specs.lean`
+- Editable proof file: `Benchmark/Generated/Rootstock/FlyoverQuoteLifecycle/Tasks/DepositPegOutRegistersRequiredAmount.lean`
+- Hidden reference solution: `Benchmark.Cases.Rootstock.FlyoverQuoteLifecycle.Proofs`
+
+### `rootstock/flyover_quote_lifecycle/refund_peg_out_conserves_quote_amount`
+- Track / property class / proof family: `proof-only` / `lifecycle_accounting` / `state_preservation_local_effects`
+- Readiness: prompt_context=`ready`, editable_proof=`ready`, reference_solution=`ready`
+- Theorem target: `Benchmark.Cases.Rootstock.FlyoverQuoteLifecycle.refundPegOut_conserves_quote_amount`
+- Evaluation: engine=`lean_proof_generation`, target_kind=`proof_generation`
+- Implementation files: `cases/rootstock/flyover_quote_lifecycle/verity/Contract.lean`, `Benchmark/Cases/Rootstock/FlyoverQuoteLifecycle/Contract.lean`
+- Specification files: `cases/rootstock/flyover_quote_lifecycle/verity/Specs.lean`, `Benchmark/Cases/Rootstock/FlyoverQuoteLifecycle/Specs.lean`
+- Editable proof file: `Benchmark/Generated/Rootstock/FlyoverQuoteLifecycle/Tasks/RefundPegOutConservesQuoteAmount.lean`
+- Hidden reference solution: `Benchmark.Cases.Rootstock.FlyoverQuoteLifecycle.Proofs`
+
+### `rootstock/flyover_quote_lifecycle/refund_user_peg_out_conserves_quote_amount`
+- Track / property class / proof family: `proof-only` / `lifecycle_accounting` / `state_preservation_local_effects`
+- Readiness: prompt_context=`ready`, editable_proof=`ready`, reference_solution=`ready`
+- Theorem target: `Benchmark.Cases.Rootstock.FlyoverQuoteLifecycle.refundUserPegOut_conserves_quote_amount`
+- Evaluation: engine=`lean_proof_generation`, target_kind=`proof_generation`
+- Implementation files: `cases/rootstock/flyover_quote_lifecycle/verity/Contract.lean`, `Benchmark/Cases/Rootstock/FlyoverQuoteLifecycle/Contract.lean`
+- Specification files: `cases/rootstock/flyover_quote_lifecycle/verity/Specs.lean`, `Benchmark/Cases/Rootstock/FlyoverQuoteLifecycle/Specs.lean`
+- Editable proof file: `Benchmark/Generated/Rootstock/FlyoverQuoteLifecycle/Tasks/RefundUserPegOutConservesQuoteAmount.lean`
+- Hidden reference solution: `Benchmark.Cases.Rootstock.FlyoverQuoteLifecycle.Proofs`
 
 ### `safe/owner_manager_reach/add_owner_acyclicity`
 - Track / property class / proof family: `proof-only` / `linked_list_acyclicity` / `state_preservation_local_effects`
