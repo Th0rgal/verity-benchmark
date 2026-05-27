@@ -11,7 +11,9 @@ The model preserves the source function boundaries relevant to conservation:
 `swap`, `_calculateFee`, `_burnStableTokenAndTransferCollateral`, and
 `_getTokenAmountForAmountInUSD` are represented by `swapDirect`,
 `redeemFeeAmount`, `redeemDirect`, `tokenAmountForUsd`, and
-`cbrAdjustedTokenAmount`.
+`cbrAdjustedTokenAmount`. `swapDirect` now computes the swap quote from explicit
+oracle price and supported token-unit inputs rather than accepting a free quote
+parameter.
 
 Build commands required by the skill:
 

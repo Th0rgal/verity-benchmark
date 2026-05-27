@@ -27,7 +27,8 @@ verity_version: 9eaf64218be14b59f6253219c111a5abf958e7b7
 lean_toolchain: leanprover/lean4:v4.22.0
 abstraction_level: protocol_slice
 abstraction_tags:
-  - oracle_quote_explicit
+  - oracle_price_explicit
+  - swap_quote_computed
   - erc20_calls_ghosted
   - usd0_supply_effect_ghosted
   - direct_swap_redeem_only
@@ -37,18 +38,18 @@ abstraction_tags:
   - access_control_elided
 abstraction_notes: >
   The benchmark targets DaoCollateral direct swap/redeem conservation. Oracle
-  quotes and token decimal scale are explicit inputs. The token unit is now
-  explicitly gated to Solidity's supported `10 ** decimals` values for
-  collateral decimals `0..18`; larger decimal counts are outside this benchmark
-  because Solidity's normalization takes a different division branch. ERC20
-  transfers and USD0 mint/burn calls are represented by the treasury collateral
-  balance and a ghosted USD0 supply effect, keeping the proof scoped to
-  DaoCollateral rather than USD0 token correctness. The direct swap path credits
-  exactly the RWA amount and mints exactly the oracle USD quote; a separate
-  theorem ties that quote to the explicit floor(collateralAmount * price /
-  tokenUnit) formula when oracle parameters are supplied. Successful-call
-  hypotheses expose Solidity checked-arithmetic boundaries, nonzero quote,
-  uint128 swap amount bound, supported token unit, treasury collateral
+  price and token decimal scale are explicit inputs. The swap quote is computed
+  inside the model as floor(collateralAmount * price / tokenUnit), rather than
+  supplied as a free theorem parameter. The token unit is explicitly gated to
+  Solidity's supported `10 ** decimals` values for collateral decimals `0..18`;
+  larger decimal counts are outside this benchmark because Solidity's
+  normalization takes a different division branch. ERC20 transfers and USD0
+  mint/burn calls are represented by the treasury collateral balance and a
+  ghosted USD0 supply effect, keeping the proof scoped to DaoCollateral rather
+  than USD0 token correctness. The direct swap path credits exactly the RWA
+  amount and mints exactly the computed oracle USD quote. Successful-call
+  hypotheses expose Solidity checked-arithmetic boundaries, nonzero computed
+  quote, uint128 swap amount bound, supported token unit, treasury collateral
   sufficiency, and configured redeem fee / CBR coefficient bounds. The redeem
   path burns the user amount, remints only the non-CBR fee, and debits the exact
   collateral amount computed from net burned USD0, oracle price, token decimals,

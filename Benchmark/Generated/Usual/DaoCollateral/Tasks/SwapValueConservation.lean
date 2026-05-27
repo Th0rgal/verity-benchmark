@@ -6,17 +6,18 @@ open Verity
 open Verity.EVM.Uint256
 
 /--
-If the oracle quote equals the explicit price-times-collateral formula, the
-direct swap transition satisfies the value-conservation spec.
+The direct swap model computes the oracle quote internally from explicit price
+and supported token-unit inputs, so the value-conservation spec no longer
+depends on a free quote parameter.
 -/
 theorem swap_value_conservation
-    (rwaToken : Address) (amount wadQuoteInUSD minAmountOut price tokenUnit : Uint256)
+    (rwaToken : Address) (amount minAmountOut price tokenUnit : Uint256)
     (s : ContractState)
     (hAmount : amount != 0)
-    (hMin : wadQuoteInUSD >= minAmountOut)
-    (hArithmetic : successfulSwapArithmetic rwaToken amount wadQuoteInUSD price tokenUnit s) :
-    let s' := ((DaoCollateral.swapDirect rwaToken amount wadQuoteInUSD minAmountOut).run s).snd
-    swap_value_conservation_spec rwaToken amount wadQuoteInUSD price tokenUnit s s' := by
+    (hMin : expectedSwapUsdQuote amount price tokenUnit >= minAmountOut)
+    (hArithmetic : successfulSwapArithmetic rwaToken amount price tokenUnit s) :
+    let s' := ((DaoCollateral.swapDirect rwaToken amount minAmountOut price tokenUnit).run s).snd
+    swap_value_conservation_spec rwaToken amount price tokenUnit s s' := by
   exact ?_
 
 end Benchmark.Cases.Usual.DaoCollateral

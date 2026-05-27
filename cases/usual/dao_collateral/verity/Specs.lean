@@ -43,14 +43,14 @@ def expectedSwapUsdQuote
   div (mul collateralAmount price) tokenUnit
 
 def successfulSwapArithmetic
-    (rwaToken : Address) (amount wadQuoteInUSD price tokenUnit : Uint256)
+    (rwaToken : Address) (amount price tokenUnit : Uint256)
     (s : ContractState) : Prop :=
+  let wadQuoteInUSD := expectedSwapUsdQuote amount price tokenUnit
   supportedTokenUnit tokenUnit = true ∧
   tokenUnit != 0 ∧
   amount <= 340282366920938463463374607431768211455 ∧
   wadQuoteInUSD ≠ 0 ∧
   mulDoesNotWrap amount price ∧
-  wadQuoteInUSD = expectedSwapUsdQuote amount price tokenUnit ∧
   addDoesNotWrap (usd0SupplyOf s) wadQuoteInUSD ∧
   addDoesNotWrap (treasuryCollateralOf s rwaToken) amount
 
@@ -74,14 +74,14 @@ def collateralValueUsd (collateralAmount price tokenUnit : Uint256) : Uint256 :=
   floorMulDiv collateralAmount price tokenUnit
 
 def swap_conservation_spec
-    (rwaToken : Address) (amount wadQuoteInUSD : Uint256) (s s' : ContractState) : Prop :=
+    (rwaToken : Address) (amount price tokenUnit : Uint256) (s s' : ContractState) : Prop :=
+  let wadQuoteInUSD := expectedSwapUsdQuote amount price tokenUnit
   usd0SupplyOf s' = add (usd0SupplyOf s) wadQuoteInUSD ∧
   treasuryCollateralOf s' rwaToken = add (treasuryCollateralOf s rwaToken) amount
 
 def swap_value_conservation_spec
-    (rwaToken : Address) (amount wadQuoteInUSD price tokenUnit : Uint256)
+    (rwaToken : Address) (amount price tokenUnit : Uint256)
     (s s' : ContractState) : Prop :=
-  wadQuoteInUSD = expectedSwapUsdQuote amount price tokenUnit ∧
   usd0SupplyOf s' = add (usd0SupplyOf s) (expectedSwapUsdQuote amount price tokenUnit) ∧
   treasuryCollateralOf s' rwaToken = add (treasuryCollateralOf s rwaToken) amount
 

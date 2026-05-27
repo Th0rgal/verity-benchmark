@@ -20,11 +20,12 @@ open Verity.EVM.Uint256
     may call or route functions but do not change direct swap/redeem arithmetic.
   - ERC20 transfers and USD0 mint/burn calls are represented as updates to
     `treasuryCollateral` and `usd0Supply`, avoiding USD0 token correctness.
-  - Oracle reads and token decimals are explicit parameters (`wadQuoteInUSD`,
-    `price`, `tokenUnit`). `tokenUnit` is required to be one of the Solidity
-    `10 ** decimals` values for supported collateral decimals `0..18`; larger
-    decimal counts would take a different normalization branch and are outside
-    this direct-market benchmark.
+  - Oracle reads and token decimals are explicit parameters (`price`,
+    `tokenUnit`). The swap quote is computed inside the model from those values.
+    `tokenUnit` is required to be one of the Solidity `10 ** decimals` values
+    for supported collateral decimals `0..18`; larger decimal counts would take
+    a different normalization branch and are outside this direct-market
+    benchmark.
   - `Math.mulDiv(..., Floor)` is modeled by Uint256 `div` after `mul`. Overflow
     preconditions are theorem hypotheses instead of modeled Solidity reverts.
   - CBR is modeled only in redeem return calculation, where it changes the
@@ -81,9 +82,32 @@ verity_contract DaoCollateral where
     cbrCoefficient : Uint256 := slot 4
 
   function swapDirect
-      (rwaToken : Address, amount : Uint256, wadQuoteInUSD : Uint256, minAmountOut : Uint256) : Unit := do
+      (rwaToken : Address, amount : Uint256, minAmountOut : Uint256, price : Uint256, tokenUnit : Uint256) : Unit := do
     require (amount != 0) "AmountIsZero"
     require (amount <= 340282366920938463463374607431768211455) "AmountTooHigh"
+    require (tokenUnit != 0) "InvalidTokenDecimals"
+    require
+      (tokenUnit == 1 ||
+      tokenUnit == 10 ||
+      tokenUnit == 100 ||
+      tokenUnit == 1000 ||
+      tokenUnit == 10000 ||
+      tokenUnit == 100000 ||
+      tokenUnit == 1000000 ||
+      tokenUnit == 10000000 ||
+      tokenUnit == 100000000 ||
+      tokenUnit == 1000000000 ||
+      tokenUnit == 10000000000 ||
+      tokenUnit == 100000000000 ||
+      tokenUnit == 1000000000000 ||
+      tokenUnit == 10000000000000 ||
+      tokenUnit == 100000000000000 ||
+      tokenUnit == 1000000000000000 ||
+      tokenUnit == 10000000000000000 ||
+      tokenUnit == 100000000000000000 ||
+      tokenUnit == 1000000000000000000)
+      "UnsupportedTokenDecimals"
+    let wadQuoteInUSD := div (mul amount price) tokenUnit
     require (wadQuoteInUSD != 0) "AmountTooLow"
     require (wadQuoteInUSD >= minAmountOut) "AmountTooLow"
 

@@ -10,48 +10,46 @@ open Verity
 open Verity.EVM.Uint256
 
 theorem swap_conservation
-    (rwaToken : Address) (amount wadQuoteInUSD minAmountOut : Uint256) (s : ContractState)
+    (rwaToken : Address) (amount minAmountOut price tokenUnit : Uint256) (s : ContractState)
     (hAmount : amount != 0)
-    (hAmountMax : amount <= 340282366920938463463374607431768211455)
-    (hQuoteNonzero : wadQuoteInUSD != 0)
-    (hMin : wadQuoteInUSD >= minAmountOut)
-    (hArithmetic :
-      addDoesNotWrap (usd0SupplyOf s) wadQuoteInUSD ∧
-      addDoesNotWrap (treasuryCollateralOf s rwaToken) amount) :
-    let s' := ((DaoCollateral.swapDirect rwaToken amount wadQuoteInUSD minAmountOut).run s).snd
-    swap_conservation_spec rwaToken amount wadQuoteInUSD s s' := by
-  simp [swap_conservation_spec, usd0SupplyOf, treasuryCollateralOf,
-    DaoCollateral.swapDirect, hAmount, hAmountMax, hQuoteNonzero, hMin, hArithmetic,
-    addDoesNotWrap,
+    (hMin : expectedSwapUsdQuote amount price tokenUnit >= minAmountOut)
+    (hArithmetic : successfulSwapArithmetic rwaToken amount price tokenUnit s) :
+    let s' := ((DaoCollateral.swapDirect rwaToken amount minAmountOut price tokenUnit).run s).snd
+    swap_conservation_spec rwaToken amount price tokenUnit s s' := by
+  rcases hArithmetic with
+    ⟨hSupportedUnit, hTokenUnit, hAmountMax, hQuoteNonzero, hMul, hSupplyAdd,
+      hCollateralAdd⟩
+  simp [supportedTokenUnit, SCALAR_ONE] at hSupportedUnit
+  have hQuoteNonzero' : div (mul amount price) tokenUnit ≠ 0 := by
+    simpa [expectedSwapUsdQuote] using hQuoteNonzero
+  have hMin' : div (mul amount price) tokenUnit ≥ minAmountOut := by
+    simpa [expectedSwapUsdQuote] using hMin
+  simp [swap_conservation_spec, expectedSwapUsdQuote, usd0SupplyOf, treasuryCollateralOf,
+    DaoCollateral.swapDirect, hAmount, hAmountMax, hTokenUnit, hSupportedUnit,
+    hQuoteNonzero', hMin', hSupplyAdd, hCollateralAdd, addDoesNotWrap,
     DaoCollateral.usd0Supply, DaoCollateral.treasuryCollateral,
     Verity.require, Verity.bind, Bind.bind, Contract.run, ContractResult.snd,
     getStorage, setStorage, getMapping, setMapping]
 
 theorem swap_value_conservation
-    (rwaToken : Address) (amount wadQuoteInUSD minAmountOut price tokenUnit : Uint256)
+    (rwaToken : Address) (amount minAmountOut price tokenUnit : Uint256)
     (s : ContractState)
     (hAmount : amount != 0)
-    (hMin : wadQuoteInUSD >= minAmountOut)
-    (hArithmetic : successfulSwapArithmetic rwaToken amount wadQuoteInUSD price tokenUnit s) :
-    let s' := ((DaoCollateral.swapDirect rwaToken amount wadQuoteInUSD minAmountOut).run s).snd
-  swap_value_conservation_spec rwaToken amount wadQuoteInUSD price tokenUnit s s' := by
+    (hMin : expectedSwapUsdQuote amount price tokenUnit >= minAmountOut)
+    (hArithmetic : successfulSwapArithmetic rwaToken amount price tokenUnit s) :
+    let s' := ((DaoCollateral.swapDirect rwaToken amount minAmountOut price tokenUnit).run s).snd
+    swap_value_conservation_spec rwaToken amount price tokenUnit s s' := by
   rcases hArithmetic with
-    ⟨hSupportedUnit, hTokenUnit, hAmountMax, hQuoteNonzero, hMul, hQuote, hSupplyAdd,
+    ⟨hSupportedUnit, hTokenUnit, hAmountMax, hQuoteNonzero, hMul, hSupplyAdd,
       hCollateralAdd⟩
-  have hQuoteNonzero' : expectedSwapUsdQuote amount price tokenUnit ≠ 0 := by
-    intro h
-    apply hQuoteNonzero
-    rw [hQuote]
-    exact h
-  have hMin' : expectedSwapUsdQuote amount price tokenUnit ≥ minAmountOut := by
-    rw [← hQuote]
-    exact hMin
+  simp [supportedTokenUnit, SCALAR_ONE] at hSupportedUnit
   have hQuoteNonzero'' : div (mul amount price) tokenUnit ≠ 0 := by
-    simpa [expectedSwapUsdQuote] using hQuoteNonzero'
+    simpa [expectedSwapUsdQuote] using hQuoteNonzero
   have hMin'' : div (mul amount price) tokenUnit ≥ minAmountOut := by
-    simpa [expectedSwapUsdQuote] using hMin'
-  simp [swap_value_conservation_spec, expectedSwapUsdQuote, hQuote,
-    DaoCollateral.swapDirect, hAmount, hAmountMax, hQuoteNonzero'', hMin'',
+    simpa [expectedSwapUsdQuote] using hMin
+  simp [swap_value_conservation_spec, expectedSwapUsdQuote,
+    DaoCollateral.swapDirect, hAmount, hAmountMax, hTokenUnit, hSupportedUnit,
+    hQuoteNonzero'', hMin'',
     hSupplyAdd, hCollateralAdd, addDoesNotWrap,
     usd0SupplyOf, treasuryCollateralOf,
     DaoCollateral.usd0Supply, DaoCollateral.treasuryCollateral,

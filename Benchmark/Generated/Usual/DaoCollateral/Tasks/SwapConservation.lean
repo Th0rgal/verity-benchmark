@@ -6,20 +6,17 @@ open Verity
 open Verity.EVM.Uint256
 
 /--
-Direct swap mints exactly the oracle USD quote and credits exactly the RWA
-collateral amount received by the treasury.
+Direct swap computes the oracle USD quote from explicit price and supported
+token-unit inputs, then mints exactly that quote and credits exactly the RWA
+collateral amount in the modeled treasury ledger.
 -/
 theorem swap_conservation
-    (rwaToken : Address) (amount wadQuoteInUSD minAmountOut : Uint256) (s : ContractState)
+    (rwaToken : Address) (amount minAmountOut price tokenUnit : Uint256) (s : ContractState)
     (hAmount : amount != 0)
-    (hAmountMax : amount <= 340282366920938463463374607431768211455)
-    (hQuoteNonzero : wadQuoteInUSD != 0)
-    (hMin : wadQuoteInUSD >= minAmountOut)
-    (hArithmetic :
-      addDoesNotWrap (usd0SupplyOf s) wadQuoteInUSD ∧
-      addDoesNotWrap (treasuryCollateralOf s rwaToken) amount) :
-    let s' := ((DaoCollateral.swapDirect rwaToken amount wadQuoteInUSD minAmountOut).run s).snd
-    swap_conservation_spec rwaToken amount wadQuoteInUSD s s' := by
+    (hMin : expectedSwapUsdQuote amount price tokenUnit >= minAmountOut)
+    (hArithmetic : successfulSwapArithmetic rwaToken amount price tokenUnit s) :
+    let s' := ((DaoCollateral.swapDirect rwaToken amount minAmountOut price tokenUnit).run s).snd
+    swap_conservation_spec rwaToken amount price tokenUnit s s' := by
   exact ?_
 
 end Benchmark.Cases.Usual.DaoCollateral

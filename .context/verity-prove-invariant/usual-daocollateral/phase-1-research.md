@@ -57,7 +57,7 @@ and verifies the DaoCollateral accounting equation itself.
 
 | Solidity construct | Closest Verity surface | Classification | Syntax/semantics risk |
 | --- | --- | --- | --- |
-| `swap(rwaToken, amount, minAmountOut)` | `swapDirect(rwaToken, amount, wadQuoteInUSD, minAmountOut)` | no issue | Oracle quote parameterized; same accounting writes. |
+| `swap(rwaToken, amount, minAmountOut)` | `swapDirect(rwaToken, amount, minAmountOut, price, tokenUnit)` | no issue | Oracle price and token unit are parameterized; the model computes the USD quote internally before the same accounting writes. |
 | `_calculateFee(amount, rwaToken)` | `redeemFeeAmount stableAmount redeemFee tokenUnit` | no issue | Preserves floor bps fee and token-decimal normalization. Sourcify source around line 500 shows `Math.mulDiv(usd0Amount, $.redeemFee, SCALAR_TEN_KWEI, Floor)` followed by token-decimal normalization. |
 | `_burnStableTokenAndTransferCollateral(...)` | `redeemDirect` supply and collateral writes | no issue | ERC20/USD0 calls ghosted as supply/collateral state effects. |
 | `_getTokenAmountForAmountInUSD` | `tokenAmountForUsd`, `cbrAdjustedTokenAmount` | no issue | Preserves floor oracle conversion and CBR branch. |
@@ -67,7 +67,7 @@ and verifies the DaoCollateral accounting equation itself.
 
 ## Draft Simplifications
 
-- Parameterize oracle quote, oracle price, and token unit.
+- Parameterize oracle price and token unit; compute the swap quote in the model.
 - Model only direct swap/redeem paths.
 - Ghost ERC20 transfer side effects as treasury collateral balance changes.
 - Ghost USD0 mint/burn side effects as `usd0Supply` changes.

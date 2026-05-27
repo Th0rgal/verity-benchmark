@@ -1664,7 +1664,8 @@
       "lean_toolchain": "leanprover/lean4:v4.22.0",
       "abstraction_level": "protocol_slice",
       "abstraction_tags": [
-        "oracle_quote_explicit",
+        "oracle_price_explicit",
+        "swap_quote_computed",
         "erc20_calls_ghosted",
         "usd0_supply_effect_ghosted",
         "direct_swap_redeem_only",
@@ -1673,7 +1674,7 @@
         "intent_paths_elided",
         "access_control_elided"
       ],
-      "abstraction_notes": "The benchmark targets DaoCollateral direct swap/redeem conservation. Oracle quotes and token decimal scale are explicit inputs. The token unit is now explicitly gated to Solidity's supported `10 ** decimals` values for collateral decimals `0..18`; larger decimal counts are outside this benchmark because Solidity's normalization takes a different division branch. ERC20 transfers and USD0 mint/burn calls are represented by the treasury collateral balance and a ghosted USD0 supply effect, keeping the proof scoped to DaoCollateral rather than USD0 token correctness. The direct swap path credits exactly the RWA amount and mints exactly the oracle USD quote; a separate theorem ties that quote to the explicit floor(collateralAmount * price / tokenUnit) formula when oracle parameters are supplied. Successful-call hypotheses expose Solidity checked-arithmetic boundaries, nonzero quote, uint128 swap amount bound, supported token unit, treasury collateral sufficiency, and configured redeem fee / CBR coefficient bounds. The redeem path burns the user amount, remints only the non-CBR fee, and debits the exact collateral amount computed from net burned USD0, oracle price, token decimals, CBR flag, and floor rounding. SwapperEngine, intent matching, permits, role checks, pause gates, events, and registry lookups are elided because they do not alter this conservation equation.",
+      "abstraction_notes": "The benchmark targets DaoCollateral direct swap/redeem conservation. Oracle price and token decimal scale are explicit inputs. The swap quote is computed inside the model as floor(collateralAmount * price / tokenUnit), rather than supplied as a free theorem parameter. The token unit is explicitly gated to Solidity's supported `10 ** decimals` values for collateral decimals `0..18`; larger decimal counts are outside this benchmark because Solidity's normalization takes a different division branch. ERC20 transfers and USD0 mint/burn calls are represented by the treasury collateral balance and a ghosted USD0 supply effect, keeping the proof scoped to DaoCollateral rather than USD0 token correctness. The direct swap path credits exactly the RWA amount and mints exactly the computed oracle USD quote. Successful-call hypotheses expose Solidity checked-arithmetic boundaries, nonzero computed quote, uint128 swap amount bound, supported token unit, treasury collateral sufficiency, and configured redeem fee / CBR coefficient bounds. The redeem path burns the user amount, remints only the non-CBR fee, and debits the exact collateral amount computed from net burned USD0, oracle price, token decimals, CBR flag, and floor rounding. SwapperEngine, intent matching, permits, role checks, pause gates, events, and registry lookups are elided because they do not alter this conservation equation.",
       "unsupported_feature_codes": [
         "external_erc20_calls_ghosted",
         "oracle_reads_parameterized",
@@ -6832,10 +6833,11 @@
         "Benchmark/Generated/Usual/DaoCollateral/Tasks/SwapConservation.lean"
       ],
       "abstraction_level": "protocol_slice",
-      "abstraction_notes": "Proves that a successful direct `swap` increases ghosted USD0 supply by the oracle quote and credits treasury collateral by the exact RWA amount received, under explicit successful-call assumptions for nonzero quote, uint128 amount bound, and checked addition.",
+      "abstraction_notes": "Proves that a successful direct `swap` computes the oracle quote from explicit price and supported token-unit inputs, increases ghosted USD0 supply by that computed quote, and credits treasury collateral by the exact RWA amount received, under explicit successful-call assumptions for nonzero computed quote, uint128 amount bound, supported token unit, and checked addition.",
       "unsupported_feature_codes": [
         "external_erc20_calls_ghosted",
         "oracle_reads_parameterized",
+        "supported_token_unit_preconditions",
         "successful_call_preconditions"
       ],
       "reference_solution_module": "Benchmark.Cases.Usual.DaoCollateral.Proofs",
@@ -6881,7 +6883,7 @@
         "Benchmark/Generated/Usual/DaoCollateral/Tasks/SwapValueConservation.lean"
       ],
       "abstraction_level": "protocol_slice",
-      "abstraction_notes": "Strengthens local swap state preservation with an oracle-parameterized value condition: the theorem requires a supported `10 ** decimals` token unit for collateral decimals `0..18` and successful-call arithmetic hypotheses, then proves the minted USD0 delta equals floor(collateralAmount * price / tokenUnit).",
+      "abstraction_notes": "Strengthens local swap state preservation by removing the free quote parameter from the modeled transition. The theorem requires a supported `10 ** decimals` token unit for collateral decimals `0..18` and successful-call arithmetic hypotheses, then proves the minted USD0 delta equals the quote computed inside the model: floor(collateralAmount * price / tokenUnit).",
       "unsupported_feature_codes": [
         "external_erc20_calls_ghosted",
         "oracle_reads_parameterized",
@@ -7802,5 +7804,5 @@
       }
     }
   ],
-  "generated_at": "2026-05-27T15:52:10.576388+00:00"
+  "generated_at": "2026-05-27T15:52:26.523675+00:00"
 }
