@@ -4,11 +4,11 @@ This report is generated from the benchmark manifests.
 
 ## Summary
 
-- Families: 20
-- Implementations: 21
-- Active cases: 18
-- Buildable active cases: 18
-- Active tasks: 107
+- Families: 22
+- Implementations: 23
+- Active cases: 20
+- Buildable active cases: 20
+- Active tasks: 121
 - Backlog cases: 3
 
 ## Buildable active cases
@@ -113,6 +113,16 @@ This report is generated from the benchmark manifests.
 - Upstream source artifact: `contracts/modules/capital/Ramm.sol`
 - Notes: Price-band slice of Nexus Mutual RAMM. The Verity model keeps the buffered book-value computation behind buy and sell spot prices and omits unrelated state evolution machinery.
 
+### `onedelta/caller_address_integrity`
+- Family / implementation: `onedelta` / `ethereum-composer`
+- Stage: `build_green`
+- Status dimensions: translation=`translated`, spec=`draft`, proof=`complete`
+- Lean target: `Benchmark.Cases.OneDelta.CallerAddressIntegrity.Compile`
+- Source ref: `https://www.codeslaw.app/contracts/ethereum/0x97648606fcc22bd96f87345ac83bd6cfcdf0acba@verified-source-0x97648606fcc22bd96f87345ac83bd6cfcdf0acba:contracts/1delta/composer/chains/ethereum/Composer.sol`
+- Selected functions: `deltaCompose`, `_deltaComposeInternal`, `_transfers`, `_transferFrom`, `_permit2TransferFrom`, `flashLoanCallback`, `swapCallback`, `clSwapCallback`
+- Upstream source artifact: `contracts/1delta/composer/chains/ethereum/Composer.sol`
+- Notes: This is a caller-identity benchmark, not an accounting benchmark. It proves that every modeled ERC20 and Permit2 fund-pull path uses the outer deltaCompose caller rather than an intermediate callback contract, the composer itself, or an embedded calldata address. The scope is transfer-command pulls plus the V3 callback direct-pull shortcut, not every transferFrom in the full composer source tree.
+
 ### `paladin_votes/stream_recovery_claim_usdc`
 - Family / implementation: `paladin_votes` / `stream_recovery_claim`
 - Stage: `build_green`
@@ -122,6 +132,16 @@ This report is generated from the benchmark manifests.
 - Selected functions: `claimUsdc`, `_claimUsdc`, `claimWeth`, `_claimWeth`, `claimBoth`
 - Upstream source artifact: `src/StreamRecoveryClaim.sol`
 - Notes: Single-round accounting slice of the full USDC/WETH claim surface, including `claimBoth`. Merkle verification is abstracted as a boolean witness and token transfer side effects are omitted.
+
+### `piku/fund_conservation`
+- Family / implementation: `piku` / `inverter_oracle_queue`
+- Stage: `build_green`
+- Status dimensions: translation=`translated`, spec=`frozen`, proof=`complete`
+- Lean target: `Benchmark.Cases.Piku.FundConservation.Compile`
+- Source ref: `https://github.com/InverterNetwork/contracts@8b7bc438344d646bab05b751c8eb4a7f0c8ca588:src/modules/fundingManager/oracle/FM_PC_Oracle_Redeeming_v1.sol`
+- Selected functions: `_sellOrder`, `_createAndEmitOrder`, `_addToOpenRedemptionAmount`, `amountPaid`, `processPayments`, `executePaymentQueue`
+- Upstream source artifact: `src/modules/fundingManager/oracle/FM_PC_Oracle_Redeeming_v1.sol`
+- Notes: Fund-conservation benchmark for Piku's oracle-priced queued redemption flow: distributed backing + queued redemption backing + remaining backing + protocol treasury fees + project treasury fees equals initial backing. Queue execution functions are source context; the modeled settlement transition is the successful `amountPaid` callback.
 
 ### `polygon/agglayer_bridge`
 - Family / implementation: `polygon` / `agglayer_bridge`
@@ -619,6 +639,106 @@ This report is generated from the benchmark manifests.
 - Editable proof file: `Benchmark/Generated/NexusMutual/RammPriceBand/Tasks/SyncSetsSellPrice.lean`
 - Hidden reference solution: `Benchmark.Cases.NexusMutual.RammPriceBand.Proofs`
 
+### `onedelta/caller_address_integrity/delta_compose_internal_erc20_transfer_from_uses_outer_caller`
+- Track / property class / proof family: `proof-only` / `access_control_identity` / `authorization_enablement`
+- Readiness: prompt_context=`ready`, editable_proof=`ready`, reference_solution=`blocked`
+- Theorem target: `Benchmark.Cases.OneDelta.CallerAddressIntegrity.delta_compose_internal_erc20_transferFrom_uses_outer_caller`
+- Evaluation: engine=`lean_proof_generation`, target_kind=`proof_generation`
+- Implementation files: `cases/onedelta/caller_address_integrity/verity/Contract.lean`, `Benchmark/Cases/OneDelta/CallerAddressIntegrity/Contract.lean`
+- Specification files: `cases/onedelta/caller_address_integrity/verity/Specs.lean`, `Benchmark/Cases/OneDelta/CallerAddressIntegrity/Specs.lean`
+- Editable proof file: `Benchmark/Generated/OneDelta/CallerAddressIntegrity/Tasks/DeltaComposeInternalErc20TransferFromUsesOuterCaller.lean`
+- Hidden reference solution: `Benchmark.Cases.OneDelta.CallerAddressIntegrity.Proofs`
+
+### `onedelta/caller_address_integrity/delta_compose_internal_permit2_transfer_from_uses_outer_caller`
+- Track / property class / proof family: `proof-only` / `access_control_identity` / `authorization_enablement`
+- Readiness: prompt_context=`ready`, editable_proof=`ready`, reference_solution=`blocked`
+- Theorem target: `Benchmark.Cases.OneDelta.CallerAddressIntegrity.delta_compose_internal_permit2_transferFrom_uses_outer_caller`
+- Evaluation: engine=`lean_proof_generation`, target_kind=`proof_generation`
+- Implementation files: `cases/onedelta/caller_address_integrity/verity/Contract.lean`, `Benchmark/Cases/OneDelta/CallerAddressIntegrity/Contract.lean`
+- Specification files: `cases/onedelta/caller_address_integrity/verity/Specs.lean`, `Benchmark/Cases/OneDelta/CallerAddressIntegrity/Specs.lean`
+- Editable proof file: `Benchmark/Generated/OneDelta/CallerAddressIntegrity/Tasks/DeltaComposeInternalPermit2TransferFromUsesOuterCaller.lean`
+- Hidden reference solution: `Benchmark.Cases.OneDelta.CallerAddressIntegrity.Proofs`
+
+### `onedelta/caller_address_integrity/direct_erc20_transfer_from_uses_outer_caller`
+- Track / property class / proof family: `proof-only` / `access_control_identity` / `authorization_enablement`
+- Readiness: prompt_context=`ready`, editable_proof=`ready`, reference_solution=`blocked`
+- Theorem target: `Benchmark.Cases.OneDelta.CallerAddressIntegrity.direct_erc20_transferFrom_uses_outer_caller`
+- Evaluation: engine=`lean_proof_generation`, target_kind=`proof_generation`
+- Implementation files: `cases/onedelta/caller_address_integrity/verity/Contract.lean`, `Benchmark/Cases/OneDelta/CallerAddressIntegrity/Contract.lean`
+- Specification files: `cases/onedelta/caller_address_integrity/verity/Specs.lean`, `Benchmark/Cases/OneDelta/CallerAddressIntegrity/Specs.lean`
+- Editable proof file: `Benchmark/Generated/OneDelta/CallerAddressIntegrity/Tasks/DirectErc20TransferFromUsesOuterCaller.lean`
+- Hidden reference solution: `Benchmark.Cases.OneDelta.CallerAddressIntegrity.Proofs`
+
+### `onedelta/caller_address_integrity/direct_permit2_transfer_from_uses_outer_caller`
+- Track / property class / proof family: `proof-only` / `access_control_identity` / `authorization_enablement`
+- Readiness: prompt_context=`ready`, editable_proof=`ready`, reference_solution=`blocked`
+- Theorem target: `Benchmark.Cases.OneDelta.CallerAddressIntegrity.direct_permit2_transferFrom_uses_outer_caller`
+- Evaluation: engine=`lean_proof_generation`, target_kind=`proof_generation`
+- Implementation files: `cases/onedelta/caller_address_integrity/verity/Contract.lean`, `Benchmark/Cases/OneDelta/CallerAddressIntegrity/Contract.lean`
+- Specification files: `cases/onedelta/caller_address_integrity/verity/Specs.lean`, `Benchmark/Cases/OneDelta/CallerAddressIntegrity/Specs.lean`
+- Editable proof file: `Benchmark/Generated/OneDelta/CallerAddressIntegrity/Tasks/DirectPermit2TransferFromUsesOuterCaller.lean`
+- Hidden reference solution: `Benchmark.Cases.OneDelta.CallerAddressIntegrity.Proofs`
+
+### `onedelta/caller_address_integrity/flash_callback_erc20_transfer_from_uses_outer_caller`
+- Track / property class / proof family: `proof-only` / `access_control_identity` / `authorization_enablement`
+- Readiness: prompt_context=`ready`, editable_proof=`ready`, reference_solution=`blocked`
+- Theorem target: `Benchmark.Cases.OneDelta.CallerAddressIntegrity.flash_callback_erc20_transferFrom_uses_outer_caller`
+- Evaluation: engine=`lean_proof_generation`, target_kind=`proof_generation`
+- Implementation files: `cases/onedelta/caller_address_integrity/verity/Contract.lean`, `Benchmark/Cases/OneDelta/CallerAddressIntegrity/Contract.lean`
+- Specification files: `cases/onedelta/caller_address_integrity/verity/Specs.lean`, `Benchmark/Cases/OneDelta/CallerAddressIntegrity/Specs.lean`
+- Editable proof file: `Benchmark/Generated/OneDelta/CallerAddressIntegrity/Tasks/FlashCallbackErc20TransferFromUsesOuterCaller.lean`
+- Hidden reference solution: `Benchmark.Cases.OneDelta.CallerAddressIntegrity.Proofs`
+
+### `onedelta/caller_address_integrity/nested_flash_and_swap_callbacks_keep_outer_caller`
+- Track / property class / proof family: `proof-only` / `access_control_identity` / `authorization_enablement`
+- Readiness: prompt_context=`ready`, editable_proof=`ready`, reference_solution=`blocked`
+- Theorem target: `Benchmark.Cases.OneDelta.CallerAddressIntegrity.nested_flash_and_swap_callbacks_keep_outer_caller`
+- Evaluation: engine=`lean_proof_generation`, target_kind=`proof_generation`
+- Implementation files: `cases/onedelta/caller_address_integrity/verity/Contract.lean`, `Benchmark/Cases/OneDelta/CallerAddressIntegrity/Contract.lean`
+- Specification files: `cases/onedelta/caller_address_integrity/verity/Specs.lean`, `Benchmark/Cases/OneDelta/CallerAddressIntegrity/Specs.lean`
+- Editable proof file: `Benchmark/Generated/OneDelta/CallerAddressIntegrity/Tasks/NestedFlashAndSwapCallbacksKeepOuterCaller.lean`
+- Hidden reference solution: `Benchmark.Cases.OneDelta.CallerAddressIntegrity.Proofs`
+
+### `onedelta/caller_address_integrity/swap_callback_permit2_transfer_from_uses_outer_caller`
+- Track / property class / proof family: `proof-only` / `access_control_identity` / `authorization_enablement`
+- Readiness: prompt_context=`ready`, editable_proof=`ready`, reference_solution=`blocked`
+- Theorem target: `Benchmark.Cases.OneDelta.CallerAddressIntegrity.swap_callback_permit2_transferFrom_uses_outer_caller`
+- Evaluation: engine=`lean_proof_generation`, target_kind=`proof_generation`
+- Implementation files: `cases/onedelta/caller_address_integrity/verity/Contract.lean`, `Benchmark/Cases/OneDelta/CallerAddressIntegrity/Contract.lean`
+- Specification files: `cases/onedelta/caller_address_integrity/verity/Specs.lean`, `Benchmark/Cases/OneDelta/CallerAddressIntegrity/Specs.lean`
+- Editable proof file: `Benchmark/Generated/OneDelta/CallerAddressIntegrity/Tasks/SwapCallbackPermit2TransferFromUsesOuterCaller.lean`
+- Hidden reference solution: `Benchmark.Cases.OneDelta.CallerAddressIntegrity.Proofs`
+
+### `onedelta/caller_address_integrity/transfers_erc20_transfer_from_uses_outer_caller`
+- Track / property class / proof family: `proof-only` / `access_control_identity` / `authorization_enablement`
+- Readiness: prompt_context=`ready`, editable_proof=`ready`, reference_solution=`blocked`
+- Theorem target: `Benchmark.Cases.OneDelta.CallerAddressIntegrity.transfers_erc20_transferFrom_uses_outer_caller`
+- Evaluation: engine=`lean_proof_generation`, target_kind=`proof_generation`
+- Implementation files: `cases/onedelta/caller_address_integrity/verity/Contract.lean`, `Benchmark/Cases/OneDelta/CallerAddressIntegrity/Contract.lean`
+- Specification files: `cases/onedelta/caller_address_integrity/verity/Specs.lean`, `Benchmark/Cases/OneDelta/CallerAddressIntegrity/Specs.lean`
+- Editable proof file: `Benchmark/Generated/OneDelta/CallerAddressIntegrity/Tasks/TransfersErc20TransferFromUsesOuterCaller.lean`
+- Hidden reference solution: `Benchmark.Cases.OneDelta.CallerAddressIntegrity.Proofs`
+
+### `onedelta/caller_address_integrity/transfers_permit2_transfer_from_uses_outer_caller`
+- Track / property class / proof family: `proof-only` / `access_control_identity` / `authorization_enablement`
+- Readiness: prompt_context=`ready`, editable_proof=`ready`, reference_solution=`blocked`
+- Theorem target: `Benchmark.Cases.OneDelta.CallerAddressIntegrity.transfers_permit2_transferFrom_uses_outer_caller`
+- Evaluation: engine=`lean_proof_generation`, target_kind=`proof_generation`
+- Implementation files: `cases/onedelta/caller_address_integrity/verity/Contract.lean`, `Benchmark/Cases/OneDelta/CallerAddressIntegrity/Contract.lean`
+- Specification files: `cases/onedelta/caller_address_integrity/verity/Specs.lean`, `Benchmark/Cases/OneDelta/CallerAddressIntegrity/Specs.lean`
+- Editable proof file: `Benchmark/Generated/OneDelta/CallerAddressIntegrity/Tasks/TransfersPermit2TransferFromUsesOuterCaller.lean`
+- Hidden reference solution: `Benchmark.Cases.OneDelta.CallerAddressIntegrity.Proofs`
+
+### `onedelta/caller_address_integrity/v3_callback_direct_transfer_from_uses_outer_caller`
+- Track / property class / proof family: `proof-only` / `access_control_identity` / `authorization_enablement`
+- Readiness: prompt_context=`ready`, editable_proof=`ready`, reference_solution=`blocked`
+- Theorem target: `Benchmark.Cases.OneDelta.CallerAddressIntegrity.v3_callback_direct_transferFrom_uses_outer_caller`
+- Evaluation: engine=`lean_proof_generation`, target_kind=`proof_generation`
+- Implementation files: `cases/onedelta/caller_address_integrity/verity/Contract.lean`, `Benchmark/Cases/OneDelta/CallerAddressIntegrity/Contract.lean`
+- Specification files: `cases/onedelta/caller_address_integrity/verity/Specs.lean`, `Benchmark/Cases/OneDelta/CallerAddressIntegrity/Specs.lean`
+- Editable proof file: `Benchmark/Generated/OneDelta/CallerAddressIntegrity/Tasks/V3CallbackDirectTransferFromUsesOuterCaller.lean`
+- Hidden reference solution: `Benchmark.Cases.OneDelta.CallerAddressIntegrity.Proofs`
+
 ### `paladin_votes/stream_recovery_claim_usdc/both_claim_marks_both_claimed`
 - Track / property class / proof family: `proof-only` / `authorization_state` / `authorization_enablement`
 - Readiness: prompt_context=`ready`, editable_proof=`ready`, reference_solution=`blocked`
@@ -878,6 +998,46 @@ This report is generated from the benchmark manifests.
 - Specification files: `cases/paladin_votes/stream_recovery_claim_usdc/verity/Specs.lean`, `Benchmark/Cases/PaladinVotes/StreamRecoveryClaimUsdc/Specs.lean`
 - Editable proof file: `Benchmark/Generated/PaladinVotes/StreamRecoveryClaimUsdc/Tasks/WethPreservesUsdcState.lean`
 - Hidden reference solution: `Benchmark.Cases.PaladinVotes.StreamRecoveryClaimUsdc.Proofs`
+
+### `piku/fund_conservation/amount_paid_preserves_fund_conservation`
+- Track / property class / proof family: `proof-only` / `accounting_conservation` / `state_preservation_local_effects`
+- Readiness: prompt_context=`ready`, editable_proof=`ready`, reference_solution=`blocked`
+- Theorem target: `Benchmark.Cases.Piku.FundConservation.amountPaid_preserves_fund_conservation`
+- Evaluation: engine=`lean_proof_generation`, target_kind=`proof_generation`
+- Implementation files: `cases/piku/fund_conservation/verity/Contract.lean`, `Benchmark/Cases/Piku/FundConservation/Contract.lean`
+- Specification files: `cases/piku/fund_conservation/verity/Specs.lean`, `Benchmark/Cases/Piku/FundConservation/Specs.lean`
+- Editable proof file: `Benchmark/Generated/Piku/FundConservation/Tasks/AmountPaidPreservesFundConservation.lean`
+- Hidden reference solution: `Benchmark.Cases.Piku.FundConservation.Proofs`
+
+### `piku/fund_conservation/amount_paid_records_distribution`
+- Track / property class / proof family: `proof-only` / `accounting_effect` / `state_preservation_local_effects`
+- Readiness: prompt_context=`ready`, editable_proof=`ready`, reference_solution=`blocked`
+- Theorem target: `Benchmark.Cases.Piku.FundConservation.amountPaid_records_distribution`
+- Evaluation: engine=`lean_proof_generation`, target_kind=`proof_generation`
+- Implementation files: `cases/piku/fund_conservation/verity/Contract.lean`, `Benchmark/Cases/Piku/FundConservation/Contract.lean`
+- Specification files: `cases/piku/fund_conservation/verity/Specs.lean`, `Benchmark/Cases/Piku/FundConservation/Specs.lean`
+- Editable proof file: `Benchmark/Generated/Piku/FundConservation/Tasks/AmountPaidRecordsDistribution.lean`
+- Hidden reference solution: `Benchmark.Cases.Piku.FundConservation.Proofs`
+
+### `piku/fund_conservation/sell_order_preserves_fund_conservation`
+- Track / property class / proof family: `proof-only` / `accounting_conservation` / `state_preservation_local_effects`
+- Readiness: prompt_context=`ready`, editable_proof=`ready`, reference_solution=`blocked`
+- Theorem target: `Benchmark.Cases.Piku.FundConservation._sellOrder_preserves_fund_conservation`
+- Evaluation: engine=`lean_proof_generation`, target_kind=`proof_generation`
+- Implementation files: `cases/piku/fund_conservation/verity/Contract.lean`, `Benchmark/Cases/Piku/FundConservation/Contract.lean`
+- Specification files: `cases/piku/fund_conservation/verity/Specs.lean`, `Benchmark/Cases/Piku/FundConservation/Specs.lean`
+- Editable proof file: `Benchmark/Generated/Piku/FundConservation/Tasks/SellOrderPreservesFundConservation.lean`
+- Hidden reference solution: `Benchmark.Cases.Piku.FundConservation.Proofs`
+
+### `piku/fund_conservation/sell_order_records_redemption_buckets`
+- Track / property class / proof family: `proof-only` / `accounting_effect` / `state_preservation_local_effects`
+- Readiness: prompt_context=`ready`, editable_proof=`ready`, reference_solution=`blocked`
+- Theorem target: `Benchmark.Cases.Piku.FundConservation._sellOrder_records_redemption_buckets`
+- Evaluation: engine=`lean_proof_generation`, target_kind=`proof_generation`
+- Implementation files: `cases/piku/fund_conservation/verity/Contract.lean`, `Benchmark/Cases/Piku/FundConservation/Contract.lean`
+- Specification files: `cases/piku/fund_conservation/verity/Specs.lean`, `Benchmark/Cases/Piku/FundConservation/Specs.lean`
+- Editable proof file: `Benchmark/Generated/Piku/FundConservation/Tasks/SellOrderRecordsRedemptionBuckets.lean`
+- Hidden reference solution: `Benchmark.Cases.Piku.FundConservation.Proofs`
 
 ### `polygon/agglayer_bridge/claimAsset_valid_leaf_and_consumes_unique_nullifier`
 - Track / property class / proof family: `proof-only` / `authorization_state` / `state_preservation_local_effects`

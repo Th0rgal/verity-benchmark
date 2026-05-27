@@ -10,34 +10,36 @@
     "backlog_tasks": "backlog/*/*/tasks/*.yaml"
   },
   "summary": {
-    "family_count": 20,
-    "implementation_count": 21,
-    "active_case_count": 18,
+    "family_count": 22,
+    "implementation_count": 23,
+    "active_case_count": 20,
     "backlog_case_count": 3,
-    "active_task_count": 107,
+    "active_task_count": 121,
     "backlog_task_count": 8,
-    "buildable_case_count": 20,
-    "runnable_task_count": 115,
+    "buildable_case_count": 22,
+    "runnable_task_count": 129,
     "case_stage_counts": {
-      "build_green": 17,
+      "build_green": 19,
       "candidate": 1,
       "proof_complete": 3
     },
     "translation_status_counts": {
       "blocked": 1,
-      "translated": 20
+      "translated": 22
     },
     "proof_status_counts": {
       "blocked": 1,
-      "complete": 13,
+      "complete": 15,
       "partial": 7
     },
     "task_track_counts": {
-      "proof-only": 115
+      "proof-only": 129
     },
     "task_property_class_counts": {
+      "access_control_identity": 10,
       "accounting_bound": 16,
-      "accounting_conservation": 13,
+      "accounting_conservation": 15,
+      "accounting_effect": 2,
       "accounting_invariant_break": 1,
       "accounting_update": 6,
       "arithmetic_rounding": 3,
@@ -74,14 +76,14 @@
       "weighted_selection": 1
     },
     "task_proof_family_counts": {
-      "authorization_enablement": 14,
+      "authorization_enablement": 24,
       "functional_correctness": 32,
       "protocol_transition_correctness": 22,
       "refinement_equivalence": 9,
-      "state_preservation_local_effects": 38
+      "state_preservation_local_effects": 42
     },
     "family_split_counts": {
-      "active": 17,
+      "active": 19,
       "backlog": 2,
       "mixed": 1
     }
@@ -258,6 +260,23 @@
       "manifest_path": "families/nexus_mutual/family.yaml"
     },
     {
+      "family_id": "onedelta",
+      "display_name": "1delta",
+      "split": "active",
+      "status": "active",
+      "description": "Benchmark family for 1delta composer routing and compact-calldata execution invariants. The initial case targets caller-address integrity for user-fund pulls through transfer commands, flash-loan callback continuations, swap-callback continuations, and the V3 direct callback-pull shortcut.",
+      "implementation_ids": [
+        "ethereum-composer"
+      ],
+      "case_ids": [
+        "onedelta/caller_address_integrity"
+      ],
+      "source_languages": [
+        "solidity"
+      ],
+      "manifest_path": "families/onedelta/family.yaml"
+    },
+    {
       "family_id": "openzeppelin",
       "display_name": "OpenZeppelin",
       "split": "backlog",
@@ -290,6 +309,23 @@
         "solidity"
       ],
       "manifest_path": "families/paladin_votes/family.yaml"
+    },
+    {
+      "family_id": "piku",
+      "display_name": "Piku",
+      "split": "active",
+      "status": "active",
+      "description": "Piku USP accounting benchmarks over the Inverter oracle-priced funding manager and queued redemption processor.",
+      "implementation_ids": [
+        "inverter_oracle_queue"
+      ],
+      "case_ids": [
+        "piku/fund_conservation"
+      ],
+      "source_languages": [
+        "solidity"
+      ],
+      "manifest_path": "families/piku/family.yaml"
     },
     {
       "family_id": "polygon",
@@ -592,6 +628,22 @@
       "manifest_path": "families/nexus_mutual/implementations/smart_contracts/implementation.yaml"
     },
     {
+      "family_id": "onedelta",
+      "implementation_id": "ethereum-composer",
+      "display_name": "OneDeltaComposerEthereum",
+      "split": "active",
+      "status": "translated",
+      "upstream_repo": "https://www.codeslaw.app/contracts/ethereum/0x97648606fcc22bd96f87345ac83bd6cfcdf0acba",
+      "upstream_commit": "verified-source-0x97648606fcc22bd96f87345ac83bd6cfcdf0acba",
+      "source_language": "solidity",
+      "source_artifact_path": "contracts/1delta/composer/chains/ethereum/Composer.sol",
+      "case_ids": [
+        "onedelta/caller_address_integrity"
+      ],
+      "notes": "Ethereum deployment of the 1delta composer. This implementation entry covers the BaseComposer dispatch surface, Ethereum callback inheritance, and transfer command paths used by the caller-address integrity case.",
+      "manifest_path": "families/onedelta/implementations/ethereum-composer/implementation.yaml"
+    },
+    {
       "family_id": "openzeppelin",
       "implementation_id": "contracts",
       "display_name": "OpenZeppelin Contracts",
@@ -622,6 +674,22 @@
       ],
       "notes": "Claim accounting contract translated as a single-round slice with Merkle verification abstracted away from the benchmark.",
       "manifest_path": "families/paladin_votes/implementations/stream_recovery_claim/implementation.yaml"
+    },
+    {
+      "family_id": "piku",
+      "implementation_id": "inverter_oracle_queue",
+      "display_name": "Inverter Oracle Queue Funding Manager",
+      "split": "active",
+      "status": "translated",
+      "upstream_repo": "https://github.com/InverterNetwork/contracts",
+      "upstream_commit": "8b7bc438344d646bab05b751c8eb4a7f0c8ca588",
+      "source_language": "solidity",
+      "source_artifact_path": "src/modules/fundingManager/oracle/FM_PC_Oracle_Redeeming_v1.sol",
+      "case_ids": [
+        "piku/fund_conservation"
+      ],
+      "notes": "Docs-matching Piku workflow implementation: oracle-priced funding manager, manual queue payment processor, and manual oracle price module.",
+      "manifest_path": "families/piku/implementations/inverter_oracle_queue/implementation.yaml"
     },
     {
       "family_id": "polygon",
@@ -1221,6 +1289,55 @@
       "proof_target": "Benchmark.Cases.NexusMutual.RammPriceBand.Proofs"
     },
     {
+      "case_id": "onedelta/caller_address_integrity",
+      "project": "onedelta",
+      "case_name": "caller_address_integrity",
+      "suite": "active",
+      "schema_version": 1,
+      "manifest_path": "cases/onedelta/caller_address_integrity/case.yaml",
+      "split": "active",
+      "family_id": "onedelta",
+      "implementation_id": "ethereum-composer",
+      "stage": "build_green",
+      "translation_status": "translated",
+      "spec_status": "draft",
+      "proof_status": "complete",
+      "source_language": "solidity",
+      "upstream_repo": "https://www.codeslaw.app/contracts/ethereum/0x97648606fcc22bd96f87345ac83bd6cfcdf0acba",
+      "upstream_commit": "verified-source-0x97648606fcc22bd96f87345ac83bd6cfcdf0acba",
+      "original_contract_path": "contracts/1delta/composer/chains/ethereum/Composer.sol",
+      "generated_artifact_path": null,
+      "source_ref": "https://www.codeslaw.app/contracts/ethereum/0x97648606fcc22bd96f87345ac83bd6cfcdf0acba@verified-source-0x97648606fcc22bd96f87345ac83bd6cfcdf0acba:contracts/1delta/composer/chains/ethereum/Composer.sol",
+      "selected_functions": [
+        "deltaCompose",
+        "_deltaComposeInternal",
+        "_transfers",
+        "_transferFrom",
+        "_permit2TransferFrom",
+        "flashLoanCallback",
+        "swapCallback",
+        "clSwapCallback"
+      ],
+      "lean_target": "Benchmark.Cases.OneDelta.CallerAddressIntegrity.Compile",
+      "failure_reason": null,
+      "notes": "This is a caller-identity benchmark, not an accounting benchmark. It proves that every modeled ERC20 and Permit2 fund-pull path uses the outer deltaCompose caller rather than an intermediate callback contract, the composer itself, or an embedded calldata address. The scope is transfer-command pulls plus the V3 callback direct-pull shortcut, not every transferFrom in the full composer source tree.",
+      "buildable": true,
+      "verity_commit": "d71bf23d908a7a952bf041ee5ebe41ba68b54426",
+      "lean_toolchain": "leanprover/lean4:v4.22.0",
+      "abstraction_level": "protocol_slice",
+      "abstraction_tags": [
+        "packed_calldata_decoded_commands",
+        "external_call_arguments_as_event_log",
+        "callback_authentication_as_precondition",
+        "transfer_commands_only",
+        "occurrence_flags_for_modeled_pulls"
+      ],
+      "abstraction_notes": "The benchmark targets caller-address integrity for user-fund pulls in OneDeltaComposerEthereum. The model preserves the key function boundaries: deltaCompose captures msg.sender, BaseComposer-style dispatch passes an explicit callerAddress, transfer command ids select ERC20 or Permit2 transferFrom, and flash-loan and swap callbacks continue dispatch with the same callerAddress. It also covers the V3 callback calldataLength == 0 shortcut that directly pays a pool with ERC20 transferFrom(callerAddress, ...). Packed calldata offsets are abstracted into decoded command ids. External token calls are represented by event-log slots recording the from argument.",
+      "unsupported_feature_codes": [],
+      "spec_target": "Benchmark.Cases.OneDelta.CallerAddressIntegrity.Specs",
+      "proof_target": "Benchmark.Cases.OneDelta.CallerAddressIntegrity.Proofs"
+    },
+    {
       "case_id": "paladin_votes/stream_recovery_claim_usdc",
       "project": "paladin_votes",
       "case_name": "stream_recovery_claim_usdc",
@@ -1263,6 +1380,61 @@
       "unsupported_feature_codes": [],
       "spec_target": "Benchmark.Cases.PaladinVotes.StreamRecoveryClaimUsdc.Specs",
       "proof_target": "Benchmark.Cases.PaladinVotes.StreamRecoveryClaimUsdc.Proofs"
+    },
+    {
+      "case_id": "piku/fund_conservation",
+      "project": "piku",
+      "case_name": "fund_conservation",
+      "suite": "active",
+      "schema_version": 1,
+      "manifest_path": "cases/piku/fund_conservation/case.yaml",
+      "split": "active",
+      "family_id": "piku",
+      "implementation_id": "inverter_oracle_queue",
+      "stage": "build_green",
+      "translation_status": "translated",
+      "spec_status": "frozen",
+      "proof_status": "complete",
+      "source_language": "solidity",
+      "upstream_repo": "https://github.com/InverterNetwork/contracts",
+      "upstream_commit": "8b7bc438344d646bab05b751c8eb4a7f0c8ca588",
+      "original_contract_path": "src/modules/fundingManager/oracle/FM_PC_Oracle_Redeeming_v1.sol",
+      "generated_artifact_path": null,
+      "source_ref": "https://github.com/InverterNetwork/contracts@8b7bc438344d646bab05b751c8eb4a7f0c8ca588:src/modules/fundingManager/oracle/FM_PC_Oracle_Redeeming_v1.sol",
+      "selected_functions": [
+        "_sellOrder",
+        "_createAndEmitOrder",
+        "_addToOpenRedemptionAmount",
+        "amountPaid",
+        "processPayments",
+        "executePaymentQueue"
+      ],
+      "lean_target": "Benchmark.Cases.Piku.FundConservation.Compile",
+      "failure_reason": null,
+      "notes": "Fund-conservation benchmark for Piku's oracle-priced queued redemption flow: distributed backing + queued redemption backing + remaining backing + protocol treasury fees + project treasury fees equals initial backing. Queue execution functions are source context; the modeled settlement transition is the successful `amountPaid` callback.",
+      "buildable": true,
+      "verity_commit": "74d8fe20ffa2f5dbb94959f3dd40a62df6aa8224",
+      "lean_toolchain": "leanprover/lean4:v4.22.0",
+      "abstraction_level": "protocol_slice",
+      "abstraction_tags": [
+        "ghost_accounting_slots",
+        "oracle_price_abstracted",
+        "queue_shape_elided",
+        "external_calls_opaque",
+        "access_control_elided",
+        "erc20_transfers_abstracted",
+        "protocol_fee_recalculation_abstracted",
+        "ghost_solvency_precondition"
+      ],
+      "abstraction_notes": "Piku's docs-matching Inverter implementation stores `_openRedemptionAmount` but does not store cumulative distributed backing, remaining backing, or protocol/project treasury fee counters. The model introduces those as ghost slots so the team-proposed fund-conservation invariant is state-readable. Oracle pricing and decimal conversion are represented by the already-computed redemption amount. Queue linked-list shape, roles, ERC20 transfer mechanics, blacklisting fallback, and event payloads are elided.",
+      "unsupported_feature_codes": [
+        "event_only_fee_accounting_requires_ghost_slot",
+        "external_oracle_pricing_abstracted",
+        "protocol_fee_recalculation_abstracted",
+        "ghost_solvency_precondition"
+      ],
+      "spec_target": "Benchmark.Cases.Piku.FundConservation.Specs",
+      "proof_target": "Benchmark.Cases.Piku.FundConservation.Proofs"
     },
     {
       "case_id": "polygon/agglayer_bridge",
@@ -3672,6 +3844,456 @@
       }
     },
     {
+      "task_ref": "onedelta/caller_address_integrity/delta_compose_internal_erc20_transfer_from_uses_outer_caller",
+      "task_id": "delta_compose_internal_erc20_transfer_from_uses_outer_caller",
+      "case_id": "onedelta/caller_address_integrity",
+      "suite": "active",
+      "schema_version": 1,
+      "manifest_path": "cases/onedelta/caller_address_integrity/tasks/delta_compose_internal_erc20_transfer_from_uses_outer_caller.yaml",
+      "split": "active",
+      "family_id": "onedelta",
+      "implementation_id": "ethereum-composer",
+      "source_ref": "https://www.codeslaw.app/contracts/ethereum/0x97648606fcc22bd96f87345ac83bd6cfcdf0acba@verified-source-0x97648606fcc22bd96f87345ac83bd6cfcdf0acba:contracts/1delta/composer/chains/ethereum/Composer.sol",
+      "task_interface_version": 2,
+      "track": "proof-only",
+      "property_class": "access_control_identity",
+      "category": "caller_address_integrity",
+      "difficulty": "medium",
+      "theorem_name": "Benchmark.Cases.OneDelta.CallerAddressIntegrity.delta_compose_internal_erc20_transferFrom_uses_outer_caller",
+      "proof_family": "authorization_enablement",
+      "translation_status": "translated",
+      "proof_status": "complete",
+      "implementation_files": [
+        "cases/onedelta/caller_address_integrity/verity/Contract.lean",
+        "Benchmark/Cases/OneDelta/CallerAddressIntegrity/Contract.lean"
+      ],
+      "specification_files": [
+        "cases/onedelta/caller_address_integrity/verity/Specs.lean",
+        "Benchmark/Cases/OneDelta/CallerAddressIntegrity/Specs.lean"
+      ],
+      "editable_files": [
+        "Benchmark/Generated/OneDelta/CallerAddressIntegrity/Tasks/DeltaComposeInternalErc20TransferFromUsesOuterCaller.lean"
+      ],
+      "abstraction_level": "protocol_slice",
+      "abstraction_notes": "Proves the decoded BaseComposer._deltaComposeInternal transfer command records the outer deltaCompose sender as the ERC20 transferFrom source.",
+      "unsupported_feature_codes": [],
+      "reference_solution_module": "Benchmark.Cases.OneDelta.CallerAddressIntegrity.Proofs",
+      "evaluation": {
+        "engine": "lean_proof_generation",
+        "target_kind": "proof_generation"
+      },
+      "readiness": {
+        "prompt_context": "ready",
+        "editable_proof": "ready",
+        "reference_solution": "blocked"
+      }
+    },
+    {
+      "task_ref": "onedelta/caller_address_integrity/delta_compose_internal_permit2_transfer_from_uses_outer_caller",
+      "task_id": "delta_compose_internal_permit2_transfer_from_uses_outer_caller",
+      "case_id": "onedelta/caller_address_integrity",
+      "suite": "active",
+      "schema_version": 1,
+      "manifest_path": "cases/onedelta/caller_address_integrity/tasks/delta_compose_internal_permit2_transfer_from_uses_outer_caller.yaml",
+      "split": "active",
+      "family_id": "onedelta",
+      "implementation_id": "ethereum-composer",
+      "source_ref": "https://www.codeslaw.app/contracts/ethereum/0x97648606fcc22bd96f87345ac83bd6cfcdf0acba@verified-source-0x97648606fcc22bd96f87345ac83bd6cfcdf0acba:contracts/1delta/composer/chains/ethereum/Composer.sol",
+      "task_interface_version": 2,
+      "track": "proof-only",
+      "property_class": "access_control_identity",
+      "category": "caller_address_integrity",
+      "difficulty": "medium",
+      "theorem_name": "Benchmark.Cases.OneDelta.CallerAddressIntegrity.delta_compose_internal_permit2_transferFrom_uses_outer_caller",
+      "proof_family": "authorization_enablement",
+      "translation_status": "translated",
+      "proof_status": "complete",
+      "implementation_files": [
+        "cases/onedelta/caller_address_integrity/verity/Contract.lean",
+        "Benchmark/Cases/OneDelta/CallerAddressIntegrity/Contract.lean"
+      ],
+      "specification_files": [
+        "cases/onedelta/caller_address_integrity/verity/Specs.lean",
+        "Benchmark/Cases/OneDelta/CallerAddressIntegrity/Specs.lean"
+      ],
+      "editable_files": [
+        "Benchmark/Generated/OneDelta/CallerAddressIntegrity/Tasks/DeltaComposeInternalPermit2TransferFromUsesOuterCaller.lean"
+      ],
+      "abstraction_level": "protocol_slice",
+      "abstraction_notes": "Proves the decoded BaseComposer._deltaComposeInternal permit2 command records the outer deltaCompose sender as the Permit2 transferFrom source.",
+      "unsupported_feature_codes": [],
+      "reference_solution_module": "Benchmark.Cases.OneDelta.CallerAddressIntegrity.Proofs",
+      "evaluation": {
+        "engine": "lean_proof_generation",
+        "target_kind": "proof_generation"
+      },
+      "readiness": {
+        "prompt_context": "ready",
+        "editable_proof": "ready",
+        "reference_solution": "blocked"
+      }
+    },
+    {
+      "task_ref": "onedelta/caller_address_integrity/direct_erc20_transfer_from_uses_outer_caller",
+      "task_id": "direct_erc20_transfer_from_uses_outer_caller",
+      "case_id": "onedelta/caller_address_integrity",
+      "suite": "active",
+      "schema_version": 1,
+      "manifest_path": "cases/onedelta/caller_address_integrity/tasks/direct_erc20_transfer_from_uses_outer_caller.yaml",
+      "split": "active",
+      "family_id": "onedelta",
+      "implementation_id": "ethereum-composer",
+      "source_ref": "https://www.codeslaw.app/contracts/ethereum/0x97648606fcc22bd96f87345ac83bd6cfcdf0acba@verified-source-0x97648606fcc22bd96f87345ac83bd6cfcdf0acba:contracts/1delta/composer/chains/ethereum/Composer.sol",
+      "task_interface_version": 2,
+      "track": "proof-only",
+      "property_class": "access_control_identity",
+      "category": "caller_address_integrity",
+      "difficulty": "medium",
+      "theorem_name": "Benchmark.Cases.OneDelta.CallerAddressIntegrity.direct_erc20_transferFrom_uses_outer_caller",
+      "proof_family": "authorization_enablement",
+      "translation_status": "translated",
+      "proof_status": "complete",
+      "implementation_files": [
+        "cases/onedelta/caller_address_integrity/verity/Contract.lean",
+        "Benchmark/Cases/OneDelta/CallerAddressIntegrity/Contract.lean"
+      ],
+      "specification_files": [
+        "cases/onedelta/caller_address_integrity/verity/Specs.lean",
+        "Benchmark/Cases/OneDelta/CallerAddressIntegrity/Specs.lean"
+      ],
+      "editable_files": [
+        "Benchmark/Generated/OneDelta/CallerAddressIntegrity/Tasks/DirectErc20TransferFromUsesOuterCaller.lean"
+      ],
+      "abstraction_level": "protocol_slice",
+      "abstraction_notes": "Proves the direct transfer command records the outer deltaCompose sender as the ERC20 transferFrom source.",
+      "unsupported_feature_codes": [],
+      "reference_solution_module": "Benchmark.Cases.OneDelta.CallerAddressIntegrity.Proofs",
+      "evaluation": {
+        "engine": "lean_proof_generation",
+        "target_kind": "proof_generation"
+      },
+      "readiness": {
+        "prompt_context": "ready",
+        "editable_proof": "ready",
+        "reference_solution": "blocked"
+      }
+    },
+    {
+      "task_ref": "onedelta/caller_address_integrity/direct_permit2_transfer_from_uses_outer_caller",
+      "task_id": "direct_permit2_transfer_from_uses_outer_caller",
+      "case_id": "onedelta/caller_address_integrity",
+      "suite": "active",
+      "schema_version": 1,
+      "manifest_path": "cases/onedelta/caller_address_integrity/tasks/direct_permit2_transfer_from_uses_outer_caller.yaml",
+      "split": "active",
+      "family_id": "onedelta",
+      "implementation_id": "ethereum-composer",
+      "source_ref": "https://www.codeslaw.app/contracts/ethereum/0x97648606fcc22bd96f87345ac83bd6cfcdf0acba@verified-source-0x97648606fcc22bd96f87345ac83bd6cfcdf0acba:contracts/1delta/composer/chains/ethereum/Composer.sol",
+      "task_interface_version": 2,
+      "track": "proof-only",
+      "property_class": "access_control_identity",
+      "category": "caller_address_integrity",
+      "difficulty": "medium",
+      "theorem_name": "Benchmark.Cases.OneDelta.CallerAddressIntegrity.direct_permit2_transferFrom_uses_outer_caller",
+      "proof_family": "authorization_enablement",
+      "translation_status": "translated",
+      "proof_status": "complete",
+      "implementation_files": [
+        "cases/onedelta/caller_address_integrity/verity/Contract.lean",
+        "Benchmark/Cases/OneDelta/CallerAddressIntegrity/Contract.lean"
+      ],
+      "specification_files": [
+        "cases/onedelta/caller_address_integrity/verity/Specs.lean",
+        "Benchmark/Cases/OneDelta/CallerAddressIntegrity/Specs.lean"
+      ],
+      "editable_files": [
+        "Benchmark/Generated/OneDelta/CallerAddressIntegrity/Tasks/DirectPermit2TransferFromUsesOuterCaller.lean"
+      ],
+      "abstraction_level": "protocol_slice",
+      "abstraction_notes": "Proves the direct Permit2 transfer command records the outer deltaCompose sender as the Permit2 transferFrom source.",
+      "unsupported_feature_codes": [],
+      "reference_solution_module": "Benchmark.Cases.OneDelta.CallerAddressIntegrity.Proofs",
+      "evaluation": {
+        "engine": "lean_proof_generation",
+        "target_kind": "proof_generation"
+      },
+      "readiness": {
+        "prompt_context": "ready",
+        "editable_proof": "ready",
+        "reference_solution": "blocked"
+      }
+    },
+    {
+      "task_ref": "onedelta/caller_address_integrity/flash_callback_erc20_transfer_from_uses_outer_caller",
+      "task_id": "flash_callback_erc20_transfer_from_uses_outer_caller",
+      "case_id": "onedelta/caller_address_integrity",
+      "suite": "active",
+      "schema_version": 1,
+      "manifest_path": "cases/onedelta/caller_address_integrity/tasks/flash_callback_erc20_transfer_from_uses_outer_caller.yaml",
+      "split": "active",
+      "family_id": "onedelta",
+      "implementation_id": "ethereum-composer",
+      "source_ref": "https://www.codeslaw.app/contracts/ethereum/0x97648606fcc22bd96f87345ac83bd6cfcdf0acba@verified-source-0x97648606fcc22bd96f87345ac83bd6cfcdf0acba:contracts/1delta/composer/chains/ethereum/Composer.sol",
+      "task_interface_version": 2,
+      "track": "proof-only",
+      "property_class": "access_control_identity",
+      "category": "callback_caller_address_integrity",
+      "difficulty": "medium",
+      "theorem_name": "Benchmark.Cases.OneDelta.CallerAddressIntegrity.flash_callback_erc20_transferFrom_uses_outer_caller",
+      "proof_family": "authorization_enablement",
+      "translation_status": "translated",
+      "proof_status": "complete",
+      "implementation_files": [
+        "cases/onedelta/caller_address_integrity/verity/Contract.lean",
+        "Benchmark/Cases/OneDelta/CallerAddressIntegrity/Contract.lean"
+      ],
+      "specification_files": [
+        "cases/onedelta/caller_address_integrity/verity/Specs.lean",
+        "Benchmark/Cases/OneDelta/CallerAddressIntegrity/Specs.lean"
+      ],
+      "editable_files": [
+        "Benchmark/Generated/OneDelta/CallerAddressIntegrity/Tasks/FlashCallbackErc20TransferFromUsesOuterCaller.lean"
+      ],
+      "abstraction_level": "protocol_slice",
+      "abstraction_notes": "Proves that an ERC20 transferFrom reached through a modeled flash-loan callback uses the original deltaCompose caller.",
+      "unsupported_feature_codes": [],
+      "reference_solution_module": "Benchmark.Cases.OneDelta.CallerAddressIntegrity.Proofs",
+      "evaluation": {
+        "engine": "lean_proof_generation",
+        "target_kind": "proof_generation"
+      },
+      "readiness": {
+        "prompt_context": "ready",
+        "editable_proof": "ready",
+        "reference_solution": "blocked"
+      }
+    },
+    {
+      "task_ref": "onedelta/caller_address_integrity/nested_flash_and_swap_callbacks_keep_outer_caller",
+      "task_id": "nested_flash_and_swap_callbacks_keep_outer_caller",
+      "case_id": "onedelta/caller_address_integrity",
+      "suite": "active",
+      "schema_version": 1,
+      "manifest_path": "cases/onedelta/caller_address_integrity/tasks/nested_flash_and_swap_callbacks_keep_outer_caller.yaml",
+      "split": "active",
+      "family_id": "onedelta",
+      "implementation_id": "ethereum-composer",
+      "source_ref": "https://www.codeslaw.app/contracts/ethereum/0x97648606fcc22bd96f87345ac83bd6cfcdf0acba@verified-source-0x97648606fcc22bd96f87345ac83bd6cfcdf0acba:contracts/1delta/composer/chains/ethereum/Composer.sol",
+      "task_interface_version": 2,
+      "track": "proof-only",
+      "property_class": "access_control_identity",
+      "category": "nested_callback_caller_address_integrity",
+      "difficulty": "medium",
+      "theorem_name": "Benchmark.Cases.OneDelta.CallerAddressIntegrity.nested_flash_and_swap_callbacks_keep_outer_caller",
+      "proof_family": "authorization_enablement",
+      "translation_status": "translated",
+      "proof_status": "complete",
+      "implementation_files": [
+        "cases/onedelta/caller_address_integrity/verity/Contract.lean",
+        "Benchmark/Cases/OneDelta/CallerAddressIntegrity/Contract.lean"
+      ],
+      "specification_files": [
+        "cases/onedelta/caller_address_integrity/verity/Specs.lean",
+        "Benchmark/Cases/OneDelta/CallerAddressIntegrity/Specs.lean"
+      ],
+      "editable_files": [
+        "Benchmark/Generated/OneDelta/CallerAddressIntegrity/Tasks/NestedFlashAndSwapCallbacksKeepOuterCaller.lean"
+      ],
+      "abstraction_level": "protocol_slice",
+      "abstraction_notes": "Proves one modeled batch containing a direct ERC20 pull, a flash-callback ERC20 pull, and a swap-callback Permit2 pull keeps all sources equal to the outer deltaCompose caller.",
+      "unsupported_feature_codes": [],
+      "reference_solution_module": "Benchmark.Cases.OneDelta.CallerAddressIntegrity.Proofs",
+      "evaluation": {
+        "engine": "lean_proof_generation",
+        "target_kind": "proof_generation"
+      },
+      "readiness": {
+        "prompt_context": "ready",
+        "editable_proof": "ready",
+        "reference_solution": "blocked"
+      }
+    },
+    {
+      "task_ref": "onedelta/caller_address_integrity/swap_callback_permit2_transfer_from_uses_outer_caller",
+      "task_id": "swap_callback_permit2_transfer_from_uses_outer_caller",
+      "case_id": "onedelta/caller_address_integrity",
+      "suite": "active",
+      "schema_version": 1,
+      "manifest_path": "cases/onedelta/caller_address_integrity/tasks/swap_callback_permit2_transfer_from_uses_outer_caller.yaml",
+      "split": "active",
+      "family_id": "onedelta",
+      "implementation_id": "ethereum-composer",
+      "source_ref": "https://www.codeslaw.app/contracts/ethereum/0x97648606fcc22bd96f87345ac83bd6cfcdf0acba@verified-source-0x97648606fcc22bd96f87345ac83bd6cfcdf0acba:contracts/1delta/composer/chains/ethereum/Composer.sol",
+      "task_interface_version": 2,
+      "track": "proof-only",
+      "property_class": "access_control_identity",
+      "category": "callback_caller_address_integrity",
+      "difficulty": "medium",
+      "theorem_name": "Benchmark.Cases.OneDelta.CallerAddressIntegrity.swap_callback_permit2_transferFrom_uses_outer_caller",
+      "proof_family": "authorization_enablement",
+      "translation_status": "translated",
+      "proof_status": "complete",
+      "implementation_files": [
+        "cases/onedelta/caller_address_integrity/verity/Contract.lean",
+        "Benchmark/Cases/OneDelta/CallerAddressIntegrity/Contract.lean"
+      ],
+      "specification_files": [
+        "cases/onedelta/caller_address_integrity/verity/Specs.lean",
+        "Benchmark/Cases/OneDelta/CallerAddressIntegrity/Specs.lean"
+      ],
+      "editable_files": [
+        "Benchmark/Generated/OneDelta/CallerAddressIntegrity/Tasks/SwapCallbackPermit2TransferFromUsesOuterCaller.lean"
+      ],
+      "abstraction_level": "protocol_slice",
+      "abstraction_notes": "Proves that a Permit2 transferFrom reached through a modeled swap callback uses the original deltaCompose caller.",
+      "unsupported_feature_codes": [],
+      "reference_solution_module": "Benchmark.Cases.OneDelta.CallerAddressIntegrity.Proofs",
+      "evaluation": {
+        "engine": "lean_proof_generation",
+        "target_kind": "proof_generation"
+      },
+      "readiness": {
+        "prompt_context": "ready",
+        "editable_proof": "ready",
+        "reference_solution": "blocked"
+      }
+    },
+    {
+      "task_ref": "onedelta/caller_address_integrity/transfers_erc20_transfer_from_uses_outer_caller",
+      "task_id": "transfers_erc20_transfer_from_uses_outer_caller",
+      "case_id": "onedelta/caller_address_integrity",
+      "suite": "active",
+      "schema_version": 1,
+      "manifest_path": "cases/onedelta/caller_address_integrity/tasks/transfers_erc20_transfer_from_uses_outer_caller.yaml",
+      "split": "active",
+      "family_id": "onedelta",
+      "implementation_id": "ethereum-composer",
+      "source_ref": "https://www.codeslaw.app/contracts/ethereum/0x97648606fcc22bd96f87345ac83bd6cfcdf0acba@verified-source-0x97648606fcc22bd96f87345ac83bd6cfcdf0acba:contracts/1delta/composer/chains/ethereum/Composer.sol",
+      "task_interface_version": 2,
+      "track": "proof-only",
+      "property_class": "access_control_identity",
+      "category": "caller_address_integrity",
+      "difficulty": "medium",
+      "theorem_name": "Benchmark.Cases.OneDelta.CallerAddressIntegrity.transfers_erc20_transferFrom_uses_outer_caller",
+      "proof_family": "authorization_enablement",
+      "translation_status": "translated",
+      "proof_status": "complete",
+      "implementation_files": [
+        "cases/onedelta/caller_address_integrity/verity/Contract.lean",
+        "Benchmark/Cases/OneDelta/CallerAddressIntegrity/Contract.lean"
+      ],
+      "specification_files": [
+        "cases/onedelta/caller_address_integrity/verity/Specs.lean",
+        "Benchmark/Cases/OneDelta/CallerAddressIntegrity/Specs.lean"
+      ],
+      "editable_files": [
+        "Benchmark/Generated/OneDelta/CallerAddressIntegrity/Tasks/TransfersErc20TransferFromUsesOuterCaller.lean"
+      ],
+      "abstraction_level": "protocol_slice",
+      "abstraction_notes": "Proves the decoded Transfers._transfers transfer command records the outer deltaCompose sender as the ERC20 transferFrom source.",
+      "unsupported_feature_codes": [],
+      "reference_solution_module": "Benchmark.Cases.OneDelta.CallerAddressIntegrity.Proofs",
+      "evaluation": {
+        "engine": "lean_proof_generation",
+        "target_kind": "proof_generation"
+      },
+      "readiness": {
+        "prompt_context": "ready",
+        "editable_proof": "ready",
+        "reference_solution": "blocked"
+      }
+    },
+    {
+      "task_ref": "onedelta/caller_address_integrity/transfers_permit2_transfer_from_uses_outer_caller",
+      "task_id": "transfers_permit2_transfer_from_uses_outer_caller",
+      "case_id": "onedelta/caller_address_integrity",
+      "suite": "active",
+      "schema_version": 1,
+      "manifest_path": "cases/onedelta/caller_address_integrity/tasks/transfers_permit2_transfer_from_uses_outer_caller.yaml",
+      "split": "active",
+      "family_id": "onedelta",
+      "implementation_id": "ethereum-composer",
+      "source_ref": "https://www.codeslaw.app/contracts/ethereum/0x97648606fcc22bd96f87345ac83bd6cfcdf0acba@verified-source-0x97648606fcc22bd96f87345ac83bd6cfcdf0acba:contracts/1delta/composer/chains/ethereum/Composer.sol",
+      "task_interface_version": 2,
+      "track": "proof-only",
+      "property_class": "access_control_identity",
+      "category": "caller_address_integrity",
+      "difficulty": "medium",
+      "theorem_name": "Benchmark.Cases.OneDelta.CallerAddressIntegrity.transfers_permit2_transferFrom_uses_outer_caller",
+      "proof_family": "authorization_enablement",
+      "translation_status": "translated",
+      "proof_status": "complete",
+      "implementation_files": [
+        "cases/onedelta/caller_address_integrity/verity/Contract.lean",
+        "Benchmark/Cases/OneDelta/CallerAddressIntegrity/Contract.lean"
+      ],
+      "specification_files": [
+        "cases/onedelta/caller_address_integrity/verity/Specs.lean",
+        "Benchmark/Cases/OneDelta/CallerAddressIntegrity/Specs.lean"
+      ],
+      "editable_files": [
+        "Benchmark/Generated/OneDelta/CallerAddressIntegrity/Tasks/TransfersPermit2TransferFromUsesOuterCaller.lean"
+      ],
+      "abstraction_level": "protocol_slice",
+      "abstraction_notes": "Proves the decoded Transfers._transfers permit2 command records the outer deltaCompose sender as the Permit2 transferFrom source.",
+      "unsupported_feature_codes": [],
+      "reference_solution_module": "Benchmark.Cases.OneDelta.CallerAddressIntegrity.Proofs",
+      "evaluation": {
+        "engine": "lean_proof_generation",
+        "target_kind": "proof_generation"
+      },
+      "readiness": {
+        "prompt_context": "ready",
+        "editable_proof": "ready",
+        "reference_solution": "blocked"
+      }
+    },
+    {
+      "task_ref": "onedelta/caller_address_integrity/v3_callback_direct_transfer_from_uses_outer_caller",
+      "task_id": "v3_callback_direct_transfer_from_uses_outer_caller",
+      "case_id": "onedelta/caller_address_integrity",
+      "suite": "active",
+      "schema_version": 1,
+      "manifest_path": "cases/onedelta/caller_address_integrity/tasks/v3_callback_direct_transfer_from_uses_outer_caller.yaml",
+      "split": "active",
+      "family_id": "onedelta",
+      "implementation_id": "ethereum-composer",
+      "source_ref": "https://www.codeslaw.app/contracts/ethereum/0x97648606fcc22bd96f87345ac83bd6cfcdf0acba@verified-source-0x97648606fcc22bd96f87345ac83bd6cfcdf0acba:contracts/1delta/composer/chains/ethereum/Composer.sol",
+      "task_interface_version": 2,
+      "track": "proof-only",
+      "property_class": "access_control_identity",
+      "category": "callback_direct_pull_caller_address_integrity",
+      "difficulty": "medium",
+      "theorem_name": "Benchmark.Cases.OneDelta.CallerAddressIntegrity.v3_callback_direct_transferFrom_uses_outer_caller",
+      "proof_family": "authorization_enablement",
+      "translation_status": "translated",
+      "proof_status": "complete",
+      "implementation_files": [
+        "cases/onedelta/caller_address_integrity/verity/Contract.lean",
+        "Benchmark/Cases/OneDelta/CallerAddressIntegrity/Contract.lean"
+      ],
+      "specification_files": [
+        "cases/onedelta/caller_address_integrity/verity/Specs.lean",
+        "Benchmark/Cases/OneDelta/CallerAddressIntegrity/Specs.lean"
+      ],
+      "editable_files": [
+        "Benchmark/Generated/OneDelta/CallerAddressIntegrity/Tasks/V3CallbackDirectTransferFromUsesOuterCaller.lean"
+      ],
+      "abstraction_level": "protocol_slice",
+      "abstraction_notes": "Proves the Uniswap V3-style callback shortcut for calldataLength == 0 uses the outer caller as the ERC20 transferFrom source.",
+      "unsupported_feature_codes": [],
+      "reference_solution_module": "Benchmark.Cases.OneDelta.CallerAddressIntegrity.Proofs",
+      "evaluation": {
+        "engine": "lean_proof_generation",
+        "target_kind": "proof_generation"
+      },
+      "readiness": {
+        "prompt_context": "ready",
+        "editable_proof": "ready",
+        "reference_solution": "blocked"
+      }
+    },
+    {
       "task_ref": "paladin_votes/stream_recovery_claim_usdc/both_claim_marks_both_claimed",
       "task_id": "both_claim_marks_both_claimed",
       "case_id": "paladin_votes/stream_recovery_claim_usdc",
@@ -4831,6 +5453,198 @@
       "abstraction_notes": "This task isolates the frame condition for the WETH claim path and shows that the USDC accounting slice remains untouched.",
       "unsupported_feature_codes": [],
       "reference_solution_module": "Benchmark.Cases.PaladinVotes.StreamRecoveryClaimUsdc.Proofs",
+      "evaluation": {
+        "engine": "lean_proof_generation",
+        "target_kind": "proof_generation"
+      },
+      "readiness": {
+        "prompt_context": "ready",
+        "editable_proof": "ready",
+        "reference_solution": "blocked"
+      }
+    },
+    {
+      "task_ref": "piku/fund_conservation/amount_paid_preserves_fund_conservation",
+      "task_id": "amount_paid_preserves_fund_conservation",
+      "case_id": "piku/fund_conservation",
+      "suite": "active",
+      "schema_version": 1,
+      "manifest_path": "cases/piku/fund_conservation/tasks/amount_paid_preserves_fund_conservation.yaml",
+      "split": "active",
+      "family_id": "piku",
+      "implementation_id": "inverter_oracle_queue",
+      "source_ref": "https://github.com/InverterNetwork/contracts@8b7bc438344d646bab05b751c8eb4a7f0c8ca588:src/modules/fundingManager/oracle/FM_PC_Oracle_Redeeming_v1.sol",
+      "task_interface_version": 2,
+      "track": "proof-only",
+      "property_class": "accounting_conservation",
+      "category": "fund_conservation",
+      "difficulty": "medium",
+      "theorem_name": "Benchmark.Cases.Piku.FundConservation.amountPaid_preserves_fund_conservation",
+      "proof_family": "state_preservation_local_effects",
+      "translation_status": "translated",
+      "proof_status": "complete",
+      "implementation_files": [
+        "cases/piku/fund_conservation/verity/Contract.lean",
+        "Benchmark/Cases/Piku/FundConservation/Contract.lean"
+      ],
+      "specification_files": [
+        "cases/piku/fund_conservation/verity/Specs.lean",
+        "Benchmark/Cases/Piku/FundConservation/Specs.lean"
+      ],
+      "editable_files": [
+        "Benchmark/Generated/Piku/FundConservation/Tasks/AmountPaidPreservesFundConservation.lean"
+      ],
+      "abstraction_level": "protocol_slice",
+      "abstraction_notes": "Proves conservation for queue payment execution once queued collateral is split between the recipient and protocol treasury.",
+      "unsupported_feature_codes": [
+        "erc20_transfers_abstracted",
+        "protocol_fee_recalculation_abstracted"
+      ],
+      "reference_solution_module": "Benchmark.Cases.Piku.FundConservation.Proofs",
+      "evaluation": {
+        "engine": "lean_proof_generation",
+        "target_kind": "proof_generation"
+      },
+      "readiness": {
+        "prompt_context": "ready",
+        "editable_proof": "ready",
+        "reference_solution": "blocked"
+      }
+    },
+    {
+      "task_ref": "piku/fund_conservation/amount_paid_records_distribution",
+      "task_id": "amount_paid_records_distribution",
+      "case_id": "piku/fund_conservation",
+      "suite": "active",
+      "schema_version": 1,
+      "manifest_path": "cases/piku/fund_conservation/tasks/amount_paid_records_distribution.yaml",
+      "split": "active",
+      "family_id": "piku",
+      "implementation_id": "inverter_oracle_queue",
+      "source_ref": "https://github.com/InverterNetwork/contracts@8b7bc438344d646bab05b751c8eb4a7f0c8ca588:src/modules/fundingManager/oracle/FM_PC_Oracle_Redeeming_v1.sol",
+      "task_interface_version": 2,
+      "track": "proof-only",
+      "property_class": "accounting_effect",
+      "category": "fund_conservation",
+      "difficulty": "easy",
+      "theorem_name": "Benchmark.Cases.Piku.FundConservation.amountPaid_records_distribution",
+      "proof_family": "state_preservation_local_effects",
+      "translation_status": "translated",
+      "proof_status": "complete",
+      "implementation_files": [
+        "cases/piku/fund_conservation/verity/Contract.lean",
+        "Benchmark/Cases/Piku/FundConservation/Contract.lean"
+      ],
+      "specification_files": [
+        "cases/piku/fund_conservation/verity/Specs.lean",
+        "Benchmark/Cases/Piku/FundConservation/Specs.lean"
+      ],
+      "editable_files": [
+        "Benchmark/Generated/Piku/FundConservation/Tasks/AmountPaidRecordsDistribution.lean"
+      ],
+      "abstraction_level": "protocol_slice",
+      "abstraction_notes": "Records the local accounting effect of queue settlement: queued redemption backing is split into user distribution and protocol treasury buckets.",
+      "unsupported_feature_codes": [
+        "erc20_transfers_abstracted",
+        "protocol_fee_recalculation_abstracted"
+      ],
+      "reference_solution_module": "Benchmark.Cases.Piku.FundConservation.Proofs",
+      "evaluation": {
+        "engine": "lean_proof_generation",
+        "target_kind": "proof_generation"
+      },
+      "readiness": {
+        "prompt_context": "ready",
+        "editable_proof": "ready",
+        "reference_solution": "blocked"
+      }
+    },
+    {
+      "task_ref": "piku/fund_conservation/sell_order_preserves_fund_conservation",
+      "task_id": "sell_order_preserves_fund_conservation",
+      "case_id": "piku/fund_conservation",
+      "suite": "active",
+      "schema_version": 1,
+      "manifest_path": "cases/piku/fund_conservation/tasks/sell_order_preserves_fund_conservation.yaml",
+      "split": "active",
+      "family_id": "piku",
+      "implementation_id": "inverter_oracle_queue",
+      "source_ref": "https://github.com/InverterNetwork/contracts@8b7bc438344d646bab05b751c8eb4a7f0c8ca588:src/modules/fundingManager/oracle/FM_PC_Oracle_Redeeming_v1.sol",
+      "task_interface_version": 2,
+      "track": "proof-only",
+      "property_class": "accounting_conservation",
+      "category": "fund_conservation",
+      "difficulty": "medium",
+      "theorem_name": "Benchmark.Cases.Piku.FundConservation._sellOrder_preserves_fund_conservation",
+      "proof_family": "state_preservation_local_effects",
+      "translation_status": "translated",
+      "proof_status": "complete",
+      "implementation_files": [
+        "cases/piku/fund_conservation/verity/Contract.lean",
+        "Benchmark/Cases/Piku/FundConservation/Contract.lean"
+      ],
+      "specification_files": [
+        "cases/piku/fund_conservation/verity/Specs.lean",
+        "Benchmark/Cases/Piku/FundConservation/Specs.lean"
+      ],
+      "editable_files": [
+        "Benchmark/Generated/Piku/FundConservation/Tasks/SellOrderPreservesFundConservation.lean"
+      ],
+      "abstraction_level": "protocol_slice",
+      "abstraction_notes": "Proves conservation for redemption-order creation under an explicit fee split arithmetic hypothesis. Ghost accounting slots expose event-only fee and distribution effects.",
+      "unsupported_feature_codes": [
+        "event_only_fee_accounting_requires_ghost_slot",
+        "ghost_solvency_precondition"
+      ],
+      "reference_solution_module": "Benchmark.Cases.Piku.FundConservation.Proofs",
+      "evaluation": {
+        "engine": "lean_proof_generation",
+        "target_kind": "proof_generation"
+      },
+      "readiness": {
+        "prompt_context": "ready",
+        "editable_proof": "ready",
+        "reference_solution": "blocked"
+      }
+    },
+    {
+      "task_ref": "piku/fund_conservation/sell_order_records_redemption_buckets",
+      "task_id": "sell_order_records_redemption_buckets",
+      "case_id": "piku/fund_conservation",
+      "suite": "active",
+      "schema_version": 1,
+      "manifest_path": "cases/piku/fund_conservation/tasks/sell_order_records_redemption_buckets.yaml",
+      "split": "active",
+      "family_id": "piku",
+      "implementation_id": "inverter_oracle_queue",
+      "source_ref": "https://github.com/InverterNetwork/contracts@8b7bc438344d646bab05b751c8eb4a7f0c8ca588:src/modules/fundingManager/oracle/FM_PC_Oracle_Redeeming_v1.sol",
+      "task_interface_version": 2,
+      "track": "proof-only",
+      "property_class": "accounting_effect",
+      "category": "fund_conservation",
+      "difficulty": "easy",
+      "theorem_name": "Benchmark.Cases.Piku.FundConservation._sellOrder_records_redemption_buckets",
+      "proof_family": "state_preservation_local_effects",
+      "translation_status": "translated",
+      "proof_status": "complete",
+      "implementation_files": [
+        "cases/piku/fund_conservation/verity/Contract.lean",
+        "Benchmark/Cases/Piku/FundConservation/Contract.lean"
+      ],
+      "specification_files": [
+        "cases/piku/fund_conservation/verity/Specs.lean",
+        "Benchmark/Cases/Piku/FundConservation/Specs.lean"
+      ],
+      "editable_files": [
+        "Benchmark/Generated/Piku/FundConservation/Tasks/SellOrderRecordsRedemptionBuckets.lean"
+      ],
+      "abstraction_level": "protocol_slice",
+      "abstraction_notes": "Records the local accounting effect of redemption-order creation: backing moves from the remaining bucket into queued redemption and project-fee buckets.",
+      "unsupported_feature_codes": [
+        "event_only_fee_accounting_requires_ghost_slot",
+        "ghost_solvency_precondition"
+      ],
+      "reference_solution_module": "Benchmark.Cases.Piku.FundConservation.Proofs",
       "evaluation": {
         "engine": "lean_proof_generation",
         "target_kind": "proof_generation"
@@ -6982,5 +7796,5 @@
       }
     }
   ],
-  "generated_at": "2026-05-27T13:36:02.261040+00:00"
+  "generated_at": "2026-05-27T14:16:42.475702+00:00"
 }
