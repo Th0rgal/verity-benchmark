@@ -24,10 +24,10 @@ theorem swap_conservation
     simpa [expectedSwapUsdQuote] using hQuoteNonzero
   have hMin' : div (mul amount price) tokenUnit ≥ minAmountOut := by
     simpa [expectedSwapUsdQuote] using hMin
-  simp [swap_conservation_spec, expectedSwapUsdQuote, usd0SupplyOf, treasuryCollateralOf,
+  simp [swap_conservation_spec, expectedSwapUsdQuote, ghostUsd0SupplyOf, ghostTreasuryCollateralOf,
     DaoCollateral.swapDirect, hAmount, hAmountMax, hTokenUnit, hSupportedUnit,
     hQuoteNonzero', hMin', hSupplyAdd, hCollateralAdd, addDoesNotWrap,
-    DaoCollateral.usd0Supply, DaoCollateral.treasuryCollateral,
+    DaoCollateral.ghostUsd0Supply, DaoCollateral.ghostTreasuryCollateral,
     Verity.require, Verity.bind, Bind.bind, Contract.run, ContractResult.snd,
     getStorage, setStorage, getMapping, setMapping]
 
@@ -51,8 +51,8 @@ theorem swap_value_conservation
     DaoCollateral.swapDirect, hAmount, hAmountMax, hTokenUnit, hSupportedUnit,
     hQuoteNonzero'', hMin'',
     hSupplyAdd, hCollateralAdd, addDoesNotWrap,
-    usd0SupplyOf, treasuryCollateralOf,
-    DaoCollateral.usd0Supply, DaoCollateral.treasuryCollateral,
+    ghostUsd0SupplyOf, ghostTreasuryCollateralOf,
+    DaoCollateral.ghostUsd0Supply, DaoCollateral.ghostTreasuryCollateral,
     Verity.require, Verity.bind, Bind.bind, Contract.run, ContractResult.snd,
     getStorage, setStorage, getMapping, setMapping]
 
@@ -96,7 +96,7 @@ theorem redeem_return_formula
       hReturnedNonzero, hMin,
       hConfig, hFeeLe, hSupplyAdd, hSupplyLe, hCollateralLe, addDoesNotWrap,
       daoConfigBounds,
-      DaoCollateral.usd0Supply, DaoCollateral.treasuryCollateral,
+      DaoCollateral.ghostUsd0Supply, DaoCollateral.ghostTreasuryCollateral,
       DaoCollateral.redeemFeeBps, DaoCollateral.cbrOn, DaoCollateral.cbrCoefficient,
       Verity.require, Verity.bind, Bind.bind, Contract.run, ContractResult.fst,
       Verity.pure, Pure.pure, getStorage, setStorage, getMapping, setMapping]
@@ -116,7 +116,7 @@ theorem redeem_return_formula
       hReturnedNonzero, hMin,
       hConfig, hFeeLe, hSupplyAdd, hSupplyLe, hCollateralLe, addDoesNotWrap,
       daoConfigBounds,
-      DaoCollateral.usd0Supply, DaoCollateral.treasuryCollateral,
+      DaoCollateral.ghostUsd0Supply, DaoCollateral.ghostTreasuryCollateral,
       DaoCollateral.redeemFeeBps, DaoCollateral.cbrOn, DaoCollateral.cbrCoefficient,
       Verity.require, Verity.bind, Bind.bind, Contract.run, ContractResult.fst,
       Verity.pure, Pure.pure, getStorage, setStorage, getMapping, setMapping]
@@ -146,18 +146,18 @@ theorem redeem_conservation
       expectedReturnedCollateral, expectedFeeUsd0, SCALAR_ONE, SCALAR_TEN_KWEI,
       supportedTokenUnit, hCbr] at hSupportedUnit hConfig hFeeLe hNetMul hSupplyAdd hSupplyLe hCollateralLe
     simp [redeem_conservation_spec, feeMintedUsd0,
-      feeUsd0, usd0SupplyOf, treasuryCollateralOf, redeemFeeBpsOf,
+      feeUsd0, ghostUsd0SupplyOf, ghostTreasuryCollateralOf, redeemFeeBpsOf,
       cbrCoefOf, isCBROnState, expectedReturnedCollateral, expectedFeeUsd0,
       redeemFeeAmount, floorMulDiv, SCALAR_ONE, SCALAR_TEN_KWEI, hCbr] at hReturnedNonzero hMin
     simp [redeem_conservation_spec, feeMintedUsd0,
-      feeUsd0, usd0SupplyOf, treasuryCollateralOf, redeemFeeBpsOf,
+      feeUsd0, ghostUsd0SupplyOf, ghostTreasuryCollateralOf, redeemFeeBpsOf,
       cbrCoefOf, isCBROnState, expectedReturnedCollateral, expectedFeeUsd0,
       redeemFeeAmount, floorMulDiv, SCALAR_ONE, SCALAR_TEN_KWEI, hCbr,
       DaoCollateral.redeemDirect, hAmount, hPrice, hTokenUnit, hSupportedUnit,
       hReturnedNonzero, hMin,
       hConfig, hFeeLe, hSupplyAdd, hSupplyLe, hCollateralLe, addDoesNotWrap,
       daoConfigBounds,
-      DaoCollateral.usd0Supply, DaoCollateral.treasuryCollateral,
+      DaoCollateral.ghostUsd0Supply, DaoCollateral.ghostTreasuryCollateral,
       DaoCollateral.redeemFeeBps, DaoCollateral.cbrOn, DaoCollateral.cbrCoefficient,
       Verity.require, Verity.bind, Bind.bind, Contract.run, ContractResult.snd,
       Verity.pure, Pure.pure, getStorage, setStorage, getMapping, setMapping]
@@ -168,18 +168,18 @@ theorem redeem_conservation
       expectedReturnedCollateral, expectedFeeUsd0, SCALAR_ONE, SCALAR_TEN_KWEI,
       supportedTokenUnit, hCbr] at hSupportedUnit hConfig hFeeLe hNetMul hCbrMul hSupplyAdd hSupplyLe hCollateralLe
     simp [redeem_conservation_spec, feeMintedUsd0,
-      feeUsd0, usd0SupplyOf, treasuryCollateralOf, redeemFeeBpsOf,
+      feeUsd0, ghostUsd0SupplyOf, ghostTreasuryCollateralOf, redeemFeeBpsOf,
       cbrCoefOf, isCBROnState, expectedReturnedCollateral, expectedFeeUsd0,
       redeemFeeAmount, floorMulDiv, SCALAR_ONE, SCALAR_TEN_KWEI, hCbr] at hReturnedNonzero hMin
     simp [redeem_conservation_spec, feeMintedUsd0,
-      feeUsd0, usd0SupplyOf, treasuryCollateralOf, redeemFeeBpsOf,
+      feeUsd0, ghostUsd0SupplyOf, ghostTreasuryCollateralOf, redeemFeeBpsOf,
       cbrCoefOf, isCBROnState, expectedReturnedCollateral, expectedFeeUsd0,
       redeemFeeAmount, floorMulDiv, SCALAR_ONE, SCALAR_TEN_KWEI, hCbr,
       DaoCollateral.redeemDirect, hAmount, hPrice, hTokenUnit, hSupportedUnit,
       hReturnedNonzero, hMin,
       hConfig, hFeeLe, hSupplyAdd, hSupplyLe, hCollateralLe, addDoesNotWrap,
       daoConfigBounds,
-      DaoCollateral.usd0Supply, DaoCollateral.treasuryCollateral,
+      DaoCollateral.ghostUsd0Supply, DaoCollateral.ghostTreasuryCollateral,
       DaoCollateral.redeemFeeBps, DaoCollateral.cbrOn, DaoCollateral.cbrCoefficient,
       Verity.require, Verity.bind, Bind.bind, Contract.run, ContractResult.snd,
       Verity.pure, Pure.pure, getStorage, setStorage, getMapping, setMapping]

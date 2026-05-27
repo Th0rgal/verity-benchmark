@@ -44,18 +44,21 @@ abstraction_notes: >
   Solidity's supported `10 ** decimals` values for collateral decimals `0..18`;
   larger decimal counts are outside this benchmark because Solidity's
   normalization takes a different division branch. ERC20 transfers and USD0
-  mint/burn calls are represented by the treasury collateral balance and a
-  ghosted USD0 supply effect, keeping the proof scoped to DaoCollateral rather
-  than USD0 token correctness. The direct swap path credits exactly the RWA
-  amount and mints exactly the computed oracle USD quote. Successful-call
+  mint/burn calls are represented by explicitly named ghost ledgers:
+  `ghostTreasuryCollateral` and `ghostUsd0Supply`. This keeps the proof scoped
+  to DaoCollateral accounting rather than USD0 or ERC20 token correctness. The
+  direct swap path credits exactly the RWA amount to the ghost collateral ledger
+  and mints exactly the computed oracle USD quote in the ghost supply ledger.
+  Successful-call
   hypotheses expose Solidity checked-arithmetic boundaries, nonzero computed
-  quote, uint128 swap amount bound, supported token unit, treasury collateral
+  quote, uint128 swap amount bound, supported token unit, ghost collateral
   sufficiency, and configured redeem fee / CBR coefficient bounds. The redeem
-  path burns the user amount, remints only the non-CBR fee, and debits the exact
-  collateral amount computed from net burned USD0, oracle price, token decimals,
-  CBR flag, and floor rounding. SwapperEngine, intent matching, permits, role
-  checks, pause gates, events, and registry lookups are elided because they do
-  not alter this conservation equation.
+  path burns the user amount in the ghost supply ledger, remints only the
+  non-CBR fee there, and debits the exact ghost collateral amount computed from
+  net burned USD0, oracle price, token decimals, CBR flag, and floor rounding.
+  SwapperEngine, intent matching, permits, role checks, pause gates, events, and
+  registry lookups are elided because they do not alter this conservation
+  equation.
 unsupported_feature_codes:
   - external_erc20_calls_ghosted
   - oracle_reads_parameterized
@@ -64,6 +67,7 @@ unsupported_feature_codes:
   - successful_call_preconditions
 notes: >
   Usual USD0 DaoCollateral conservation case. It verifies that no direct
-  swap/redeem transition can create unaccounted USD0 or debit more collateral
-  than the contract's modeled accounting permits, modulo configured redeem fee,
-  oracle price, CBR coefficient, token decimals, and floor rounding.
+  swap/redeem transition can create unaccounted ghost USD0 supply or debit more
+  ghost collateral than the contract's modeled accounting permits, modulo
+  configured redeem fee, oracle price, CBR coefficient, token decimals, and
+  floor rounding.

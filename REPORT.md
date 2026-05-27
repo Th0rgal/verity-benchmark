@@ -191,7 +191,7 @@ This report is generated from the benchmark manifests.
 - Source ref: `https://etherscan.io/address/0x0eec861d49f15f585d6bb4301fc4f89bce22af4e#code`
 - Selected functions: `swap`, `redeem`, `_calculateFee`, `_burnStableTokenAndTransferCollateral`, `_getTokenAmountForAmountInUSD`
 - Upstream source artifact: `src/daoCollateral/DaoCollateral.sol`
-- Notes: Usual USD0 DaoCollateral conservation case. It verifies that no direct swap/redeem transition can create unaccounted USD0 or debit more collateral than the contract's modeled accounting permits, modulo configured redeem fee, oracle price, CBR coefficient, token decimals, and floor rounding.
+- Notes: Usual USD0 DaoCollateral conservation case. It verifies that no direct swap/redeem transition can create unaccounted ghost USD0 supply or debit more ghost collateral than the contract's modeled accounting permits, modulo configured redeem fee, oracle price, CBR coefficient, token decimals, and floor rounding.
 
 ### `wildcat/borrow_liquidity_safety`
 - Family / implementation: `wildcat` / `v2_protocol`

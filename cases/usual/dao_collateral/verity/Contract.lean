@@ -19,7 +19,7 @@ open Verity.EVM.Uint256
     reentrancy guards, events, and SwapperEngine paths are omitted. They gate who
     may call or route functions but do not change direct swap/redeem arithmetic.
   - ERC20 transfers and USD0 mint/burn calls are represented as updates to
-    `treasuryCollateral` and `usd0Supply`, avoiding USD0 token correctness.
+    `ghostTreasuryCollateral` and `ghostUsd0Supply`, avoiding USD0 token correctness.
   - Oracle reads and token decimals are explicit parameters (`price`,
     `tokenUnit`). The swap quote is computed inside the model from those values.
     `tokenUnit` is required to be one of the Solidity `10 ** decimals` values
@@ -75,8 +75,8 @@ def cbrAdjustedTokenAmount
 
 verity_contract DaoCollateral where
   storage
-    usd0Supply : Uint256 := slot 0
-    treasuryCollateral : Address → Uint256 := slot 1
+    ghostUsd0Supply : Uint256 := slot 0
+    ghostTreasuryCollateral : Address → Uint256 := slot 1
     redeemFeeBps : Uint256 := slot 2
     cbrOn : Uint256 := slot 3
     cbrCoefficient : Uint256 := slot 4
@@ -111,11 +111,11 @@ verity_contract DaoCollateral where
     require (wadQuoteInUSD != 0) "AmountTooLow"
     require (wadQuoteInUSD >= minAmountOut) "AmountTooLow"
 
-    let supply ← getStorage usd0Supply
-    setStorage usd0Supply (add supply wadQuoteInUSD)
+    let supply ← getStorage ghostUsd0Supply
+    setStorage ghostUsd0Supply (add supply wadQuoteInUSD)
 
-    let collateral ← getMapping treasuryCollateral rwaToken
-    setMapping treasuryCollateral rwaToken (add collateral amount)
+    let collateral ← getMapping ghostTreasuryCollateral rwaToken
+    setMapping ghostTreasuryCollateral rwaToken (add collateral amount)
 
   function redeemDirect
       (rwaToken : Address, stableAmount : Uint256, minAmountOut : Uint256, price : Uint256, tokenUnit : Uint256) : Uint256 := do
@@ -160,12 +160,12 @@ verity_contract DaoCollateral where
     require (returnedCollateral != 0) "AmountTooLow"
     require (returnedCollateral >= minAmountOut) "AmountTooLow"
 
-    let supply ← getStorage usd0Supply
+    let supply ← getStorage ghostUsd0Supply
     let feeMinted := ite cbrActive 0 fee
-    setStorage usd0Supply (sub (add supply feeMinted) stableAmount)
+    setStorage ghostUsd0Supply (sub (add supply feeMinted) stableAmount)
 
-    let collateral ← getMapping treasuryCollateral rwaToken
-    setMapping treasuryCollateral rwaToken (sub collateral returnedCollateral)
+    let collateral ← getMapping ghostTreasuryCollateral rwaToken
+    setMapping ghostTreasuryCollateral rwaToken (sub collateral returnedCollateral)
 
     return returnedCollateral
 

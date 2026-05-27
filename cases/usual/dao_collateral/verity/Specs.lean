@@ -6,10 +6,10 @@ namespace Benchmark.Cases.Usual.DaoCollateral
 open Verity
 open Verity.EVM.Uint256
 
-def usd0SupplyOf (s : ContractState) : Uint256 :=
+def ghostUsd0SupplyOf (s : ContractState) : Uint256 :=
   s.storage 0
 
-def treasuryCollateralOf (s : ContractState) (rwaToken : Address) : Uint256 :=
+def ghostTreasuryCollateralOf (s : ContractState) (rwaToken : Address) : Uint256 :=
   s.storageMap 1 rwaToken
 
 def redeemFeeBpsOf (s : ContractState) : Uint256 :=
@@ -51,8 +51,8 @@ def successfulSwapArithmetic
   amount <= 340282366920938463463374607431768211455 ∧
   wadQuoteInUSD ≠ 0 ∧
   mulDoesNotWrap amount price ∧
-  addDoesNotWrap (usd0SupplyOf s) wadQuoteInUSD ∧
-  addDoesNotWrap (treasuryCollateralOf s rwaToken) amount
+  addDoesNotWrap (ghostUsd0SupplyOf s) wadQuoteInUSD ∧
+  addDoesNotWrap (ghostTreasuryCollateralOf s rwaToken) amount
 
 def feeUsd0 (stableAmount tokenUnit : Uint256) (s : ContractState) : Uint256 :=
   redeemFeeAmount stableAmount (redeemFeeBpsOf s) tokenUnit
@@ -76,14 +76,14 @@ def collateralValueUsd (collateralAmount price tokenUnit : Uint256) : Uint256 :=
 def swap_conservation_spec
     (rwaToken : Address) (amount price tokenUnit : Uint256) (s s' : ContractState) : Prop :=
   let wadQuoteInUSD := expectedSwapUsdQuote amount price tokenUnit
-  usd0SupplyOf s' = add (usd0SupplyOf s) wadQuoteInUSD ∧
-  treasuryCollateralOf s' rwaToken = add (treasuryCollateralOf s rwaToken) amount
+  ghostUsd0SupplyOf s' = add (ghostUsd0SupplyOf s) wadQuoteInUSD ∧
+  ghostTreasuryCollateralOf s' rwaToken = add (ghostTreasuryCollateralOf s rwaToken) amount
 
 def swap_value_conservation_spec
     (rwaToken : Address) (amount price tokenUnit : Uint256)
     (s s' : ContractState) : Prop :=
-  usd0SupplyOf s' = add (usd0SupplyOf s) (expectedSwapUsdQuote amount price tokenUnit) ∧
-  treasuryCollateralOf s' rwaToken = add (treasuryCollateralOf s rwaToken) amount
+  ghostUsd0SupplyOf s' = add (ghostUsd0SupplyOf s) (expectedSwapUsdQuote amount price tokenUnit) ∧
+  ghostTreasuryCollateralOf s' rwaToken = add (ghostTreasuryCollateralOf s rwaToken) amount
 
 def successfulRedeemArithmetic
     (rwaToken : Address) (stableAmount price tokenUnit : Uint256)
@@ -101,9 +101,9 @@ def successfulRedeemArithmetic
   fee <= stableAmount ∧
   mulDoesNotWrap netBurned tokenUnit ∧
   (isCBROnState s → mulDoesNotWrap baseReturned (cbrCoefOf s)) ∧
-  addDoesNotWrap (usd0SupplyOf s) feeMinted ∧
-  stableAmount <= add (usd0SupplyOf s) feeMinted ∧
-  returnedCollateral <= treasuryCollateralOf s rwaToken
+  addDoesNotWrap (ghostUsd0SupplyOf s) feeMinted ∧
+  stableAmount <= add (ghostUsd0SupplyOf s) feeMinted ∧
+  returnedCollateral <= ghostTreasuryCollateralOf s rwaToken
 
 def redeem_conservation_spec
     (rwaToken : Address) (stableAmount price tokenUnit : Uint256)
@@ -112,9 +112,9 @@ def redeem_conservation_spec
   let returnedCollateral :=
     expectedReturnedCollateral stableAmount price tokenUnit (redeemFeeBpsOf s)
       (cbrCoefOf s) (isCBROnState s)
-  usd0SupplyOf s' = sub (add (usd0SupplyOf s) feeMinted) stableAmount ∧
-  treasuryCollateralOf s' rwaToken =
-    sub (treasuryCollateralOf s rwaToken) returnedCollateral
+  ghostUsd0SupplyOf s' = sub (add (ghostUsd0SupplyOf s) feeMinted) stableAmount ∧
+  ghostTreasuryCollateralOf s' rwaToken =
+    sub (ghostTreasuryCollateralOf s rwaToken) returnedCollateral
 
 def redeem_return_formula_spec
     (returned stableAmount price tokenUnit : Uint256) (s : ContractState) : Prop :=

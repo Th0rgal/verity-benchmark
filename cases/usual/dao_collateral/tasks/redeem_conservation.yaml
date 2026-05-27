@@ -30,10 +30,10 @@ abstraction_level: protocol_slice
 abstraction_notes: >
   Proves that a successful direct `redeem` decreases ghosted USD0 supply by the
   user amount net of the explicitly reminted non-CBR fee, and debits treasury
-  collateral by the exact returned amount computed from net burned USD0, oracle
+  ghost collateral by the exact returned amount computed from net burned USD0, oracle
   price, supported token decimals `0..18`, CBR state, and floor rounding.
   Successful-call hypotheses expose fee bounds, checked arithmetic, supported
-  token unit, and treasury collateral sufficiency.
+  token unit, and ghost collateral sufficiency.
 unsupported_feature_codes:
   - external_erc20_calls_ghosted
   - oracle_reads_parameterized

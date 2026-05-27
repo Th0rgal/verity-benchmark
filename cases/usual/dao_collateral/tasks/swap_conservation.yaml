@@ -30,8 +30,8 @@ abstraction_level: protocol_slice
 abstraction_notes: >
   Proves that a successful direct `swap` computes the oracle quote from explicit
   price and supported token-unit inputs, increases ghosted USD0 supply by that
-  computed quote, and credits treasury collateral by the exact RWA amount
-  received, under explicit successful-call assumptions for nonzero computed
+  computed quote, and credits the ghost treasury-collateral ledger by the exact
+  RWA amount received, under explicit successful-call assumptions for nonzero computed
   quote, uint128 amount bound, supported token unit, and checked addition.
 unsupported_feature_codes:
   - external_erc20_calls_ghosted

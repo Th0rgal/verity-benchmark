@@ -30,9 +30,9 @@ Sources read:
 ## Candidate Invariants
 
 1. Direct swap/redeem conservation. For successful direct swaps and redeems,
-   ghosted USD0 supply effects and treasury collateral debits/credits match the
-   source formulas, modulo configured redeem fee, oracle price, token decimals,
-   CBR coefficient, and floor rounding.
+   explicitly named ghost USD0 supply and ghost treasury-collateral
+   debits/credits match the source formulas, modulo configured redeem fee,
+   oracle price, token decimals, CBR coefficient, and floor rounding.
 2. Redeem returned-collateral formula. The collateral returned by redeem equals
    `floor((amount - fee) * tokenUnit / price)`, with CBR applying another
    floor multiplication by `cbrCoef / 1e18`.
@@ -59,7 +59,7 @@ and verifies the DaoCollateral accounting equation itself.
 | --- | --- | --- | --- |
 | `swap(rwaToken, amount, minAmountOut)` | `swapDirect(rwaToken, amount, minAmountOut, price, tokenUnit)` | no issue | Oracle price and token unit are parameterized; the model computes the USD quote internally before the same accounting writes. |
 | `_calculateFee(amount, rwaToken)` | `redeemFeeAmount stableAmount redeemFee tokenUnit` | no issue | Preserves floor bps fee and token-decimal normalization. Sourcify source around line 500 shows `Math.mulDiv(usd0Amount, $.redeemFee, SCALAR_TEN_KWEI, Floor)` followed by token-decimal normalization. |
-| `_burnStableTokenAndTransferCollateral(...)` | `redeemDirect` supply and collateral writes | no issue | ERC20/USD0 calls ghosted as supply/collateral state effects. |
+| `_burnStableTokenAndTransferCollateral(...)` | `redeemDirect` ghost supply and ghost collateral writes | no issue | ERC20/USD0 calls are explicitly ghosted as `ghostUsd0Supply` / `ghostTreasuryCollateral` state effects. |
 | `_getTokenAmountForAmountInUSD` | `tokenAmountForUsd`, `cbrAdjustedTokenAmount` | no issue | Preserves floor oracle conversion and CBR branch. |
 | Token mapping / registry / role checks / pause modifiers | omitted precondition gate | proof-gap-only | Affects call admissibility, not conservation arithmetic. |
 | `Math.mulDiv(..., Floor)` | `floorMulDiv` | proof-gap-only | Overflow checks exposed as theorem preconditions. |
@@ -69,8 +69,8 @@ and verifies the DaoCollateral accounting equation itself.
 
 - Parameterize oracle price and token unit; compute the swap quote in the model.
 - Model only direct swap/redeem paths.
-- Ghost ERC20 transfer side effects as treasury collateral balance changes.
-- Ghost USD0 mint/burn side effects as `usd0Supply` changes.
+- Ghost ERC20 transfer side effects as `ghostTreasuryCollateral` changes.
+- Ghost USD0 mint/burn side effects as `ghostUsd0Supply` changes.
 - Keep fee and CBR arithmetic because they are part of the conservation equation.
 
 ## Proposed Verity Issues
