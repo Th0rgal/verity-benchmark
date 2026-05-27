@@ -35,6 +35,7 @@ active_cases = [
   "piku/fund_conservation",
   "polygon/agglayer_bridge",
   "reserve/auction_price_band",
+  "rootstock/flyover_quote_lifecycle",
   "safe/owner_manager_reach",
   "termmax/order_v2_buy_xt_single_segment",
   "usual/dao_collateral",
