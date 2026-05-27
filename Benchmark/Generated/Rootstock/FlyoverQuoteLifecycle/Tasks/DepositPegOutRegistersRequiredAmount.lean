@@ -11,6 +11,7 @@ theorem depositPegOut_registers_required_amount
     (quoteHash : Address)
     (value callFee gasFee penaltyFee msgValue dustThreshold : Uint256)
     (changeRefundSucceeds : Bool)
+    (lpRskAddress rskRefundAddress : Address)
     (blockTimestamp : Uint256)
     (expireDate expireBlock : Uint256)
     (s : ContractState)
@@ -25,11 +26,11 @@ theorem depositPegOut_registers_required_amount
       else
         true) = true) :
     let s' := ((PegOutLifecycle.depositPegOut quoteHash value callFee gasFee
-      penaltyFee msgValue dustThreshold changeRefundSucceeds blockTimestamp
+      penaltyFee msgValue dustThreshold changeRefundSucceeds lpRskAddress rskRefundAddress blockTimestamp
       expireDate expireBlock).run s).snd
     depositPegOut_registers_required_amount_spec
       quoteHash value callFee gasFee penaltyFee msgValue dustThreshold changeRefundSucceeds
-      blockTimestamp expireDate expireBlock s s' := by
+      lpRskAddress rskRefundAddress blockTimestamp expireDate expireBlock s s' := by
   exact ?_
 
 end Benchmark.Cases.Rootstock.FlyoverQuoteLifecycle

@@ -41,6 +41,14 @@ open Verity.Stdlib.Math
     accepted.
 
   What was simplified:
+  - The quote recipients are modeled as address-valued storage entries written
+    by `depositPegOut` and read by the settlement functions.
+  Why:
+  - In Solidity, `refundPegOut` and `refundUserPegOut` decode the stored quote
+    and pay the LP or user refund address from that quote. Modeling those
+    fields removes recipient identity from the theorem assumptions.
+
+  What was simplified:
   - Signature validation, provider registration, Bitcoin transaction parsing,
     and bridge confirmation checks are modeled as preconditions to the public
     lifecycle functions.
@@ -92,12 +100,15 @@ verity_contract PegOutLifecycle where
     quoteDepositTimestamp : Address → Uint256 := slot 8
     quoteExpireDate : Address → Uint256 := slot 9
     quoteExpireBlock : Address → Uint256 := slot 10
+    quoteLpRskAddress : Address → Uint256 := slot 11
+    quoteRskRefundAddress : Address → Uint256 := slot 12
 
   function depositPegOut
       (quoteHash : Address,
        value : Uint256, callFee : Uint256, gasFee : Uint256,
        penaltyFee : Uint256, msgValue : Uint256,
        dustThreshold : Uint256, changeRefundSucceeds : Bool,
+       lpRskAddress : Address, rskRefundAddress : Address,
        blockTimestamp : Uint256,
        expireDate : Uint256, expireBlock : Uint256) : Unit := do
     let oldRegistered ← getMapping quoteRegistered quoteHash
@@ -125,10 +136,11 @@ verity_contract PegOutLifecycle where
     setMapping quoteDepositTimestamp quoteHash blockTimestamp
     setMapping quoteExpireDate quoteHash expireDate
     setMapping quoteExpireBlock quoteHash expireBlock
+    setMappingAddr quoteLpRskAddress quoteHash lpRskAddress
+    setMappingAddr quoteRskRefundAddress quoteHash rskRefundAddress
 
   function refundPegOut
-      (quoteHash : Address, lpRskAddress : Address,
-       transferSucceeds : Bool,
+      (quoteHash : Address, transferSucceeds : Bool,
        transferTime : Uint256, btcBlockTime : Uint256,
        firstConfirmationTimestamp : Uint256,
        expireDate : Uint256, currentTimestamp : Uint256,
@@ -136,6 +148,7 @@ verity_contract PegOutLifecycle where
     let registered ← getMapping quoteRegistered quoteHash
     let amount ← getMapping quoteAmount quoteHash
     let penalty ← getMapping quotePenalty quoteHash
+    let lpRskAddress ← getMappingAddr quoteLpRskAddress quoteHash
     let depositTimestamp ← getMapping quoteDepositTimestamp quoteHash
     let oldCompleted ← getMapping quoteCompleted quoteHash
     let transferDeadline := add depositTimestamp transferTime
@@ -168,12 +181,12 @@ verity_contract PegOutLifecycle where
       setMapping internalBalance lpRskAddress newBalance
 
   function refundUserPegOut
-      (quoteHash : Address, rskRefundAddress : Address,
-       transferSucceeds : Bool,
+      (quoteHash : Address, transferSucceeds : Bool,
        currentTimestamp : Uint256, currentBlock : Uint256) : Unit := do
     let registered ← getMapping quoteRegistered quoteHash
     let amount ← getMapping quoteAmount quoteHash
     let penalty ← getMapping quotePenalty quoteHash
+    let rskRefundAddress ← getMappingAddr quoteRskRefundAddress quoteHash
     let expireDate ← getMapping quoteExpireDate quoteHash
     let expireBlock ← getMapping quoteExpireBlock quoteHash
 

@@ -29,9 +29,9 @@ reference_solution_declaration: Benchmark.Cases.Rootstock.FlyoverQuoteLifecycle.
 abstraction_level: protocol_slice
 abstraction_notes: >
   Proves the successful expired user refund path completes and clears a registered
-  quote, assigns the registered amount either to the user transfer witness or
-  recipient fallback balance under the named stored-recipient assumption, and
-  records the external collateral slash-call amount with the quote penalty.
+  quote, assigns the registered amount either to the stored user refund recipient
+  transfer witness or that recipient's fallback balance, and records the
+  external collateral slash-call amount with the quote penalty.
 unsupported_feature_codes:
   - bytes32_quote_hash_modeled_as_address_key
   - external_bridge_calls_as_preconditions

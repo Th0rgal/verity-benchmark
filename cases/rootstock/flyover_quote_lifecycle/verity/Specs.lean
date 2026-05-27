@@ -50,11 +50,13 @@ def expireDateOf (s : ContractState) (quoteHash : Address) : Uint256 :=
 def expireBlockOf (s : ContractState) (quoteHash : Address) : Uint256 :=
   s.storageMap 10 quoteHash
 
-/-- Opaque boundary: the LP recipient input is the stored quote LP address. -/
-opaque lpRecipientMatchesStoredQuote : Address → Address → Prop
+/-- Stored LP Rootstock recipient from the accepted quote. -/
+def lpRecipientOf (s : ContractState) (quoteHash : Address) : Address :=
+  wordToAddress (s.storageMap 11 quoteHash)
 
-/-- Opaque boundary: the user recipient input is the stored quote refund address. -/
-opaque userRecipientMatchesStoredQuote : Address → Address → Prop
+/-- Stored user refund recipient from the accepted quote. -/
+def userRefundRecipientOf (s : ContractState) (quoteHash : Address) : Address :=
+  wordToAddress (s.storageMap 12 quoteHash)
 
 /-- The external slash call is reached with the explicit quote penalty when it occurs. -/
 def slashCallMatchesPenalty (s s' : ContractState) (quoteHash : Address) (slashed : Bool) : Prop :=
@@ -93,22 +95,25 @@ def depositPegOut_registers_required_amount_spec
     (value callFee gasFee : Uint256)
     (_penaltyFee _msgValue _dustThreshold : Uint256)
     (_changeRefundSucceeds : Bool)
+    (lpRskAddress rskRefundAddress : Address)
     (blockTimestamp : Uint256)
     (expireDate expireBlock : Uint256)
     (_s s' : ContractState) : Prop :=
   depositedAmount s' quoteHash = add (add value callFee) gasFee ∧
     depositTimestampOf s' quoteHash = blockTimestamp ∧
     expireDateOf s' quoteHash = expireDate ∧
-    expireBlockOf s' quoteHash = expireBlock
+    expireBlockOf s' quoteHash = expireBlock ∧
+    lpRecipientOf s' quoteHash = lpRskAddress ∧
+    userRefundRecipientOf s' quoteHash = rskRefundAddress
 
 /-- LP settlement assigns the quote amount once, either as a transfer or fallback balance. -/
 def refundPegOut_conserves_quote_amount_spec
     (quoteHash : Address)
-    (lpRskAddress : Address)
     (transferSucceeds : Bool)
     (transferTime btcBlockTime firstConfirmationTimestamp
       expireDate currentTimestamp expireBlock currentBlock : Uint256)
     (s s' : ContractState) : Prop :=
+  let lpRskAddress := lpRecipientOf s quoteHash
   let expectedConfirmation :=
     add (add (depositTimestampOf s quoteHash) transferTime) btcBlockTime
   let shouldPenalize :=
@@ -123,10 +128,10 @@ def refundPegOut_conserves_quote_amount_spec
 /-- User settlement assigns the quote amount once, either as a transfer or fallback balance. -/
 def refundUserPegOut_conserves_quote_amount_spec
     (quoteHash : Address)
-    (rskRefundAddress : Address)
     (transferSucceeds : Bool)
     (currentTimestamp currentBlock : Uint256)
     (s s' : ContractState) : Prop :=
+  let rskRefundAddress := userRefundRecipientOf s quoteHash
   (currentTimestamp > expireDateOf s quoteHash) = true ∧
     (currentBlock > expireBlockOf s quoteHash) = true ∧
     completed s' quoteHash = completedFlag ∧

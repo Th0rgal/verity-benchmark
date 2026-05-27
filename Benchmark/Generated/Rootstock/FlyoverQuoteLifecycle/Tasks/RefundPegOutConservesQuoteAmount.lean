@@ -9,7 +9,6 @@ open Verity.EVM.Uint256
 /-- LP refund completes the quote and assigns the registered amount. -/
 theorem refundPegOut_conserves_quote_amount
     (quoteHash : Address)
-    (lpRskAddress : Address)
     (transferSucceeds : Bool)
     (transferTime btcBlockTime firstConfirmationTimestamp
       expireDate currentTimestamp expireBlock currentBlock : Uint256)
@@ -20,14 +19,13 @@ theorem refundPegOut_conserves_quote_amount
       add (add (s.storageMap 8 quoteHash) transferTime) btcBlockTime >=
         add (s.storageMap 8 quoteHash) transferTime)
     (hFallbackNoOverflow :
-      add (s.storageMap 5 lpRskAddress) (s.storageMap 0 quoteHash) >=
-        s.storageMap 5 lpRskAddress)
-    (_hLpRecipient : lpRecipientMatchesStoredQuote quoteHash lpRskAddress)
+      add (s.storageMap 5 (lpRecipientOf s quoteHash)) (s.storageMap 0 quoteHash) >=
+        s.storageMap 5 (lpRecipientOf s quoteHash))
     (hRegistered : (s.storageMap 7 quoteHash == completedFlag) = true)
     (hIncomplete : (s.storageMap 2 quoteHash == 0) = true) :
-    let s' := ((PegOutLifecycle.refundPegOut quoteHash lpRskAddress transferSucceeds transferTime
+    let s' := ((PegOutLifecycle.refundPegOut quoteHash transferSucceeds transferTime
       btcBlockTime firstConfirmationTimestamp expireDate currentTimestamp expireBlock currentBlock).run s).snd
-    refundPegOut_conserves_quote_amount_spec quoteHash lpRskAddress transferSucceeds transferTime
+    refundPegOut_conserves_quote_amount_spec quoteHash transferSucceeds transferTime
       btcBlockTime firstConfirmationTimestamp expireDate currentTimestamp expireBlock currentBlock s s' := by
   exact ?_
 

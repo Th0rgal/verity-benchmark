@@ -29,9 +29,10 @@ reference_solution_declaration: Benchmark.Cases.Rootstock.FlyoverQuoteLifecycle.
 abstraction_level: protocol_slice
 abstraction_notes: >
   Proves the successful deposit path records the required quote amount, deposit
-  timestamp, and user-refund expiry fields after checked-addition guards and
-  dust/change-refund handling. Signature, provider, and quote-hash validation
-  are outside this proof task and handled as benchmark scope assumptions.
+  timestamp, LP recipient, user-refund recipient, and user-refund expiry fields
+  after checked-addition guards and dust/change-refund handling. Signature,
+  provider, and quote-hash validation are outside this proof task and handled as
+  benchmark scope assumptions.
 unsupported_feature_codes:
   - bytes32_quote_hash_modeled_as_address_key
   - struct_calldata_flattened
