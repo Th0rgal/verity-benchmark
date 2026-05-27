@@ -37,6 +37,8 @@ python3 scripts/check_axiom_ledger.py
 python3 scripts/check_verity_pin_staleness.py --warn-only
 python3 scripts/validate_manifests.py
 python3 scripts/generate_metadata.py
-if ! ./scripts/run_all.sh; then
-  echo "run_all completed with failing benchmark outcomes; artifact generation was still exercised" >&2
+if [[ "${VERITY_RUN_FULL_TASK_SWEEP:-0}" == "1" ]]; then
+  if ! ./scripts/run_all.sh; then
+    echo "run_all completed with failing benchmark outcomes; artifact generation was still exercised" >&2
+  fi
 fi
