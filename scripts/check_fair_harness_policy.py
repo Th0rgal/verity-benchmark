@@ -42,6 +42,13 @@ def main() -> int:
     candidate = lean_tools._candidate_from_response(original, "trivial", "sample")
     if "import Benchmark.Grindset" in candidate:
         errors.append("fair/model proof patching must not add broad Benchmark.Grindset imports")
+    multiline_candidate = lean_tools._candidate_from_response(
+        original,
+        "unfold sample\n    trivial",
+        "sample",
+    )
+    if "\n      trivial" in multiline_candidate:
+        errors.append("fair/model proof patching should normalize over-indented tactic bodies")
     comparison_candidate = lean_tools._candidate_from_comparison_response(original, "trivial", "sample")
     if "import Benchmark.Grindset" not in comparison_candidate:
         errors.append("comparison-mode API fallback should preserve previous Benchmark.Grindset import behavior")
@@ -97,6 +104,11 @@ def main() -> int:
     temp_workspace = Path(tempfile.mkdtemp(prefix="verity-fair-policy-tools-"))
     original_chat_completion = lean_tools.chat_completion
     original_run_lean_module = lean_tools._run_lean_module
+    original_urlopen = lean_tools.urllib.request.urlopen
+    original_request_retries = lean_tools.REQUEST_RETRIES
+    original_request_backoff = lean_tools.REQUEST_RETRY_BACKOFF_SECONDS
+    original_context_tokens = lean_tools.DEFAULT_CONTEXT_TOKENS
+    original_native_tools = lean_tools.DEFAULT_NATIVE_TOOLS
     try:
         proof_rel = "Benchmark/Generated/Sample.lean"
         proof_path = temp_workspace / proof_rel
@@ -130,6 +142,172 @@ def main() -> int:
         )
         if binary_read.get("ok") is not False or "utf-8" not in str(binary_read.get("error")):
             errors.append("fair read_file should report non-UTF-8 files as tool errors")
+
+        dependency_cache = Path(tempfile.mkdtemp(prefix="verity-fair-policy-deps-"))
+        dependency_file = dependency_cache / "packages" / "verity" / "Verity" / "Storage.lean"
+        dependency_file.parent.mkdir(parents=True, exist_ok=True)
+        dependency_file.write_text("namespace Verity\n\ndef fairDependencySentinel : True := True.intro\n\nend Verity\n", encoding="utf-8")
+        dependency_proof = dependency_cache / "packages" / "verity" / "Contracts" / "Foo" / "Proofs" / "Basic.lean"
+        dependency_proof.parent.mkdir(parents=True, exist_ok=True)
+        dependency_proof.write_text("def hiddenSolution : True := True.intro\n", encoding="utf-8")
+        (temp_workspace / ".lake").symlink_to(dependency_cache, target_is_directory=True)
+        dependency_search = lean_tools._execute_fair_tool(
+            "search_declarations",
+            {"query": "fairDependencySentinel", "limit": 10},
+            task={"task_ref": "sample/group/task"},
+            workspace=temp_workspace,
+            original=original,
+            proof_path=proof_path,
+            target_module="Benchmark.Generated.Sample",
+            attempts_dir=temp_workspace / "attempts",
+            attempts=[],
+        )
+        dependency_paths = [str(item.get("path")) for item in dependency_search.get("results", []) if isinstance(item, dict)]
+        if ".lake/packages/verity/Verity/Storage.lean" not in dependency_paths:
+            errors.append("fair search_declarations should include public dependency Lean files")
+        hidden_search = lean_tools._execute_fair_tool(
+            "search_declarations",
+            {"query": "hiddenSolution", "limit": 10},
+            task={"task_ref": "sample/group/task"},
+            workspace=temp_workspace,
+            original=original,
+            proof_path=proof_path,
+            target_module="Benchmark.Generated.Sample",
+            attempts_dir=temp_workspace / "attempts",
+            attempts=[],
+        )
+        if hidden_search.get("results"):
+            errors.append("fair search_declarations must not expose dependency Proofs files")
+        dependency_read = lean_tools._execute_fair_tool(
+            "read_file",
+            {"path": ".lake/packages/verity/Verity/Storage.lean"},
+            task={"task_ref": "sample/group/task"},
+            workspace=temp_workspace,
+            original=original,
+            proof_path=proof_path,
+            target_module="Benchmark.Generated.Sample",
+            attempts_dir=temp_workspace / "attempts",
+            attempts=[],
+        )
+        if dependency_read.get("ok") is not True or "fairDependencySentinel" not in str(dependency_read.get("content")):
+            errors.append("fair read_file should read public dependency Lean files")
+        dependency_outline = lean_tools._execute_fair_tool(
+            "definition_outline",
+            {"query": "fairDependencySentinel", "limit": 10},
+            task={"task_ref": "sample/group/task"},
+            workspace=temp_workspace,
+            original=original,
+            proof_path=proof_path,
+            target_module="Benchmark.Generated.Sample",
+            attempts_dir=temp_workspace / "attempts",
+            attempts=[],
+        )
+        outline_names = [str(item.get("name")) for item in dependency_outline.get("results", []) if isinstance(item, dict)]
+        if "Verity.fairDependencySentinel" not in outline_names:
+            errors.append("fair definition_outline should include public dependency declarations")
+        hidden_read = lean_tools._execute_fair_tool(
+            "read_file",
+            {"path": ".lake/packages/verity/Contracts/Foo/Proofs/Basic.lean"},
+            task={"task_ref": "sample/group/task"},
+            workspace=temp_workspace,
+            original=original,
+            proof_path=proof_path,
+            target_module="Benchmark.Generated.Sample",
+            attempts_dir=temp_workspace / "attempts",
+            attempts=[],
+        )
+        if hidden_read.get("ok") is not False:
+            errors.append("fair read_file must not expose dependency Proofs files")
+        hidden_outline = lean_tools._execute_fair_tool(
+            "definition_outline",
+            {"query": "hiddenSolution", "limit": 10},
+            task={"task_ref": "sample/group/task"},
+            workspace=temp_workspace,
+            original=original,
+            proof_path=proof_path,
+            target_module="Benchmark.Generated.Sample",
+            attempts_dir=temp_workspace / "attempts",
+            attempts=[],
+        )
+        if hidden_outline.get("results"):
+            errors.append("fair definition_outline must not expose dependency Proofs files")
+        shutil.rmtree(dependency_cache, ignore_errors=True)
+
+        forbidden_attempts: list[dict[str, object]] = []
+        forbidden_proof = lean_tools._execute_fair_tool(
+            "check_proof",
+            {"proof": "sorry"},
+            task={"task_ref": "sample/group/task", "task_id": "task"},
+            workspace=temp_workspace,
+            original=original,
+            proof_path=proof_path,
+            target_module="Benchmark.Generated.Sample",
+            attempts_dir=temp_workspace / "attempts",
+            attempts=forbidden_attempts,
+        )
+        if forbidden_proof.get("passed") is not False:
+            errors.append("fair check_proof must reject forbidden placeholders before Lean")
+        if not forbidden_attempts or forbidden_attempts[0].get("status") != "rejected_forbidden_placeholder":
+            errors.append("fair forbidden-proof rejection should be recorded as an attempt")
+
+        sandbox_state = {"count": lean_tools.DEFAULT_MAX_SANDBOX_CALLS}
+        sandbox_blocked = lean_tools._execute_fair_tool(
+            "tactic_sandbox",
+            {"prefix": "trivial"},
+            task={"task_ref": "sample/group/task"},
+            workspace=temp_workspace,
+            original=original,
+            proof_path=proof_path,
+            target_module="Benchmark.Generated.Sample",
+            attempts_dir=temp_workspace / "attempts",
+            attempts=[],
+            sandbox_state=sandbox_state,
+        )
+        if sandbox_blocked.get("ok") is not False or sandbox_blocked.get("error") != "tactic_sandbox_budget_exceeded":
+            errors.append("fair tactic_sandbox should enforce its own bounded budget")
+
+        request_log = temp_workspace / "request-retries.jsonl"
+        urlopen_calls: list[bytes] = []
+
+        class FakeResponse:
+            def __enter__(self) -> "FakeResponse":
+                return self
+
+            def __exit__(self, *args: object) -> None:
+                return None
+
+            def read(self) -> bytes:
+                return b'{"choices":[{"message":{"role":"assistant","content":"ok"}}]}'
+
+        def flaky_urlopen(request: object, timeout: object = None) -> FakeResponse:
+            data = getattr(request, "data", b"")
+            if isinstance(data, bytes):
+                urlopen_calls.append(data)
+            if len(urlopen_calls) == 1:
+                raise TimeoutError("synthetic timeout")
+            return FakeResponse()
+
+        lean_tools.urllib.request.urlopen = flaky_urlopen
+        lean_tools.REQUEST_RETRIES = 1
+        lean_tools.REQUEST_RETRY_BACKOFF_SECONDS = 0
+        lean_tools.DEFAULT_CONTEXT_TOKENS = None
+        retry_response = lean_tools.chat_completion(
+            [{"role": "user", "content": "hello"}],
+            base_url="http://example.invalid/v1",
+            request_log_path=request_log,
+            request_index=7,
+        )
+        if retry_response.get("choices") is None or len(urlopen_calls) != 2:
+            errors.append("chat_completion should retry a transient timeout and return the later response")
+        request_payload = json.loads(urlopen_calls[0].decode("utf-8"))
+        if "n_ctx" in request_payload:
+            errors.append("chat_completion should not send provider-specific n_ctx unless configured")
+        request_events = [json.loads(line) for line in request_log.read_text(encoding="utf-8").splitlines()]
+        if [event.get("status") for event in request_events] != ["request_retry", "request_retry_succeeded"]:
+            errors.append("chat_completion retry log should record retry and success events")
+        lean_tools.urllib.request.urlopen = original_urlopen
+        lean_tools.DEFAULT_CONTEXT_TOKENS = original_context_tokens
+        lean_tools.DEFAULT_NATIVE_TOOLS = True
 
         def fake_chat_completion(*args: object, **kwargs: object) -> dict[str, object]:
             return {
@@ -258,6 +436,7 @@ def main() -> int:
 
         lean_tools.chat_completion = fake_text_tool_chat_completion
         lean_tools._run_lean_module = fake_passing_lean_module
+        lean_tools.DEFAULT_NATIVE_TOOLS = True
         text_tool_log = temp_workspace / "text-tool-calls.jsonl"
         result = lean_tools._attempt_task_fair(
             {
@@ -284,6 +463,11 @@ def main() -> int:
     finally:
         lean_tools.chat_completion = original_chat_completion
         lean_tools._run_lean_module = original_run_lean_module
+        lean_tools.urllib.request.urlopen = original_urlopen
+        lean_tools.REQUEST_RETRIES = original_request_retries
+        lean_tools.REQUEST_RETRY_BACKOFF_SECONDS = original_request_backoff
+        lean_tools.DEFAULT_CONTEXT_TOKENS = original_context_tokens
+        lean_tools.DEFAULT_NATIVE_TOOLS = original_native_tools
         shutil.rmtree(temp_workspace, ignore_errors=True)
 
     if errors:

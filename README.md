@@ -95,9 +95,18 @@ The supported benchmark harnesses are:
 
 Default harness modes:
 
-- `fair`: OpenAI-compatible tool loop with `show_task`, `read_file`, `show_goal`, `check_proof`, `try_tactics`, and `search_declarations`. Fair workspaces exclude group-specific Grindset helpers and fair proof patching does not add broad `Benchmark.Grindset` imports. Native tool calls and JSON-encoded text tool calls are both supported. This is the headline comparison mode.
+- `fair`: OpenAI-compatible tool loop with `show_task`, `read_file`, `show_goal`, `definition_outline`, `tactic_sandbox`, `check_proof`, `try_tactics`, and `search_declarations`. Fair workspaces exclude group-specific Grindset helpers and fair proof patching does not add broad `Benchmark.Grindset` imports. Native tool calls and JSON-encoded text tool calls are both supported. This is the headline comparison mode.
+- `fair+libs`: same agent-first loop as `fair`, but allows explicit inspection of the generic Grindset helper modules copied into the fair workspace. It still excludes group-specific helpers and theorem-specific local candidates.
 - `tuned`: generic heuristic/API comparison mode without hardcoded local proof candidates or group-specific Grindset helpers.
 - `legacy`: compatibility mode for the previous local-candidate and group-specific Grindset behavior. Use this only as an upper-bound/debug signal, not as the headline comparison.
+
+Fair-mode chat requests retry transient provider failures by default and log retry events in `conversations/*.jsonl`. Provider-specific context-window hints such as `n_ctx` are opt-in through `DEFAULT_HARNESS_CONTEXT_TOKENS`. For small-context providers, set `DEFAULT_HARNESS_NATIVE_TOOLS=0` and lower `DEFAULT_HARNESS_TOOL_RESULT_CHARS` / `DEFAULT_HARNESS_TASK_SUMMARY_CHARS`; the harness will use compact JSON tool calls and keep full tool output in artifacts. Fair tools can search and read public Lean dependency files under `.lake`, while hidden proof files, GeneratedPreview, `.env`, and Grindset remain blocked by default.
+
+Fair task results include `failure_class` so provider failures, no-tool loops, context loops, parse errors, unknown names, unsolved goals, Lean timeouts, and other Lean failures are distinguishable in run artifacts.
+
+Provider switching is configured in `.env`. Set `DEFAULT_HARNESS_PROVIDER=qwen` or `DEFAULT_HARNESS_PROVIDER=glm` to make the default harness read `DEFAULT_HARNESS_QWEN_*` or `DEFAULT_HARNESS_GLM_*` values before the generic `DEFAULT_HARNESS_*` endpoint/model/key.
+
+Fair-mode tools do not expose `Benchmark/Grindset/*` files by default. Set `DEFAULT_HARNESS_ALLOW_GRINDSET_TOOLS=1` only for explicit research runs that measure the value of generic Grindset helpers.
 
 Both `default --mode fair` and `grok-build` receive the same generated `harness/TASK_SUMMARY.md` in each run workspace. It lists the target theorem, editable files, implementation/specification files, check command, and policy. Grok also gets the initial `./harness/check.sh` result in that summary so it does not spend turns rediscovering the first Lean failure.
 

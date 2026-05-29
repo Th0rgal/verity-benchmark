@@ -6,6 +6,7 @@ import json
 import os
 import signal
 import shutil
+import socket
 import subprocess
 import time
 import urllib.request
@@ -16,39 +17,123 @@ from pathlib import Path
 from typing import Any
 
 try:
-    from ..manifests import filter_group_to_task, group_to_json, load_group
-    from ..paths import RESULTS_DIR
+    from ..manifests import filter_group_to_task, load_group
+    from ..paths import RESULTS_DIR, ROOT
     from ..reports import write_run_report
     from ..verifier import verify_group
-    from ..workspace_builder import assert_workspace_isolated, build_group_workspace
+    from ..workspace_builder import agent_group_to_json, assert_workspace_isolated, build_group_workspace
 except ImportError:
-    from manifests import filter_group_to_task, group_to_json, load_group
-    from paths import RESULTS_DIR
+    from manifests import filter_group_to_task, load_group
+    from paths import RESULTS_DIR, ROOT
     from reports import write_run_report
     from verifier import verify_group
-    from workspace_builder import assert_workspace_isolated, build_group_workspace
+    from workspace_builder import agent_group_to_json, assert_workspace_isolated, build_group_workspace
 
 HARNESS_ID = "default"
 RUN_SLUG = "default"
-VALID_MODES = ("fair", "tuned", "legacy")
-DEFAULT_BASE_URL = os.environ.get("DEFAULT_HARNESS_BASE_URL", os.environ.get("GAZELLA_BASE_URL", "https://spark-de79.gazella-vector.ts.net/v1"))
-DEFAULT_MODEL = os.environ.get("DEFAULT_HARNESS_MODEL", os.environ.get("GAZELLA_MODEL", "qwen3.5-397b"))
+VALID_MODES = ("fair", "fair+libs", "tuned", "legacy")
+PROVIDER_DEFAULTS = {
+    "qwen": {
+        "base_url": "https://spark-de79.gazella-vector.ts.net/v1",
+        "model": "qwen3.5-397b",
+    },
+    "glm": {
+        "base_url": "https://api.z.ai/api/coding/paas/v4",
+        "model": "glm-5.1",
+    },
+}
+DEFAULT_PROVIDER = os.environ.get("DEFAULT_HARNESS_PROVIDER", "").strip().lower()
+
+
+def _provider_env(name: str) -> str | None:
+    if not DEFAULT_PROVIDER:
+        return None
+    value = os.environ.get(f"DEFAULT_HARNESS_{DEFAULT_PROVIDER.upper()}_{name}")
+    return value if value not in {None, ""} else None
+
+
+def _provider_default(name: str, fallback: str) -> str:
+    if not DEFAULT_PROVIDER:
+        return fallback
+    provider_defaults = PROVIDER_DEFAULTS.get(DEFAULT_PROVIDER, {})
+    value = provider_defaults.get(name.lower())
+    return str(value) if value else fallback
+
+
+def _harness_env(name: str, fallback: str, *, legacy_name: str | None = None) -> str:
+    profile_value = _provider_env(name)
+    if profile_value is not None:
+        return profile_value
+    direct_value = os.environ.get(f"DEFAULT_HARNESS_{name}")
+    if direct_value not in {None, ""}:
+        return str(direct_value)
+    if legacy_name:
+        legacy_value = os.environ.get(legacy_name)
+        if legacy_value not in {None, ""}:
+            return str(legacy_value)
+    return _provider_default(name, fallback)
+
+
+DEFAULT_BASE_URL = _harness_env("BASE_URL", "https://spark-de79.gazella-vector.ts.net/v1", legacy_name="GAZELLA_BASE_URL")
+DEFAULT_MODEL = _harness_env("MODEL", "qwen3.5-397b", legacy_name="GAZELLA_MODEL")
 MAX_FILE_CHARS = int(os.environ.get("DEFAULT_HARNESS_MAX_FILE_CHARS", os.environ.get("GAZELLA_MAX_FILE_CHARS", "6000")))
 PROMPT_CONTEXT_CHARS = int(os.environ.get("DEFAULT_HARNESS_PROMPT_CONTEXT_CHARS", os.environ.get("GAZELLA_PROMPT_CONTEXT_CHARS", "8000")))
 LEAN_CHECK_TIMEOUT_SECONDS = int(os.environ.get("DEFAULT_HARNESS_LEAN_CHECK_TIMEOUT_SECONDS", os.environ.get("GAZELLA_LEAN_CHECK_TIMEOUT_SECONDS", "60")))
 REQUEST_TIMEOUT_SECONDS = int(os.environ.get("DEFAULT_HARNESS_REQUEST_TIMEOUT_SECONDS", os.environ.get("GAZELLA_REQUEST_TIMEOUT_SECONDS", "180")))
-DEFAULT_CONTEXT_TOKENS = 32768
+REQUEST_RETRIES = int(os.environ.get("DEFAULT_HARNESS_REQUEST_RETRIES", os.environ.get("GAZELLA_REQUEST_RETRIES", "2")))
+REQUEST_RETRY_BACKOFF_SECONDS = float(os.environ.get("DEFAULT_HARNESS_REQUEST_RETRY_BACKOFF_SECONDS", os.environ.get("GAZELLA_REQUEST_RETRY_BACKOFF_SECONDS", "2")))
+DEFAULT_CONTEXT_TOKENS = os.environ.get("DEFAULT_HARNESS_CONTEXT_TOKENS", os.environ.get("GAZELLA_N_CTX"))
 DEFAULT_MAX_TOOL_CALLS = int(os.environ.get("DEFAULT_HARNESS_MAX_TOOL_CALLS", "24"))
 DEFAULT_MAX_RESPONSE_TOKENS = int(os.environ.get("DEFAULT_HARNESS_MAX_RESPONSE_TOKENS", "4096"))
+DEFAULT_NATIVE_TOOLS = os.environ.get("DEFAULT_HARNESS_NATIVE_TOOLS", "1").lower() not in {"0", "false", "no"}
+DEFAULT_TOOL_RESULT_CHARS = int(os.environ.get("DEFAULT_HARNESS_TOOL_RESULT_CHARS", "6000"))
+DEFAULT_TASK_SUMMARY_CHARS = int(os.environ.get("DEFAULT_HARNESS_TASK_SUMMARY_CHARS", "8000"))
+DEFAULT_MAX_NON_PROOF_TOOL_CALLS = int(os.environ.get("DEFAULT_HARNESS_MAX_NON_PROOF_TOOL_CALLS", "8"))
+DEFAULT_MAX_SANDBOX_CALLS = int(os.environ.get("DEFAULT_HARNESS_MAX_SANDBOX_CALLS", "8"))
+DEFAULT_ALLOW_GRINDSET_TOOLS = os.environ.get("DEFAULT_HARNESS_ALLOW_GRINDSET_TOOLS", "0").lower() in {"1", "true", "yes"}
 GRINDSET_IMPORT = "import Benchmark.Grindset"
+
+
+class ChatCompletionError(RuntimeError):
+    def __init__(
+        self,
+        message: str,
+        *,
+        kind: str,
+        attempts: int,
+        timeout_seconds: int,
+        transient: bool,
+        last_status: int | None = None,
+    ) -> None:
+        super().__init__(message)
+        self.kind = kind
+        self.attempts = attempts
+        self.timeout_seconds = timeout_seconds
+        self.transient = transient
+        self.last_status = last_status
+
+    def to_dict(self) -> dict[str, object]:
+        return {
+            "message": str(self),
+            "kind": self.kind,
+            "attempts": self.attempts,
+            "timeout_seconds": self.timeout_seconds,
+            "transient": self.transient,
+            "last_status": self.last_status,
+        }
 
 
 def _api_key() -> str | None:
     return (
-        os.environ.get("DEFAULT_HARNESS_API_KEY")
+        _provider_env("API_KEY")
+        or os.environ.get("DEFAULT_HARNESS_API_KEY")
         or os.environ.get("GAZELLA_API_KEY")
         or os.environ.get("OPENAI_API_KEY")
     )
+
+
+def _active_provider() -> str:
+    return DEFAULT_PROVIDER or "custom"
 
 
 def endpoint_smoke(base_url: str = DEFAULT_BASE_URL, model: str = DEFAULT_MODEL) -> dict[str, object]:
@@ -76,29 +161,106 @@ def chat_completion(
     max_tokens: int = DEFAULT_MAX_RESPONSE_TOKENS,
     tools: list[dict[str, Any]] | None = None,
     tool_choice: object | None = None,
+    request_log_path: Path | None = None,
+    request_index: int | None = None,
 ) -> dict[str, object]:
     payload: dict[str, Any] = {
         "model": model,
         "messages": messages,
         "max_tokens": max_tokens,
         "temperature": 0,
-        "n_ctx": int(os.environ.get("GAZELLA_N_CTX", DEFAULT_CONTEXT_TOKENS)),
     }
+    if DEFAULT_CONTEXT_TOKENS:
+        payload["n_ctx"] = int(DEFAULT_CONTEXT_TOKENS)
     if tools is not None:
         payload["tools"] = tools
     if tool_choice is not None:
         payload["tool_choice"] = tool_choice
     body = json.dumps(payload).encode("utf-8")
-    request = urllib.request.Request(f"{base_url.rstrip('/')}/chat/completions", data=body, headers={"Content-Type": "application/json"}, method="POST")
-    api_key = _api_key()
-    if api_key:
-        request.add_header("Authorization", f"Bearer {api_key}")
-    try:
-        with urllib.request.urlopen(request, timeout=REQUEST_TIMEOUT_SECONDS) as response:
-            return json.loads(response.read().decode("utf-8"))
-    except urllib.error.HTTPError as exc:
-        detail = exc.read().decode("utf-8", errors="replace")
-        raise RuntimeError(f"HTTP {exc.code}: {detail}") from exc
+    max_request_attempts = max(1, REQUEST_RETRIES + 1)
+    last_error: ChatCompletionError | None = None
+    for attempt in range(1, max_request_attempts + 1):
+        started = time.time()
+        request = urllib.request.Request(f"{base_url.rstrip('/')}/chat/completions", data=body, headers={"Content-Type": "application/json"}, method="POST")
+        api_key = _api_key()
+        if api_key:
+            request.add_header("Authorization", f"Bearer {api_key}")
+        try:
+            with urllib.request.urlopen(request, timeout=REQUEST_TIMEOUT_SECONDS) as response:
+                decoded = json.loads(response.read().decode("utf-8"))
+                if request_log_path is not None and attempt > 1:
+                    _append_jsonl(
+                        request_log_path,
+                        {
+                            "status": "request_retry_succeeded",
+                            "request_index": request_index,
+                            "attempt": attempt,
+                            "duration_seconds": round(time.time() - started, 3),
+                        },
+                    )
+                return decoded
+        except urllib.error.HTTPError as exc:
+            detail = exc.read().decode("utf-8", errors="replace")
+            transient = exc.code in {408, 409, 425, 429, 500, 502, 503, 504}
+            kind = "context_length_exceeded" if "exceeds the available context size" in detail else ("http_transient" if transient else "http_error")
+            message = f"HTTP {exc.code}: {detail[:1200]}"
+            last_error = ChatCompletionError(
+                message,
+                kind=kind,
+                attempts=attempt,
+                timeout_seconds=REQUEST_TIMEOUT_SECONDS,
+                transient=transient,
+                last_status=exc.code,
+            )
+        except (TimeoutError, socket.timeout) as exc:
+            last_error = ChatCompletionError(
+                f"request_timeout: {exc}",
+                kind="request_timeout",
+                attempts=attempt,
+                timeout_seconds=REQUEST_TIMEOUT_SECONDS,
+                transient=True,
+            )
+        except (urllib.error.URLError, OSError) as exc:
+            last_error = ChatCompletionError(
+                f"transport_error: {exc}",
+                kind="transport_error",
+                attempts=attempt,
+                timeout_seconds=REQUEST_TIMEOUT_SECONDS,
+                transient=True,
+            )
+        if request_log_path is not None and last_error is not None:
+            _append_jsonl(
+                request_log_path,
+                {
+                    "status": "request_retry" if last_error.transient and attempt < max_request_attempts else "request_failed",
+                    "request_index": request_index,
+                    "attempt": attempt,
+                    "max_attempts": max_request_attempts,
+                    "duration_seconds": round(time.time() - started, 3),
+                    "error": last_error.to_dict(),
+                },
+            )
+        if last_error is None or not last_error.transient or attempt >= max_request_attempts:
+            break
+        time.sleep(REQUEST_RETRY_BACKOFF_SECONDS * attempt)
+    if last_error is None:
+        raise ChatCompletionError(
+            "request_failed_without_error",
+            kind="request_failed",
+            attempts=max_request_attempts,
+            timeout_seconds=REQUEST_TIMEOUT_SECONDS,
+            transient=False,
+        )
+    if last_error.kind == "request_timeout":
+        raise ChatCompletionError(
+            f"request_timeout after {last_error.attempts} attempt(s), timeout={REQUEST_TIMEOUT_SECONDS}s",
+            kind=last_error.kind,
+            attempts=last_error.attempts,
+            timeout_seconds=REQUEST_TIMEOUT_SECONDS,
+            transient=last_error.transient,
+            last_status=last_error.last_status,
+        ) from last_error
+    raise last_error
 
 
 def _response_text(response: dict[str, object]) -> str:
@@ -113,6 +275,15 @@ def _response_text(response: dict[str, object]) -> str:
         return ""
     content = message.get("content")
     return content if isinstance(content, str) else ""
+
+
+def _logged_response_message(message: dict[str, object]) -> dict[str, object]:
+    logged = {k: v for k, v in message.items() if k in {"role", "content", "tool_calls"}}
+    reasoning = message.get("reasoning_content")
+    if isinstance(reasoning, str) and reasoning:
+        logged["reasoning_content"] = reasoning[-DEFAULT_TOOL_RESULT_CHARS:]
+        logged["provider_reasoning_chars"] = len(reasoning)
+    return logged
 
 
 def _strip_thinking(text: str) -> str:
@@ -145,7 +316,7 @@ def _indent_proof_body(text: str) -> str:
             break
         if stripped.startswith(("Explanation", "This proof", "The proof", "Note:", "```")):
             break
-        lines.append(line)
+        lines.append(stripped)
     return "\n".join(f"  {line}" for line in lines) + "\n"
 
 
@@ -165,6 +336,13 @@ def _patch_proof_body(original: str, proof_body: str) -> str:
     if end_index == -1:
         end_index = len(original)
     return original[:index] + replacement + original[end_index:]
+
+
+FORBIDDEN_PROOF_RE = re.compile(r"\b(sorry|admit|axiom)\b|\?_[A-Za-z0-9_']*")
+
+
+def _contains_forbidden_proof_token(text: str) -> bool:
+    return FORBIDDEN_PROOF_RE.search(text) is not None
 
 
 def _ensure_grindset_import(text: str) -> str:
@@ -323,6 +501,77 @@ def _run_lean_module(workspace: Path, module: str, timeout_seconds: int | None =
             stderr = stderr.decode("utf-8", errors="replace")
         return 124, stdout + stderr + "\ntimeout"
     return process.returncode, (stdout + stderr).strip()
+
+
+def _theorem_statement(original: str, theorem_name: object) -> str:
+    decl_name = _decl_basename(theorem_name)
+    if not decl_name:
+        return ""
+    pattern = re.compile(
+        rf"(?ms)^\s*(?:theorem|lemma)\s+{re.escape(decl_name)}\b.*?:=\s*by",
+    )
+    match = pattern.search(original)
+    if match:
+        return original[match.start() : match.end()].rsplit(":=", 1)[0].strip()[:2000]
+    generic = re.search(r"(?ms)^\s*(?:theorem|lemma)\s+[A-Za-z0-9_'.]+.*?:=\s*by", original)
+    if generic:
+        return original[generic.start() : generic.end()].rsplit(":=", 1)[0].strip()[:2000]
+    return ""
+
+
+def _goal_diagnostics(output: str) -> dict[str, object]:
+    compact = _compact_lean_output(output)
+    goals = _extract_goal_blocks(compact)
+    primary = _split_goal_context(goals[0]) if goals else {"hypotheses": [], "target": ""}
+    target_text = str(primary.get("target") or "")
+    return {
+        "output": compact,
+        "goals": goals,
+        "local_hypotheses": primary.get("hypotheses", []),
+        "target": target_text,
+        "constants": _constants_from_text("\n".join(goals) if goals else compact),
+        "first_error": _first_meaningful_lean_error(compact),
+        "failure_kind": _classify_lean_failure(compact) if compact else None,
+    }
+
+
+def _run_tactic_snapshot(
+    *,
+    original: str,
+    proof_path: Path,
+    workspace: Path,
+    target_module: str,
+    tactic: str,
+) -> dict[str, object]:
+    previous = proof_path.read_text(encoding="utf-8") if proof_path.is_file() else original
+    candidate = _candidate_from_response(original, tactic + "\nall_goals exact ?_", None)
+    if _contains_forbidden_proof_token(tactic):
+        return {"ok": False, "error": "sandbox tactic contains sorry, admit, axiom, or a placeholder"}
+    try:
+        proof_path.write_text(candidate, encoding="utf-8")
+        code, output = _run_lean_module(workspace, target_module)
+    finally:
+        proof_path.write_text(previous, encoding="utf-8")
+    diagnostics = _goal_diagnostics(output)
+    return {
+        "ok": True,
+        "exit_code": code,
+        "changed_goal": bool(diagnostics.get("goals")),
+        "diagnostics": diagnostics,
+    }
+
+
+def _proof_result_diagnostics(output: str, *, baseline_goal: str = "") -> dict[str, object]:
+    diagnostics = _goal_diagnostics(output)
+    target = str(diagnostics.get("target") or "")
+    return {
+        "changed_goal": bool(target and target != baseline_goal),
+        "new_goal": target,
+        "first_error": diagnostics.get("first_error"),
+        "failure_kind": diagnostics.get("failure_kind"),
+        "local_hypotheses": diagnostics.get("local_hypotheses", []),
+        "constants": diagnostics.get("constants", []),
+    }
 
 
 def _local_tactic_candidates(task: dict[str, object]) -> list[tuple[str, str]]:
@@ -1559,6 +1808,119 @@ def _compact_lean_output(output: str, limit: int = 4000) -> str:
     return output[-limit:]
 
 
+def _first_meaningful_lean_error(output: str) -> str:
+    compact = _compact_lean_output(output, limit=1600)
+    for line in compact.splitlines():
+        stripped = line.strip()
+        if stripped and not stripped.startswith("trace: .>") and "LEAN_PATH=" not in stripped:
+            return stripped[:500]
+    return compact.splitlines()[0][:500] if compact.splitlines() else ""
+
+
+def _classify_lean_failure(output: str) -> str:
+    lowered = output.lower()
+    if "unexpected token" in lowered or "expected" in lowered and "error:" in lowered:
+        return "lean_parse_error"
+    if "unknown identifier" in lowered or "unknown constant" in lowered or "unknown namespace" in lowered:
+        return "lean_unknown_name"
+    if "unsolved goals" in lowered:
+        return "lean_unsolved_goals"
+    if "type mismatch" in lowered or "application type mismatch" in lowered:
+        return "lean_type_error"
+    if "timeout" in lowered:
+        return "lean_timeout"
+    if "error:" in lowered:
+        return "lean_error"
+    return "lean_check_failed"
+
+
+def _extract_goal_blocks(output: str, *, limit: int = 2400) -> list[str]:
+    blocks: list[str] = []
+    lines = output.splitlines()
+    for index, line in enumerate(lines):
+        if "⊢" not in line and not line.strip().startswith("⊢"):
+            continue
+        start = index
+        while start > 0:
+            previous = lines[start - 1]
+            if not previous.strip():
+                break
+            if "error:" in previous.lower():
+                break
+            start -= 1
+        end = index + 1
+        while end < len(lines):
+            current = lines[end]
+            if "error:" in current.lower() and end > index + 1:
+                break
+            if not current.strip() and end > index + 2:
+                break
+            end += 1
+        block = "\n".join(lines[start:end]).strip()
+        if block and block not in blocks:
+            blocks.append(block[-limit:])
+    return blocks[:3]
+
+
+def _split_goal_context(goal: str) -> dict[str, object]:
+    hypotheses: list[str] = []
+    target_lines: list[str] = []
+    in_target = False
+    for raw in goal.splitlines():
+        line = raw.strip()
+        if not line:
+            continue
+        if line.startswith("⊢") or "⊢" in line:
+            in_target = True
+            target_lines.append(line.split("⊢", 1)[1].strip() if "⊢" in line else line.lstrip("⊢").strip())
+            continue
+        if in_target:
+            target_lines.append(line)
+        elif " : " in line:
+            hypotheses.append(line)
+    return {"hypotheses": hypotheses[:30], "target": "\n".join(target_lines)[:1800]}
+
+
+LEAN_KEYWORDS = {
+    "by", "let", "fun", "forall", "if", "then", "else", "match", "with", "true", "false",
+    "Type", "Prop", "Sort", "Nat", "Int", "Bool", "String", "Unit", "Fin", "Option", "List",
+}
+
+
+def _constants_from_text(text: str) -> list[str]:
+    names: set[str] = set()
+    for token in re.findall(r"\b[A-Za-z_][A-Za-z0-9_'.]*(?:\.[A-Za-z_][A-Za-z0-9_'.]*)*\b", text):
+        if token in LEAN_KEYWORDS or token.startswith("h") and len(token) <= 4:
+            continue
+        if token[0].isupper() or "." in token or token in {"getStorage", "setStorage", "getMapping", "setMapping", "require", "Contract", "ContractResult", "storage", "storageMap"}:
+            names.add(token)
+    return sorted(names)[:60]
+
+
+def _failure_taxonomy(status: str, attempts: list[dict[str, object]], *, tool_calls: int = 0, no_tool_responses: int = 0) -> str:
+    if status in {"missing_credentials", "request_timeout", "request_failed"}:
+        return "provider_or_context_failure"
+    if status == "failed_no_tool_calls" or (tool_calls == 0 and not attempts):
+        return "no_tool_calls"
+    if status == "failed_no_attempt" and tool_calls > 0:
+        return "context_loop"
+    outputs = "\n".join(str(attempt.get("output", "")) for attempt in attempts)
+    if attempts:
+        lean_kind = _classify_lean_failure(outputs)
+        if lean_kind == "lean_parse_error":
+            return "proof_parse_failures"
+        if lean_kind == "lean_unknown_name":
+            return "proof_unknown_names"
+        if lean_kind == "lean_unsolved_goals":
+            return "proof_unsolved_goals"
+        if lean_kind == "lean_timeout":
+            return "timeout_after_progress"
+        return "proof_lean_failures"
+    if no_tool_responses:
+        return "context_loop"
+    return "unknown_failure"
+
+
 def _retry_feedback(output: str) -> str:
     compact = _compact_lean_output(output, limit=900)
     lines = [line for line in compact.splitlines() if "error:" in line.lower() or "unsolved goals" in line.lower()]
@@ -1625,7 +1987,7 @@ FAIR_TOOLS: list[dict[str, Any]] = [
         "type": "function",
         "function": {
             "name": "try_tactics",
-            "description": "Check one or more tactic bodies under := by. This is a Lean check helper, not a source of hardcoded task solutions.",
+            "description": "Check one or more tactic bodies under := by and return structured diagnostics. This counts as a proof attempt.",
             "parameters": {
                 "type": "object",
                 "properties": {
@@ -1644,13 +2006,42 @@ FAIR_TOOLS: list[dict[str, Any]] = [
     {
         "type": "function",
         "function": {
+            "name": "tactic_sandbox",
+            "description": "Run one short exploratory tactic prefix under := by and return the resulting goal/error. This does not count as a proof attempt and is capped.",
+            "parameters": {
+                "type": "object",
+                "properties": {"prefix": {"type": "string"}},
+                "required": ["prefix"],
+                "additionalProperties": False,
+            },
+        },
+    },
+    {
+        "type": "function",
+        "function": {
             "name": "search_declarations",
-            "description": "Search public Lean files in the workspace for declarations or text.",
+            "description": "Search public workspace and dependency Lean files for declarations or text.",
             "parameters": {
                 "type": "object",
                 "properties": {
                     "query": {"type": "string"},
                     "limit": {"type": "integer", "minimum": 1, "maximum": 50},
+                },
+                "required": ["query"],
+                "additionalProperties": False,
+            },
+        },
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "definition_outline",
+            "description": "Return matching public Lean declarations with signatures, source paths, small def body previews, and nearby related simp lemmas.",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "query": {"type": "string"},
+                    "limit": {"type": "integer", "minimum": 1, "maximum": 25},
                 },
                 "required": ["query"],
                 "additionalProperties": False,
@@ -1666,6 +2057,9 @@ def _safe_workspace_path(workspace: Path, rel: str) -> Path:
     path = (workspace / rel).resolve()
     root = workspace.resolve()
     if path != root and root not in path.parents:
+        for dependency_root in _fair_dependency_roots(workspace):
+            if path == dependency_root or dependency_root in path.parents:
+                return path
         raise ValueError("path escapes workspace")
     return path
 
@@ -1687,13 +2081,72 @@ def _local_no_auth_endpoint(base_url: str) -> bool:
     return host in {"127.0.0.1", "localhost", "::1"}
 
 
-def _search_declarations(workspace: Path, query: str, *, limit: int = 20) -> list[dict[str, object]]:
+def _fair_tool_can_read(rel: str, *, allow_grindset_tools: bool = False) -> bool:
+    parts = Path(rel).parts
+    if rel == ".env" or ".env" in parts:
+        return False
+    if rel.startswith("Benchmark/GeneratedPreview/") or "/GeneratedPreview/" in rel:
+        return False
+    if rel.endswith("Proofs.lean") or "/Proofs/" in rel:
+        return False
+    if allow_grindset_tools or DEFAULT_ALLOW_GRINDSET_TOOLS:
+        return True
+    return not rel.startswith("Benchmark/Grindset/")
+
+
+def _fair_dependency_roots(workspace: Path) -> list[Path]:
+    roots: list[Path] = []
+    lake = workspace / ".lake"
+    try:
+        if lake.exists():
+            roots.append(lake.resolve())
+    except OSError:
+        pass
+    root_lake = ROOT / ".lake"
+    try:
+        if root_lake.exists():
+            resolved = root_lake.resolve()
+            if resolved not in roots:
+                roots.append(resolved)
+    except OSError:
+        pass
+    return roots
+
+
+def _public_lean_files(workspace: Path, *, allow_grindset_tools: bool = False) -> list[tuple[str, Path]]:
+    seen: set[Path] = set()
+    files: list[tuple[str, Path]] = []
+
+    for path in workspace.rglob("*.lean"):
+        try:
+            resolved = path.resolve()
+            rel = path.relative_to(workspace).as_posix()
+        except (OSError, ValueError):
+            continue
+        if resolved in seen or not _fair_tool_can_read(rel, allow_grindset_tools=allow_grindset_tools):
+            continue
+        seen.add(resolved)
+        files.append((rel, path))
+
+    for dependency_root in _fair_dependency_roots(workspace):
+        for path in dependency_root.rglob("*.lean"):
+            try:
+                resolved = path.resolve()
+                rel = ".lake/" + path.relative_to(dependency_root).as_posix()
+            except (OSError, ValueError):
+                continue
+            if resolved in seen or not _fair_tool_can_read(rel, allow_grindset_tools=allow_grindset_tools):
+                continue
+            seen.add(resolved)
+            files.append((rel, path))
+
+    return sorted(files, key=lambda item: item[0])
+
+
+def _search_declarations(workspace: Path, query: str, *, limit: int = 20, allow_grindset_tools: bool = False) -> list[dict[str, object]]:
     results: list[dict[str, object]] = []
     pattern = query.lower()
-    for path in sorted(workspace.glob("**/*.lean")):
-        rel = path.relative_to(workspace).as_posix()
-        if "/Proofs" in rel or rel.startswith("Benchmark/GeneratedPreview/"):
-            continue
+    for rel, path in _public_lean_files(workspace, allow_grindset_tools=allow_grindset_tools):
         try:
             lines = path.read_text(encoding="utf-8").splitlines()
         except UnicodeDecodeError:
@@ -1704,6 +2157,109 @@ def _search_declarations(workspace: Path, query: str, *, limit: int = 20) -> lis
                 results.append({"path": rel, "line": lineno, "text": stripped[:240]})
                 if len(results) >= limit:
                     return results
+    return results
+
+
+DECL_RE = re.compile(r"^\s*(?:@[^\n]+)?\s*(def|theorem|lemma|abbrev|structure|inductive|class|instance)\s+([A-Za-z_][A-Za-z0-9_'.]*)")
+
+
+def _declaration_signature(lines: list[str], start: int) -> str:
+    collected: list[str] = []
+    paren_balance = 0
+    bracket_balance = 0
+    for raw in lines[start : min(len(lines), start + 12)]:
+        stripped = raw.strip()
+        if not stripped:
+            break
+        collected.append(stripped)
+        paren_balance += stripped.count("(") - stripped.count(")")
+        bracket_balance += stripped.count("[") - stripped.count("]")
+        joined = " ".join(collected)
+        if ":=" in joined or " where" in joined or (":" in joined and paren_balance <= 0 and bracket_balance <= 0):
+            break
+    signature = " ".join(collected)
+    if ":=" in signature:
+        signature = signature.split(":=", 1)[0].rstrip()
+    return signature[:700]
+
+
+def _declaration_body_preview(lines: list[str], start: int, *, limit: int = 700) -> str:
+    preview: list[str] = []
+    for raw in lines[start : min(len(lines), start + 18)]:
+        if raw.startswith(("theorem ", "lemma ")) and preview:
+            break
+        preview.append(raw.rstrip())
+    text = "\n".join(preview).strip()
+    return text[:limit]
+
+
+def _related_simp_lemmas(lines: list[str], decl_start: int, query: str) -> list[str]:
+    related: list[str] = []
+    q = query.lower()
+    start = max(0, decl_start - 45)
+    end = min(len(lines), decl_start + 46)
+    for index in range(start, end):
+        line = lines[index].strip()
+        if not line:
+            continue
+        lower = line.lower()
+        if "@[simp" not in lower and q not in lower:
+            continue
+        match = DECL_RE.match(line)
+        if match and match.group(1) in {"theorem", "lemma", "def"}:
+            related.append(_declaration_signature(lines, index))
+        elif "@[simp" in lower and index + 1 < len(lines):
+            next_match = DECL_RE.match(lines[index + 1].strip())
+            if next_match:
+                related.append(_declaration_signature(lines, index + 1))
+        if len(related) >= 6:
+            break
+    return related
+
+
+def _definition_outline(workspace: Path, query: str, *, limit: int = 12, allow_grindset_tools: bool = False) -> list[dict[str, object]]:
+    results: list[dict[str, object]] = []
+    pattern = query.lower()
+    for rel, path in _public_lean_files(workspace, allow_grindset_tools=allow_grindset_tools):
+        try:
+            lines = path.read_text(encoding="utf-8").splitlines()
+        except UnicodeDecodeError:
+            continue
+        namespace_stack: list[str] = []
+        for lineno, raw in enumerate(lines, start=1):
+            stripped = raw.strip()
+            ns_match = re.match(r"namespace\s+([A-Za-z0-9_'.]+)", stripped)
+            if ns_match:
+                namespace_stack.append(ns_match.group(1))
+                continue
+            if stripped == "end" or stripped.startswith("end "):
+                if namespace_stack:
+                    namespace_stack.pop()
+                continue
+            match = DECL_RE.match(stripped)
+            if not match:
+                continue
+            kind, name = match.groups()
+            namespace = ".".join(namespace_stack)
+            qualified = name if "." in name or not namespace else f"{namespace}.{name}"
+            signature = _declaration_signature(lines, lineno - 1)
+            haystack = f"{qualified}\n{signature}".lower()
+            if pattern not in haystack:
+                continue
+            item: dict[str, object] = {
+                "name": qualified,
+                "kind": kind,
+                "namespace": namespace,
+                "path": rel,
+                "line": lineno,
+                "signature": signature,
+                "related_simp_lemmas": _related_simp_lemmas(lines, lineno - 1, query),
+            }
+            if kind in {"def", "abbrev"}:
+                item["body_preview"] = _declaration_body_preview(lines, lineno - 1)
+            results.append(item)
+            if len(results) >= limit:
+                return results
     return results
 
 
@@ -1727,6 +2283,10 @@ def _append_jsonl(path: Path, payload: dict[str, object]) -> None:
         handle.write(json.dumps(payload, sort_keys=True) + "\n")
 
 
+def _tool_result_content(result: dict[str, object]) -> str:
+    return json.dumps(result, sort_keys=True)[-DEFAULT_TOOL_RESULT_CHARS:]
+
+
 def _proof_attempt_count(attempts: list[dict[str, object]]) -> int:
     return sum(1 for attempt in attempts if str(attempt.get("attempt", "")).startswith("tool:"))
 
@@ -1742,11 +2302,13 @@ def _execute_fair_tool(
     target_module: str,
     attempts_dir: Path,
     attempts: list[dict[str, object]],
+    sandbox_state: dict[str, int] | None = None,
+    allow_grindset_tools: bool = False,
 ) -> dict[str, object]:
     if name == "show_task":
         summary_path = workspace / "harness" / "TASK_SUMMARY.md"
         summary = summary_path.read_text(encoding="utf-8") if summary_path.is_file() else ""
-        return {"ok": True, "task": _task_public_view(task), "task_summary": summary[-8000:]}
+        return {"ok": True, "task": _task_public_view(task), "task_summary": summary[-DEFAULT_TASK_SUMMARY_CHARS:]}
     if name == "read_file":
         rel = args.get("path")
         if not isinstance(rel, str):
@@ -1755,6 +2317,8 @@ def _execute_fair_tool(
             path = _safe_workspace_path(workspace, rel)
         except ValueError as exc:
             return {"ok": False, "error": str(exc)}
+        if not _fair_tool_can_read(rel, allow_grindset_tools=allow_grindset_tools):
+            return {"ok": False, "error": "fair mode does not expose hidden proof, GeneratedPreview, .env, or disabled Grindset files"}
         if not path.is_file():
             return {"ok": False, "error": "file not found"}
         try:
@@ -1766,8 +2330,41 @@ def _execute_fair_tool(
         return {"ok": True, "path": rel, "content": content}
     if name == "show_goal":
         code, output = _run_lean_module(workspace, target_module)
-        return {"ok": True, "exit_code": code, "output": _compact_lean_output(output)}
+        normalized = _run_tactic_snapshot(
+            original=original,
+            proof_path=proof_path,
+            workspace=workspace,
+            target_module=target_module,
+            tactic="dsimp",
+        )
+        return {
+            "ok": True,
+            "exit_code": code,
+            "theorem_statement": _theorem_statement(original, task.get("theorem_name")),
+            "diagnostics": _goal_diagnostics(output),
+            "normalized_once": normalized.get("diagnostics") if normalized.get("ok") else normalized,
+        }
+    if name == "tactic_sandbox":
+        prefix = args.get("prefix")
+        if not isinstance(prefix, str) or not prefix.strip():
+            return {"ok": False, "error": "prefix must be a non-empty string"}
+        state = sandbox_state if sandbox_state is not None else {}
+        used = state.get("count", 0)
+        limit = state.get("limit", DEFAULT_MAX_SANDBOX_CALLS)
+        if used >= limit:
+            return {"ok": False, "error": "tactic_sandbox_budget_exceeded", "max_calls": limit}
+        state["count"] = used + 1
+        return _run_tactic_snapshot(
+            original=original,
+            proof_path=proof_path,
+            workspace=workspace,
+            target_module=target_module,
+            tactic=prefix,
+        ) | {"sandbox_calls_used": state["count"], "sandbox_calls_max": limit}
     if name in {"check_proof", "try_tactics"}:
+        baseline_code, baseline_output = _run_lean_module(workspace, target_module)
+        baseline_diag = _goal_diagnostics(baseline_output)
+        baseline_goal = str(baseline_diag.get("target") or "")
         proofs: list[tuple[str, str]] = []
         if name == "check_proof":
             proof = args.get("proof")
@@ -1786,6 +2383,27 @@ def _execute_fair_tool(
         results: list[dict[str, object]] = []
         for label, proof in proofs:
             candidate = _candidate_from_response(original, proof, task.get("theorem_name"))
+            if _contains_forbidden_proof_token(candidate):
+                candidate_path = _write_attempt_artifact(attempts_dir, task, f"fair-{len(attempts) + 1}-{label}", candidate)
+                attempt = {
+                    "attempt": f"tool:{name}",
+                    "status": "rejected_forbidden_placeholder",
+                    "exit_code": None,
+                    "candidate_path": str(candidate_path),
+                    "output": "proof contains sorry, admit, axiom, or an unsolved placeholder",
+                    "failure_kind": "forbidden_placeholder",
+                    "diagnostics": {
+                        "changed_goal": False,
+                        "new_goal": baseline_goal,
+                        "first_error": "proof contains sorry, admit, axiom, or an unsolved placeholder",
+                        "failure_kind": "forbidden_placeholder",
+                    },
+                    "duration_seconds": 0,
+                    "response_usage": None,
+                }
+                attempts.append(attempt)
+                results.append(attempt)
+                continue
             proof_path.write_text(candidate, encoding="utf-8")
             candidate_path = _write_attempt_artifact(attempts_dir, task, f"fair-{len(attempts) + 1}-{label}", candidate)
             lean_start = time.time()
@@ -1796,6 +2414,8 @@ def _execute_fair_tool(
                 "exit_code": code,
                 "candidate_path": str(candidate_path),
                 "output": _compact_lean_output(output),
+                "failure_kind": None if code == 0 else _classify_lean_failure(output),
+                "diagnostics": _proof_result_diagnostics(output, baseline_goal=baseline_goal),
                 "duration_seconds": round(time.time() - lean_start, 3),
                 "response_usage": None,
             }
@@ -1809,7 +2429,13 @@ def _execute_fair_tool(
         if not isinstance(query, str) or not query:
             return {"ok": False, "error": "query must be a non-empty string"}
         limit = args.get("limit")
-        return {"ok": True, "results": _search_declarations(workspace, query, limit=int(limit) if isinstance(limit, int) else 20)}
+        return {"ok": True, "results": _search_declarations(workspace, query, limit=int(limit) if isinstance(limit, int) else 20, allow_grindset_tools=allow_grindset_tools)}
+    if name == "definition_outline":
+        query = args.get("query")
+        if not isinstance(query, str) or not query:
+            return {"ok": False, "error": "query must be a non-empty string"}
+        limit = args.get("limit")
+        return {"ok": True, "results": _definition_outline(workspace, query, limit=int(limit) if isinstance(limit, int) else 12, allow_grindset_tools=allow_grindset_tools)}
     return {"ok": False, "error": f"unknown tool: {name}"}
 
 
@@ -1876,6 +2502,7 @@ def _attempt_task_fair(
     attempts_dir: Path,
     tool_log_path: Path,
     conversation_log_path: Path,
+    allow_grindset_tools: bool = False,
 ) -> dict[str, object]:
     editable_files = task.get("editable_files")
     target_module = task.get("target_module")
@@ -1886,55 +2513,90 @@ def _attempt_task_fair(
     original = proof_path.read_text(encoding="utf-8")
     attempts: list[dict[str, object]] = []
 
+    if DEFAULT_NATIVE_TOOLS:
+        system_prompt = (
+            "You are an agent solving one public Lean benchmark task through tools only. "
+            "Call show_task first; it returns the shared TASK_SUMMARY.md used by all harnesses. "
+            "Then inspect files with read_file, show_goal, definition_outline, and search_declarations. "
+            "Use tactic_sandbox for small exploratory tactic prefixes and check_proof or try_tactics for proof attempts. "
+            "Non-proof tools are capped; after a few inspection calls, try a tactic or proof and learn from Lean diagnostics. "
+            "Do not use sorry, admit, axiom, hidden imports, "
+            "Benchmark.GeneratedPreview, or reference Proofs modules. Do not assume a hardcoded solution from the task name. "
+            "If native tool calling is unavailable, return JSON like {\"tool\":\"show_task\",\"arguments\":{}}."
+        )
+        user_prompt = (
+            f"Solve the Lean task in editable file {editable}. "
+            "Call show_task first, then inspect the public files and check proof bodies until Lean passes."
+        )
+    else:
+        system_prompt = (
+            "Solve one Lean task by JSON tool calls only. "
+            "Allowed tools: show_task {}, read_file {path}, show_goal {}, "
+            "definition_outline {query,limit}, search_declarations {query,limit}, "
+            "tactic_sandbox {prefix}, try_tactics {tactics}, check_proof {proof}. "
+            "Non-proof tools are capped; reserve budget for try_tactics/check_proof. "
+            "No sorry/admit/axiom/hidden imports/reference Proofs. "
+            "Reply only as JSON, e.g. {\"tool\":\"show_task\",\"arguments\":{}}."
+        )
+        user_prompt = f"Task file: {editable}. First call show_task."
+
     messages: list[dict[str, Any]] = [
-        {
-            "role": "system",
-            "content": (
-                "You are an agent solving one public Lean benchmark task through tools only. "
-                "Call show_task first; it returns the shared TASK_SUMMARY.md used by all harnesses. "
-                "Then inspect files with read_file, show_goal, and search_declarations. "
-                "Use check_proof or try_tactics for every proof attempt. Do not use sorry, admit, axiom, hidden imports, "
-                "Benchmark.GeneratedPreview, or reference Proofs modules. Do not assume a hardcoded solution from the task name. "
-                "If native tool calling is unavailable, return JSON like {\"tool\":\"show_task\",\"arguments\":{}}."
-            ),
-        },
-        {
-            "role": "user",
-            "content": (
-                f"Solve the Lean task in editable file {editable}. "
-                "Call show_task first, then inspect the public files and check proof bodies until Lean passes."
-            ),
-        },
+        {"role": "system", "content": system_prompt},
+        {"role": "user", "content": user_prompt},
     ]
+
+    def set_compact_user_context(content: str) -> None:
+        messages[:] = [
+            {"role": "system", "content": system_prompt},
+            {"role": "user", "content": f"{user_prompt}\n{content}\nReply with the next JSON tool call."},
+        ]
     no_tool_response_limit = max(3, min(20, max_tool_calls))
     request_limit = max_tool_calls + max_attempts + no_tool_response_limit
     tool_calls_executed = 0
+    non_proof_tool_calls = 0
+    non_proof_tool_limit = min(
+        DEFAULT_MAX_NON_PROOF_TOOL_CALLS,
+        max(3, max_tool_calls // 2),
+    )
     no_tool_responses = 0
+    sandbox_state = {"count": 0, "limit": min(DEFAULT_MAX_SANDBOX_CALLS, max(1, max_tool_calls // 4))}
     for request_index in range(1, request_limit + 1):
         if _proof_attempt_count(attempts) >= max_attempts:
             break
         if tool_calls_executed >= max_tool_calls:
             break
         try:
-            response = chat_completion(messages, base_url=base_url, tools=FAIR_TOOLS, tool_choice="auto")
+            response = chat_completion(
+                messages,
+                base_url=base_url,
+                tools=FAIR_TOOLS if DEFAULT_NATIVE_TOOLS else None,
+                tool_choice="auto" if DEFAULT_NATIVE_TOOLS else None,
+                request_log_path=conversation_log_path,
+                request_index=request_index,
+            )
         except Exception as exc:
+            error_payload = exc.to_dict() if isinstance(exc, ChatCompletionError) else {"message": str(exc)}
+            status = "request_timeout" if isinstance(exc, ChatCompletionError) and exc.kind == "request_timeout" else "request_failed"
             _append_jsonl(
                 conversation_log_path,
                 {
                     "task_ref": task.get("task_ref"),
                     "request_index": request_index,
-                    "status": "request_failed",
-                    "error": str(exc),
+                    "status": status,
+                    "error": error_payload,
                 },
             )
             return {
                 "task_ref": task.get("task_ref"),
-                "status": "request_failed",
-                "error": str(exc),
+                "status": status,
+                "error": error_payload,
                 "attempts": attempts,
                 "tool_calls_executed": tool_calls_executed,
+                "non_proof_tool_calls": non_proof_tool_calls,
+                "non_proof_tool_limit": non_proof_tool_limit,
                 "tool_log": str(tool_log_path),
                 "conversation_log": str(conversation_log_path),
+                "failure_class": _failure_taxonomy(status, attempts, tool_calls=tool_calls_executed, no_tool_responses=no_tool_responses),
             }
         response_message = {}
         choices = response.get("choices")
@@ -1948,7 +2610,7 @@ def _attempt_task_fair(
             {
                 "task_ref": task.get("task_ref"),
                 "request_index": request_index,
-                "message": {k: v for k, v in response_message.items() if k in {"role", "content", "tool_calls"}},
+                "message": _logged_response_message(response_message),
                 "usage": response.get("usage") if isinstance(response, dict) else None,
             },
         )
@@ -1980,7 +2642,7 @@ def _attempt_task_fair(
                 messages.append(
                     {
                         "role": "user",
-                        "content": "Fair mode requires Lean proof attempts through check_proof or try_tactics. Call a tool next.",
+                        "content": "Fair mode requires a tool call. Reply only with JSON for one allowed tool.",
                     }
                 )
                 continue
@@ -2027,6 +2689,42 @@ def _attempt_task_fair(
                     },
                 )
                 continue
+            if name not in {"check_proof", "try_tactics", "tactic_sandbox"} and non_proof_tool_calls >= non_proof_tool_limit:
+                result = {
+                    "ok": False,
+                    "error": "non_proof_tool_budget_exceeded",
+                    "non_proof_tool_calls": non_proof_tool_calls,
+                    "non_proof_tool_limit": non_proof_tool_limit,
+                    "message": "Use check_proof or try_tactics now. Do not re-read or re-show task context.",
+                }
+                tool_calls_executed += 1
+                _append_jsonl(
+                    tool_log_path,
+                    {
+                        "task_ref": task.get("task_ref"),
+                        "tool": name,
+                        "arguments": args,
+                        "result": result,
+                        "tool_call_id": tool_call.get("id"),
+                        "duration_seconds": 0,
+                    },
+                )
+                if text_protocol:
+                    content = f"Tool result for {name}: {_tool_result_content(result)}"
+                    if DEFAULT_NATIVE_TOOLS:
+                        messages.append({"role": "user", "content": content})
+                    else:
+                        set_compact_user_context(content)
+                else:
+                    messages.append(
+                        {
+                            "role": "tool",
+                            "tool_call_id": tool_call.get("id") or f"call-{request_index}",
+                            "name": name,
+                            "content": _tool_result_content(result),
+                        }
+                    )
+                continue
             if name == "try_tactics":
                 remaining = max(0, max_attempts - _proof_attempt_count(attempts))
                 raw_tactics = args.get("tactics")
@@ -2043,8 +2741,12 @@ def _attempt_task_fair(
                 target_module=target_module,
                 attempts_dir=attempts_dir,
                 attempts=attempts,
+                sandbox_state=sandbox_state,
+                allow_grindset_tools=allow_grindset_tools,
             )
             tool_calls_executed += 1
+            if name not in {"check_proof", "try_tactics", "tactic_sandbox"}:
+                non_proof_tool_calls += 1
             _append_jsonl(
                 tool_log_path,
                 {
@@ -2057,27 +2759,30 @@ def _attempt_task_fair(
                 },
             )
             if text_protocol:
-                messages.append(
-                    {
-                        "role": "user",
-                        "content": f"Tool result for {name}: {json.dumps(result)[-6000:]}",
-                    }
-                )
+                content = f"Tool result for {name}: {_tool_result_content(result)}"
+                if DEFAULT_NATIVE_TOOLS:
+                    messages.append({"role": "user", "content": content})
+                else:
+                    set_compact_user_context(content)
             else:
                 messages.append(
                     {
                         "role": "tool",
                         "tool_call_id": tool_call.get("id") or f"call-{request_index}",
                         "name": name,
-                        "content": json.dumps(result)[-6000:],
+                        "content": _tool_result_content(result),
                     }
                 )
             if result.get("passed") is True:
                 return {
                     "task_ref": task.get("task_ref"),
                     "status": "lean_passed",
+                    "failure_class": None,
                     "attempts": attempts,
                     "tool_calls_executed": tool_calls_executed,
+                    "non_proof_tool_calls": non_proof_tool_calls,
+                    "non_proof_tool_limit": non_proof_tool_limit,
+                    "tactic_sandbox_calls": sandbox_state["count"],
                     "tool_log": str(tool_log_path),
                     "conversation_log": str(conversation_log_path),
                 }
@@ -2091,9 +2796,13 @@ def _attempt_task_fair(
     return {
         "task_ref": task.get("task_ref"),
         "status": final_status,
+        "failure_class": _failure_taxonomy(final_status, attempts, tool_calls=tool_calls_executed, no_tool_responses=no_tool_responses),
         "attempts": attempts,
         "tool_calls_executed": tool_calls_executed,
+        "non_proof_tool_calls": non_proof_tool_calls,
+        "non_proof_tool_limit": non_proof_tool_limit,
         "no_tool_responses": no_tool_responses,
+        "tactic_sandbox_calls": sandbox_state["count"],
         "tool_log": str(tool_log_path),
         "conversation_log": str(conversation_log_path),
     }
@@ -2298,24 +3007,27 @@ def run_group(
         group = filter_group_to_task(group, task_ref)
     built = build_group_workspace(group, run_id=run_id, include_group_grindset=(mode == "legacy"))
     assert_workspace_isolated(built.path)
-    base_url = os.environ.get("DEFAULT_HARNESS_BASE_URL", os.environ.get("GAZELLA_BASE_URL", DEFAULT_BASE_URL))
+    base_url = DEFAULT_BASE_URL
     response: dict[str, object]
     if dry_run:
         response = {
             "status": "dry_run",
+            "provider": _active_provider(),
             "base_url": base_url,
             "model": DEFAULT_MODEL,
             "mode": mode,
             "max_attempts": max_attempts,
             "max_tool_calls": max_tool_calls,
         }
-    elif mode in {"fair", "tuned"} and not _api_key() and not _local_no_auth_endpoint(base_url):
+    elif mode in {"fair", "fair+libs", "tuned"} and not _api_key() and not _local_no_auth_endpoint(base_url):
+        provider_key_hint = f", DEFAULT_HARNESS_{DEFAULT_PROVIDER.upper()}_API_KEY" if DEFAULT_PROVIDER else ""
         response = {
             "status": "missing_credentials",
+            "provider": _active_provider(),
             "base_url": base_url,
             "model": DEFAULT_MODEL,
             "mode": mode,
-            "error": f"{mode} mode requires DEFAULT_HARNESS_API_KEY, GAZELLA_API_KEY, OPENAI_API_KEY, or a localhost-compatible no-auth endpoint",
+            "error": f"{mode} mode requires DEFAULT_HARNESS_API_KEY{provider_key_hint}, GAZELLA_API_KEY, OPENAI_API_KEY, or a localhost-compatible no-auth endpoint",
             "tasks": [],
         }
     else:
@@ -2324,7 +3036,7 @@ def run_group(
             tasks_payload = json.loads((built.path / "harness" / "TASKS.json").read_text(encoding="utf-8"))
             for task in tasks_payload.get("tasks", []):
                 if isinstance(task, dict):
-                    if mode == "fair":
+                    if mode in {"fair", "fair+libs"}:
                         task_results.append(
                             _attempt_task_fair(
                                 task,
@@ -2335,6 +3047,7 @@ def run_group(
                                 attempts_dir=run_dir / "attempts",
                                 tool_log_path=run_dir / "tool-calls" / f"{str(task.get('task_id') or task.get('task_ref')).replace('/', '__')}.jsonl",
                                 conversation_log_path=run_dir / "conversations" / f"{str(task.get('task_id') or task.get('task_ref')).replace('/', '__')}.jsonl",
+                                allow_grindset_tools=(mode == "fair+libs"),
                             )
                         )
                     else:
@@ -2349,16 +3062,17 @@ def run_group(
                                 allow_grindset_import=(mode == "legacy"),
                             )
                         )
-            response = {"status": "completed", "base_url": base_url, "model": DEFAULT_MODEL, "mode": mode, "tasks": task_results}
+            response = {"status": "completed", "provider": _active_provider(), "base_url": base_url, "model": DEFAULT_MODEL, "mode": mode, "tasks": task_results}
         except Exception as exc:
-            response = {"status": "harness_error", "error": str(exc), "base_url": base_url, "model": DEFAULT_MODEL, "mode": mode, "tasks": task_results}
+            response = {"status": "harness_error", "error": str(exc), "provider": _active_provider(), "base_url": base_url, "model": DEFAULT_MODEL, "mode": mode, "tasks": task_results}
 
     (run_dir / "workspace-manifest.json").write_text((built.path / "workspace-manifest.json").read_text(encoding="utf-8"), encoding="utf-8")
     shutil.copy2(built.path / "harness" / "TASK_SUMMARY.md", run_dir / "TASK_SUMMARY.md")
     (run_dir / "harness-request.json").write_text(
         json.dumps(
             {
-                "group": group_to_json(group),
+                "group": agent_group_to_json(group),
+                "provider": _active_provider(),
                 "base_url": base_url,
                 "model": DEFAULT_MODEL,
                 "mode": mode,
@@ -2386,6 +3100,7 @@ def run_group(
         "schema_version": 1,
         "run_id": run_id,
         "harness_id": HARNESS_ID,
+        "provider": _active_provider(),
         "model": DEFAULT_MODEL,
         "track": "group/lean_tools",
         "mode": mode,
@@ -2423,7 +3138,7 @@ def main() -> int:
     run.add_argument("--task-ref")
     args = parser.parse_args()
     if args.command == "smoke":
-        print(json.dumps(endpoint_smoke(os.environ.get("DEFAULT_HARNESS_BASE_URL", os.environ.get("GAZELLA_BASE_URL", DEFAULT_BASE_URL))), indent=2))
+        print(json.dumps(endpoint_smoke(DEFAULT_BASE_URL, DEFAULT_MODEL), indent=2))
         return 0
     code, run_dir = run_group(
         args.group_id,

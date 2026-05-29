@@ -50,6 +50,46 @@ def _read_if_present(workspace: Path, rel_path: str, *, limit: int = 6000) -> st
     return text
 
 
+def _symbol_lines(text: str, *, limit: int = 20) -> list[str]:
+    symbols: list[str] = []
+    namespace = ""
+    for raw in text.splitlines():
+        line = raw.strip()
+        if not line:
+            continue
+        if line.startswith("namespace "):
+            namespace = line.split(None, 1)[1]
+            continue
+        if line.startswith("end "):
+            namespace = ""
+            continue
+        if line.startswith(("def ", "theorem ", "lemma ", "abbrev ", "structure ", "inductive ")):
+            symbols.append(line.split(":=", 1)[0].strip()[:220])
+        elif line.startswith("function "):
+            symbols.append((f"{namespace}.{line}" if namespace else line)[:220])
+        elif ":= slot " in line:
+            symbols.append(("storage " + line)[:220])
+        if len(symbols) >= limit:
+            break
+    return symbols
+
+
+def _relevant_symbols_for_task(workspace: Path, task: object) -> list[str]:
+    symbols: list[str] = []
+    seen: set[str] = set()
+    for rel in (*task.implementation_files, *task.specification_files):
+        text = _read_if_present(workspace, rel, limit=10000)
+        if not text:
+            continue
+        for symbol in _symbol_lines(text, limit=16):
+            if symbol not in seen:
+                seen.add(symbol)
+                symbols.append(f"- `{rel}`: {symbol}")
+            if len(symbols) >= 24:
+                return symbols
+    return symbols
+
+
 def _task_summary_markdown(group: Group, workspace: Path, *, include_group_grindset: bool) -> str:
     lines = [
         "# Verity Task Summary",
@@ -81,6 +121,9 @@ def _task_summary_markdown(group: Group, workspace: Path, *, include_group_grind
                 "",
             ]
         )
+        symbols = _relevant_symbols_for_task(workspace, task)
+        if symbols:
+            lines.extend(["### Relevant Symbols", "", *symbols, ""])
         for rel in task.editable_files:
             content = _read_if_present(workspace, rel)
             if content:

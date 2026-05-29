@@ -24,5 +24,11 @@
   "header_envs": {},
   "extra_body": {},
   "request_timeout_seconds": 60,
-  "optional_secret_env": ["DEFAULT_HARNESS_API_KEY", "GAZELLA_API_KEY", "OPENAI_API_KEY"]
+  "optional_secret_env": [
+    "DEFAULT_HARNESS_API_KEY",
+    "DEFAULT_HARNESS_QWEN_API_KEY",
+    "DEFAULT_HARNESS_GLM_API_KEY",
+    "GAZELLA_API_KEY",
+    "OPENAI_API_KEY"
+  ]
 }

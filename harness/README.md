@@ -39,7 +39,8 @@ Runtime tracks:
 - `group/shell`: shell-based coding-agent harness for Grok Build
 
 Default harness modes:
-- `fair`: the default, agent-first mode. It does not run hardcoded local proof candidates, heuristic grind candidates, or theorem/task-name dispatch. Its workspace excludes group-specific Grindset helper modules, and model proof patching does not add broad `Benchmark.Grindset` imports. The model interacts through an OpenAI-compatible tool loop with Lean-native tools: `show_task`, `read_file`, `show_goal`, `check_proof`, `try_tactics`, and `search_declarations`; endpoints that return JSON-encoded tool calls as assistant text are accepted as a compatibility path. Assistant messages are written under `conversations/*.jsonl`; tool calls are written under `tool-calls/*.jsonl`; checked proof candidates are written under `attempts/*.lean` and summarized in `harness-response.json`. Missing remote API credentials in fair/tuned modes produce a `missing_credentials` artifact instead of accidentally comparing against a non-agent path.
+- `fair`: the default, agent-first mode. It does not run hardcoded local proof candidates, heuristic grind candidates, or theorem/task-name dispatch. Its workspace excludes group-specific Grindset helper modules, and model proof patching does not add broad `Benchmark.Grindset` imports. The model interacts through an OpenAI-compatible tool loop with Lean-native tools: `show_task`, `read_file`, `show_goal`, `definition_outline`, `tactic_sandbox`, `check_proof`, `try_tactics`, and `search_declarations`; endpoints that return JSON-encoded tool calls as assistant text are accepted as a compatibility path. Assistant messages are written under `conversations/*.jsonl`; tool calls are written under `tool-calls/*.jsonl`; checked proof candidates are written under `attempts/*.lean` and summarized in `harness-response.json`. Missing remote API credentials in fair/tuned modes produce a `missing_credentials` artifact instead of accidentally comparing against a non-agent path.
+- `fair+libs`: same fair agent loop, with generic Grindset helper modules visible to tools. It still excludes group-specific Grindset modules and theorem-specific local candidates.
 - `tuned`: generic heuristic/API comparison mode without hardcoded local proof candidates, broad Grindset import patching, or group-specific Grindset helper modules.
 - `legacy`: compatibility mode for the previous local-candidate and group-specific Grindset behavior. Use this only as an upper-bound/debug signal, not as the headline comparison.
 
@@ -47,6 +48,8 @@ Task briefing:
 - Every task/group workspace contains `harness/TASK_SUMMARY.md`.
 - The summary is shared by fair default and Grok Build and includes target theorem names, editable files, implementation/specification files, the exact `./harness/check.sh` command, policy, and current editable theorem skeletons.
 - Grok Build appends the initial check result to the summary before the shell agent starts. The fair default agent receives the same summary through `show_task`.
+- Fair-mode `definition_outline`, `search_declarations`, and `read_file` can inspect public Lean dependency files under `.lake`, while hidden proof files, GeneratedPreview, `.env`, and Grindset remain blocked by default.
+- Fair task results include `failure_class`, distinguishing provider/context failures, no-tool loops, context loops, proof parse errors, unknown names, unsolved goals, Lean timeouts, and other Lean failures.
 
 Budget profiles:
 - `quick`: `max_attempts=1`, `max_tool_calls=24`, `max_turns=20`, `grok_timeout_seconds=900`.
@@ -59,14 +62,28 @@ Default harness API env:
 - `DEFAULT_HARNESS_MODEL`
 - `DEFAULT_HARNESS_API_KEY`
 - `DEFAULT_HARNESS_REQUEST_TIMEOUT_SECONDS`
+- `DEFAULT_HARNESS_REQUEST_RETRIES`
+- `DEFAULT_HARNESS_REQUEST_RETRY_BACKOFF_SECONDS`
 - `DEFAULT_HARNESS_MAX_TOOL_CALLS`
 - `DEFAULT_HARNESS_MAX_RESPONSE_TOKENS`
+- `DEFAULT_HARNESS_NATIVE_TOOLS`
+- `DEFAULT_HARNESS_TOOL_RESULT_CHARS`
+- `DEFAULT_HARNESS_TASK_SUMMARY_CHARS`
+- `DEFAULT_HARNESS_MAX_NON_PROOF_TOOL_CALLS`
+- `DEFAULT_HARNESS_ALLOW_GRINDSET_TOOLS` for explicit research runs with
+  generic Grindset helper visibility; default fair comparisons keep this off
+- `DEFAULT_HARNESS_CONTEXT_TOKENS` if the provider supports an `n_ctx` request hint
 
 Local runtime configuration:
 - Copy `.env.example` to `.env`.
 - Put local provider keys and model settings in `.env`.
 - `.env` is ignored by git and loaded by `harness.cli` before runner startup.
 - Existing process environment variables take precedence over values in `.env`.
+- To switch between configured providers without editing the generic endpoint,
+  set `DEFAULT_HARNESS_PROVIDER=qwen` or `DEFAULT_HARNESS_PROVIDER=glm`.
+  The selected profile reads `DEFAULT_HARNESS_QWEN_*` or
+  `DEFAULT_HARNESS_GLM_*` values first, then falls back to the generic
+  `DEFAULT_HARNESS_*` values.
 
 Compatibility env still accepted by the default harness:
 - `GAZELLA_BASE_URL`
